@@ -7,3 +7,6 @@ I will try to do things following "Best Practices", or in the case of the first 
 - 2-add-aspire
   - This second step is going to add some of the initial steps for getting aspire working. This will be using version 9 rc 1 since that allows me to wait for the database to start up before proceeding with things
   - This will only add the basic extensions that are used as well as the app host, we will add migration application later once we start adding db elements
+- 3-add-styling
+  - This third step is a relatively small one since all we are going to do is add beercss as the styling library
+  - We are going to try and only use the css elements for as long as possible, so even after pulling in the npm package, we will only copy over the css elements for now.

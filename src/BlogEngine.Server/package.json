@@ -1,0 +1,14 @@
+{
+  "version": "1.0.0",
+  "name": "blogengine",
+  "private": true,
+  "devDependencies": {
+    "beercss": "^3.7.10",
+    "copyfiles": "^2.4.1",
+    "rimraf": "^6.0.1"
+  },
+  "scripts": {
+    "copy-styles": "copyfiles -f styles/site.css node_modules/beercss/dist/cdn/beer.min.css wwwroot/css",
+    "clean-styles": "rimraf wwwroot/css"
+  }
+}
