@@ -10,3 +10,8 @@ I will try to do things following "Best Practices", or in the case of the first 
 - 3-add-styling
   - This third step is a relatively small one since all we are going to do is add beercss as the styling library
   - We are going to try and only use the css elements for as long as possible, so even after pulling in the npm package, we will only copy over the css elements for now.
+- 4-add-homepage-and-post-page-template
+  - This branch will just start to add some of the beercss styling to the site
+  - Will build out a main landing page with a link to the blog landing page
+  - Will build out a basic blog listing landing page
+  - Will build out a basic blog display page

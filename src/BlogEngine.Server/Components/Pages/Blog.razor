@@ -1,0 +1,6 @@
+@page "/Blog"
+<h3>Blog</h3>
+@foreach (var post in _posts)
+{
+    <PostBlurb Post="post" />
+}
