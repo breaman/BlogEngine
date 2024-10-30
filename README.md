@@ -4,3 +4,6 @@ I will try to do things following "Best Practices", or in the case of the first 
   - This is gonna follow some guidelines that Kevin Bost pointed me to in his github.com/keboo repo
   - First branch is just getting simple empty web application setup but with the central package management configured as well as a central place to manage the sdk/c# version to be used
   - There is also a global.json file that was added to make sure we stay on .net 8 since that is the LTS version at the moment (I may or may not upgrade to 9 when it is released, not sure yet)
+- 2-add-aspire
+  - This second step is going to add some of the initial steps for getting aspire working. This will be using version 9 rc 1 since that allows me to wait for the database to start up before proceeding with things
+  - This will only add the basic extensions that are used as well as the app host, we will add migration application later once we start adding db elements
