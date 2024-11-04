@@ -1,1 +1,14 @@
-<h3>PostBlurb</h3>
+<article class="no-elevate border white-text">
+    <a href="/blog/@Post.PublishDate.ToString("yyyy/MM/dd")/@Post.Slug" style="display: block">
+        <div>
+            <h4 class="max">@Post.Title</h4>
+            @if (!string.IsNullOrWhiteSpace(Post.Subtitle))
+            {
+                <h6>@Post.Subtitle</h6>
+            }
+            <p>@Post.Description</p>
+        </div>
+    </a>
+    <hr class="bottom-margin top-margin" style="margin: 0 -1rem" />
+    <p>@Post.PublishDate.ToString("MMMM dd, yyyy")</p>
+</article>

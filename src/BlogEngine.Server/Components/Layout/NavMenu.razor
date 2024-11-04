@@ -1,19 +1,21 @@
 @using Microsoft.AspNetCore.Components.Authorization
-<header class="l">
+<header class="l white-text brown">
     <nav>
         <h6>
-            <NavLink href="/">Michael Stokesbary</NavLink>
+            <NavLink href="/" Match="NavLinkMatch.All">Michael Stokesbary</NavLink>
         </h6>
         <nav class="max right-align">
-            <NavLink href="/blog">Blog</NavLink>
+            <NavLink href="/blog" Match="NavLinkMatch.Prefix">Blog</NavLink>
+            <NavLink href="/about" Match="NavLinkMatch.All">About</NavLink>
         </nav>
     </nav>
 </header>
-<header class="s m">
+<header class="s m white-text purple4">
     <h6 class="center-align top-padding">
-        <NavLink href="/">Michael Stokesbary</NavLink>
+        <NavLink href="/" Match="NavLinkMatch.All">Michael Stokesbary</NavLink>
     </h6>
     <nav class="no-margin center-align">
-        <NavLink href="/blog">Blog</NavLink>
+        <NavLink href="/blog" Match="NavLinkMatch.Prefix">Blog</NavLink>
+        <NavLink href="/about" Match="NavLinkMatch.All">About</NavLink>
     </nav>
 </header>

@@ -1,6 +1,10 @@
 @page "/Blog"
-<h3>Blog</h3>
-@foreach (var post in _posts)
-{
-    <PostBlurb Post="post" />
-}
+
+<div class="grid">
+    @foreach (var post in _posts)
+    {
+        <div class="s6">
+            <PostBlurb Post="post" />
+        </div>
+    }
+</div>
