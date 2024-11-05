@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <UserSecretsId>dotnet-BlogEngine.MigrationService-44ed1b16-24ee-4216-a6d4-d42bb2a692ab</UserSecretsId>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Aspire.Microsoft.EntityFrameworkCore.SqlServer" />
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0"/>
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\src\BlogEngine.Data\BlogEngine.Data.csproj" />
+      <ProjectReference Include="..\BlogEngine.ServiceDefaults\BlogEngine.ServiceDefaults.csproj" />
+    </ItemGroup>
+</Project>

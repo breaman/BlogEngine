@@ -1,0 +1,18 @@
+@page "/account/login"
+<h3>Login</h3>
+<EditForm Model="Dto" method="post" OnSubmit="LoginUser" FormName="login">
+    <FluentValidationValidator @ref="_fluentValidationValidator" DisableAssemblyScanning="true" />
+    <ValidationSummary role="alert" />
+    <div class="field label border small-round">
+        <InputText @bind-Value="Dto.Email" id="email" autocomplete="username" placeholder=" " />
+        <label for="email">Email</label>
+    </div>
+    <div class="field label border small-round">
+        <InputText type="password" @bind-Value="Dto.Password" id="password" placeholder=" " />
+        <label for="password">Password</label>
+    </div>
+    <div>
+        <button type="submit">Log in</button>
+        <NavLink href="account/forgotpassword" class="button">Forgot your password?</NavLink>
+    </div>
+</EditForm>

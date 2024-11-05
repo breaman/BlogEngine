@@ -6,8 +6,10 @@
     </PropertyGroup>
     <ItemGroup>
       <PackageReference Include="Aspire.Hosting.AppHost" />
+      <PackageReference Include="Aspire.Hosting.SqlServer" />
     </ItemGroup>
     <ItemGroup>
       <ProjectReference Include="..\..\src\BlogEngine.Server\BlogEngine.Server.csproj" />
+      <ProjectReference Include="..\BlogEngine.MigrationService\BlogEngine.MigrationService.csproj" />
     </ItemGroup>
 </Project>

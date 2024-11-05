@@ -15,3 +15,7 @@ I will try to do things following "Best Practices", or in the case of the first 
   - Will build out a main landing page with a link to the blog landing page
   - Will build out a basic blog listing landing page
   - Will build out a basic blog display page
+- 5-add-authentication
+  - This one will add some identity features to the application
+  - One big piece this will now bring in as well is running with a database
+  - This will also add in Audit Logging since we are putting database pieces into place

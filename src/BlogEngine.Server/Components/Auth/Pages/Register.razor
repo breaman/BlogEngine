@@ -1,0 +1,41 @@
+@page "/Account/Register"
+@using Microsoft.AspNetCore.Identity
+
+<h3>Register</h3>
+
+<div>
+    <div>
+        <ul>
+            @foreach (var errorMessage in (_identityErrors ?? Enumerable.Empty<IdentityError>()))
+            {
+                <li>@errorMessage.Description</li>
+            }
+        </ul>
+    </div>
+    <EditForm Model="Dto" FormName="register" OnSubmit="RegisterUser">
+        <FluentValidationValidator @ref="_fluentValidationValidator" DisableAssemblyScanning="true" />
+        <ValidationSummary role="alert" />
+        <div class="field label border small-round">
+            <InputText @bind-Value="Dto.Email" id="email" autocomplete="username" placeholder=" " />
+            <label for="email">Email</label>
+        </div>
+        <div class="field label border small-round">
+            <InputText type="password" @bind-Value="Dto.Password" id="password" placeholder=" " />
+            <label for="password">Password</label>
+        </div>
+        <div class="field label border small-round">
+            <InputText type="password" @bind-Value="Dto.ConfirmPassword" id="confirmPassword" placeholder=" " />
+            <label for="confirmPassword">Confirm Password</label>
+        </div>
+        <div class="field label border small-round">
+            <InputText @bind-Value="Dto.FirstName" id="firstName" placeholder=" " />
+            <label for="firstName">First Name</label>
+        </div>
+        <div class="field label border small-round">
+            <InputText @bind-Value="Dto.LastName" id="lastName" placeholder=" " />
+            <label for="lastName">Last Name</label>
+        </div>
+        <button type="submit">Create Account</button>
+        <a class="button secondary">Cancel</a>
+    </EditForm>
+</div>
