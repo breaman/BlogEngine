@@ -5,6 +5,26 @@
             <NavLink href="/" Match="NavLinkMatch.All">Michael Stokesbary</NavLink>
         </h6>
         <nav class="max right-align">
+            <AuthorizeView>
+                <Authorized>
+                    <AuthorizeView Roles="@SharedConstants.Administrator" Context="adminContext">
+                        <Authorized>
+                            <NavLink href="/admin">Admin</NavLink>
+                        </Authorized>
+                    </AuthorizeView>
+                    <form action="/Account/Logout" method="post" id="logoutForm" class="center-align">
+                        <AntiforgeryToken/>
+                        <input type="hidden" name="ReturnUrl" value="@_currentUrl"/>
+                        <a onClick="(() => { var logoutForm = document.getElementById('logoutForm'); logoutForm.submit(); })()">
+                            Log Off
+                        </a>
+                    </form>
+                </Authorized>
+                <NotAuthorized>
+                    @* <NavLink href="/account/register">Register</NavLink> *@
+                    @* <NavLink class="ml-4" href="/account/login">Log in</NavLink> *@
+                </NotAuthorized>
+            </AuthorizeView>
             <NavLink href="/blog" Match="NavLinkMatch.Prefix">Blog</NavLink>
             <NavLink href="/about" Match="NavLinkMatch.All">About</NavLink>
         </nav>
@@ -15,6 +35,26 @@
         <NavLink href="/" Match="NavLinkMatch.All">Michael Stokesbary</NavLink>
     </h6>
     <nav class="no-margin center-align">
+        <AuthorizeView>
+            <Authorized>
+                <AuthorizeView Roles="@SharedConstants.Administrator" Context="adminContext">
+                    <Authorized>
+                        <NavLink href="/admin">Admin</NavLink>
+                    </Authorized>
+                </AuthorizeView>
+                <form action="/Account/Logout" method="post" id="logoutForm" class="center-align">
+                    <AntiforgeryToken/>
+                    <input type="hidden" name="ReturnUrl" value="@_currentUrl"/>
+                    <a onClick="(() => { var logoutForm = document.getElementById('logoutForm'); logoutForm.submit(); })()">
+                        Log Off
+                    </a>
+                </form>
+            </Authorized>
+            <NotAuthorized>
+                @* <NavLink href="/account/register">Register</NavLink> *@
+                @* <NavLink class="ml-4" href="/account/login">Log in</NavLink> *@
+            </NotAuthorized>
+        </AuthorizeView>
         <NavLink href="/blog" Match="NavLinkMatch.Prefix">Blog</NavLink>
         <NavLink href="/about" Match="NavLinkMatch.All">About</NavLink>
     </nav>
