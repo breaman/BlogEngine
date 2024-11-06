@@ -1,11 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <ItemGroup>
     <ProjectReference Include="..\..\aspire\BlogEngine.ServiceDefaults\BlogEngine.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\BlogEngine.Client\BlogEngine.Client.csproj" />
     <ProjectReference Include="..\BlogEngine.Data\BlogEngine.Data.csproj" />
     <ProjectReference Include="..\BlogEngine.Shared\BlogEngine.Shared.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Blazored.FluentValidation" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
     <PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
       <PrivateAssets>all</PrivateAssets>

@@ -1,0 +1,64 @@
+@page "/admin/posts/create"
+@page "/admin/posts/edit/{PostId:int?}"
+
+<BlazoredToasts />
+
+<div class="row bottom-margin">
+    <h3 class="max">@((_isEditing) ? "Edit" : "Create") Post</h3>
+
+    @* @if (_isEditing) *@
+    @* { *@
+    @*     <div> *@
+    @*         <button @onclick="() => DeleteEvent(Dto.EventId)">Delete</button> *@
+    @*     </div> *@
+    @* } *@
+</div>
+
+<div>
+    <EditForm Model="Dto" OnSubmit="SavePost" FormName="CreateEditPost">
+        <FluentValidationValidator
+            @ref="_fluentValidationValidator" DisableAssemblyScanning="true"/>
+        <ValidationSummary class="text-sm text-red-500 px-8" role="alert"/>
+        <div class="field label border small-round">
+            <InputText Value="@Dto.Title" ValueExpression="() => Dto.Title" ValueChanged="@((string? title) => UpdateSlug(title))" id="title" placeholder=" "/>
+            <label for="title">Title</label>
+        </div>
+        <div class="field label border small-round">
+            <InputText @bind-Value="Dto.Subtitle" id="subtitle" placeholder=" "/>
+            <label for="subtitle">Subtitle</label>
+        </div>
+        <div class="field">
+            <div class="row no-padding">
+                <div class="max">
+                    <div class="field label border small-round">
+                        <InputText @bind-Value="Dto.Slug" id="slug" placeholder=" "/>
+                        <label for="slug">Slug</label>
+                    </div>
+                </div>
+                <button type="button" class="text-nowrap" @onclick="ReplaceSlug">Replace Slug</button>
+            </div>
+        </div>
+        <div class="field label border small-round">
+            <InputText @bind-Value="Dto.Description" id="description" placeholder=" "/>
+            <label for="description">Description</label>
+        </div>
+        <div class="field textarea label border small-round">
+            <InputTextArea @bind-Value="Dto.Content" id="content" placeholder=" "></InputTextArea>
+            <label for="content">Content</label>
+        </div>
+        <div class="field label border small-round">
+            <InputDate Type="InputDateType.Date" @bind-Value="Dto.PublishDate" id="publishedDate" placeholder=" "/>
+            <label for="publishedDate">Date Posted</label>
+        </div>
+        <label class="checkbox">
+            <InputCheckbox @bind-Value="Dto.IsPublished" id="published" placeholder=" "/>
+            <span for="published">Is Published</span>
+        </label>
+        <div>
+            <button type="submit">
+                <span>Save Post</span>
+            </button>
+            <a href="/admin/posts" class="button secondary">Cancel</a>
+        </div>
+    </EditForm>
+</div>

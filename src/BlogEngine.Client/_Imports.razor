@@ -1,0 +1,11 @@
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@* Need the Components.Web for the @onclick event stuff, interesting part is other events are still fired without this (like form submit and ValueChangeed *@
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.JSInterop
+@using static Microsoft.AspNetCore.Components.Web.RenderMode
+@using Blazored.Toast
+@using Blazored.FluentValidation;
+@using Blazored.Toast.Services;
+@using SharedConstants = BlogEngine.Shared.Models.Constants

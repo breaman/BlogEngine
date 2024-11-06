@@ -1,3 +1,5 @@
+using Blazored.Toast;
+using BlogEngine.Client.Services;
 using BlogEngine.Data.Interfaces;
 using BlogEngine.Server.Components;
 using BlogEngine.Server.Components.Auth;
@@ -9,6 +11,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using _Imports = BlogEngine.Client._Imports;
 using SharedConstants = BlogEngine.Shared.Models.Constants;
 
 var isMigrations = Environment.GetCommandLineArgs()[0].Contains("ef.dll");
@@ -19,7 +22,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 
 // Add "core" services to the container.
-builder.Services.AddRazorComponents();
+builder.Services.AddRazorComponents()
+    .AddInteractiveWebAssemblyComponents();
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddHttpClient();
 // End "core" services
 
 // Add blazor auth stuff
@@ -73,11 +80,15 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
         .EnableSensitiveDataLogging());
 builder.EnrichSqlServerDbContext<ApplicationDbContext>();
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
+
+builder.Services.AddBlazoredToast();
     
 builder.Services.AddSingleton<IEnhancedEmailSender<User>, IdentityNoOpEmailSender>();
 builder.Services.AddScoped<IUserService, HttpUserService>();
 
 builder.Services.Configure<BlogOptions>(builder.Configuration.GetSection("BlogOptions"));
+
+builder.Services.AddTransient<IPostService, ServerPostService>();
 // End application stuff
 
 var app = builder.Build();
@@ -88,6 +99,7 @@ app.MapDefaultEndpoints();
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
+    app.UseWebAssemblyDebugging();
     app.UseMigrationsEndPoint();
 }
 else
@@ -102,7 +114,9 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseAntiforgery();
 
-app.MapRazorComponents<App>();
+app.MapRazorComponents<App>()
+    .AddInteractiveWebAssemblyRenderMode()
+    .AddAdditionalAssemblies(typeof(_Imports).Assembly);
 
 app.MapAdditionalIdentityEndpoints();
 

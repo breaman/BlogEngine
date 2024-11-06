@@ -19,3 +19,7 @@ I will try to do things following "Best Practices", or in the case of the first 
   - This one will add some identity features to the application
   - One big piece this will now bring in as well is running with a database
   - This will also add in Audit Logging since we are putting database pieces into place
+- 6-add-blog-post-editing
+  - This will add the admin functionality for allowing us to add/edit/delete blog posts
+  - When this is done, I will be moving this out to my main blog site and actually start doing some blogging with this beast (including turning this tutorial into a series of blog posts)
+  - This will also add in some client side elements since we want to do the blog post editing through WASM instead of server side

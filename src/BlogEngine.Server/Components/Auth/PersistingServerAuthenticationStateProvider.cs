@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using Microsoft.AspNetCore.Components;
+using BlogEngine.Client;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Server;
 using Microsoft.AspNetCore.Components.Web;

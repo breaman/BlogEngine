@@ -1,5 +1,4 @@
-using BlogEngine.Server.DTOs;
-using Microsoft.AspNetCore.Components;
+using BlogEngine.Shared.DTOs;
 
 namespace BlogEngine.Server.Components;
 

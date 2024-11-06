@@ -9,6 +9,7 @@ public class ApplicationDbContext : IdentityDbContext<User, Role, int>
     private readonly IUserService? _userService;
 
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<Post> Posts => Set<Post>();
 
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
     {

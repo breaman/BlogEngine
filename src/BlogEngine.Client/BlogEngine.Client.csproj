@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+    <PropertyGroup>
+        <NoDefaultLaunchSettingsFile>true</NoDefaultLaunchSettingsFile>
+        <StaticWebAssetProjectMode>Default</StaticWebAssetProjectMode>
+    </PropertyGroup>
+    <ItemGroup>
+      <ProjectReference Include="..\BlogEngine.Shared\BlogEngine.Shared.csproj" />
+    </ItemGroup>
+    <ItemGroup>
+      <PackageReference Include="Blazored.FluentValidation" />
+      <PackageReference Include="Blazored.Toast" />
+      <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
+      <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Authentication" />
+      <PackageReference Include="NodaTime" />
+    </ItemGroup>
+
+</Project>
