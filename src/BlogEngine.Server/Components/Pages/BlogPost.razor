@@ -6,4 +6,4 @@
     <h6>@_blogPost.Subtitle</h6>
 }
 <p>@_blogPost.PublishDate.ToString("MMMM dd, yyyy")</p>
-<p>@((MarkupString)_blogPost.Content)</p>
+<p>@((MarkupString)Markdig.Markdown.ToHtml(_blogPost?.Content ?? ""))</p>
