@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using System.Text.RegularExpressions;
 using Blazored.FluentValidation;
 using Blazored.Toast.Services;
@@ -7,10 +8,11 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using NodaTime;
 using NodaTime.Extensions;
+using SharedConstants = BlogEngine.Shared.Models.Constants;
 
 namespace BlogEngine.Client.Components.Admin.Pages;
 
-public partial class CreateEditPost : ComponentBase
+public partial class CreateEditPost : ComponentBase, IDisposable
 {
     private FluentValidationValidator? _fluentValidationValidator;
 
@@ -55,15 +57,29 @@ public partial class CreateEditPost : ComponentBase
 
     private async Task SavePost()
     {
+        HttpResponseMessage? result = null;
+
         if (await _fluentValidationValidator.ValidateAsync())
-            try
+        {
+            if (Dto.PostId > 0)
             {
-                ToastService.ShowSuccess("Post was successfully saved.", settings => settings.DisableTimeout = true );
+                result = await Client.PutAsJsonAsync($"{SharedConstants.PostApiUrl}/update/{PostId}", Dto);
             }
-            finally
+            else
             {
-                
+                result = await Client.PostAsJsonAsync($"{SharedConstants.PostApiUrl}/create", Dto);
             }
+
+            if (result.IsSuccessStatusCode)
+            {
+                // ToastService.ShowSuccess("The Event has been saved off correctly.");
+                NavigationManager.NavigateTo("/admin/posts");
+            }
+            else
+            {
+                ToastService.ShowError("Unable to save the post, please correct the errors and try again.");
+            }
+        }
         else
         {
             ToastService.ShowError("Unable to create the post, please correct the errors and try again.", settings => settings.DisableTimeout = true);
@@ -89,4 +105,6 @@ public partial class CreateEditPost : ComponentBase
         title = title.Trim().Replace(' ', '-');
         Dto.Slug = title;
     }
+    
+    void IDisposable.Dispose() => _persistingSubscription.Dispose();
 }

@@ -1,0 +1,19 @@
+@page "/admin/posts"
+<h3 class="mb-4">View Posts</h3>
+
+<p class="mb-4">Here is where we would see all the posts in the system and be able to edit them</p>
+
+<div class="mb-4">
+    @if (_posts.Count > 0)
+    {
+        foreach (var post in _posts)
+        {
+            <div>
+                <span>@post.Title</span>
+                <a class="button" href=@($"/admin/posts/edit/{post.PostId}")>Edit</a>
+            </div>
+        }
+    }
+</div>
+
+<a href="/admin/posts/create" class="button">Create Post</a>

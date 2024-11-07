@@ -1,12 +1,13 @@
 using BlogEngine.Client.Services;
 using BlogEngine.Shared.DTOs;
+using Microsoft.EntityFrameworkCore;
 
 namespace BlogEngine.Server.Services;
 
-public class ServerPostService : IPostService
+public class ServerPostService(ApplicationDbContext DbContext) : IPostService
 {
-    public Task<PostDto> GetPostByIdAsync(int postId)
+    public async Task<PostDto> GetPostByIdAsync(int postId)
     {
-        throw new NotImplementedException();
+        return await DbContext.Posts.Where(p => p.Id == postId).Select(p => p.ToDto()).SingleOrDefaultAsync();
     }
 }

@@ -1,11 +1,13 @@
+using System.Net.Http.Json;
 using BlogEngine.Shared.DTOs;
+using SharedConstants = BlogEngine.Shared.Models.Constants;
 
 namespace BlogEngine.Client.Services;
 
-public class ClientPostService : IPostService
+public class ClientPostService(HttpClient Client) : IPostService
 {
-    public Task<PostDto> GetPostByIdAsync(int postId)
+    public async Task<PostDto> GetPostByIdAsync(int postId)
     {
-        throw new NotImplementedException();
+        return await Client.GetFromJsonAsync<PostDto>($"{SharedConstants.PostApiUrl}/{postId}");
     }
 }

@@ -1,6 +1,7 @@
 using Blazored.Toast;
 using BlogEngine.Client.Services;
 using BlogEngine.Data.Interfaces;
+using BlogEngine.Server.Apis;
 using BlogEngine.Server.Components;
 using BlogEngine.Server.Components.Auth;
 using BlogEngine.Server.Components.Email;
@@ -117,6 +118,8 @@ app.UseAntiforgery();
 app.MapRazorComponents<App>()
     .AddInteractiveWebAssemblyRenderMode()
     .AddAdditionalAssemblies(typeof(_Imports).Assembly);
+
+app.MapPostsApi();
 
 app.MapAdditionalIdentityEndpoints();
 
