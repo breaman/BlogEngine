@@ -65,17 +65,17 @@ a.active {
 }
 
 /* these elements determine the color for the inputs when focused -- begin*/
-.field.border>:is(input,textarea,select):focus {
-    border-color: orange;
-}
+/*.field.border>:is(input,textarea,select):focus {*/
+/*    border-color: orange;*/
+/*}*/
 
-.field.label.border:not(.fill)>:focus+label:after {
-    border-block-start:.125rem solid orange;
-}
+/*.field.label.border:not(.fill)>:focus+label:after {*/
+/*    border-block-start:.125rem solid orange;*/
+/*}*/
 
-.field.label>:focus+label {
-    color: orange;
-}
+/*.field.label>:focus+label {*/
+/*    color: orange;*/
+/*}*/
 
 :is(input,select,textarea):-webkit-autofill {
     -webkit-background-clip: text;
