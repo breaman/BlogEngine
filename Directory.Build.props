@@ -9,10 +9,10 @@ See: https://learn.microsoft.com/visualstudio/msbuild/customize-your-build
     -->
 
     <PropertyGroup>
-        <TargetFramework>net8.0</TargetFramework>
+        <TargetFramework>net9.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <LangVersion>12</LangVersion>
+        <LangVersion>13</LangVersion>
         <AccelerateBuildsInVisualStudio>true</AccelerateBuildsInVisualStudio>
         <!-- 
         If you you like to see source generated files saved to disk you can enable the following:
