@@ -23,3 +23,8 @@ I will try to do things following "Best Practices", or in the case of the first 
   - This will add the admin functionality for allowing us to add/edit/delete blog posts
   - When this is done, I will be moving this out to my main blog site and actually start doing some blogging with this beast (including turning this tutorial into a series of blog posts)
   - This will also add in some client side elements since we want to do the blog post editing through WASM instead of server side
+- 10-migrate-to-tailwindcss
+  - Since I am a control freek, I think I'm gonna switch back to using tailwind instead of beercss
+  - Added some custom controls to help out with duplicating too much css all over the place
+  - In order to dev, I now open a console and type "npx tailwindcss -i ./styles/site.css -o ./wwwroot/css/site.css --watch"
+  - Before publishing, I then need to create a minified version of my css using "npx tailwindcss -i ./styles/site.css -o ./wwwroot/css/site.css --minify"
