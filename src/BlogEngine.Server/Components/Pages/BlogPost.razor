@@ -1,9 +1,11 @@
 @page "/Blog/{Year:int}/{Month:int}/{Day:int}/{Slug}"
 
-<h3>@_blogPost.Title</h3>
-@if (!string.IsNullOrWhiteSpace(_blogPost.Subtitle))
-{
-    <h6>@_blogPost.Subtitle</h6>
-}
-<p>@_blogPost.PublishDate.ToString("MMMM dd, yyyy")</p>
-<p>@((MarkupString)Markdig.Markdown.ToHtml(_blogPost?.Content ?? ""))</p>
+<div class="blogPost">
+    <h3 class="text-4xl">@_blogPost.Title</h3>
+    @if (!string.IsNullOrWhiteSpace(_blogPost.Subtitle))
+    {
+        <h6 class="text-2xl mt-4">@_blogPost.Subtitle</h6>
+    }
+    <p>@_blogPost.PublishDate.ToString("MMMM dd, yyyy")</p>
+    @((MarkupString)Markdig.Markdown.ToHtml(_blogPost?.Content ?? ""))
+</div>

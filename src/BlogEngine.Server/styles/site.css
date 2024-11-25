@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 #blazor-error-ui {
     background: lightyellow;
     bottom: 0;
@@ -60,25 +64,22 @@
     content: var(--blazor-load-percentage-text, "Loading");
 }
 
-a.active {
-    color: orange
+.blogPost p {
+    @apply my-4;
 }
 
-/* these elements determine the color for the inputs when focused -- begin*/
-/*.field.border>:is(input,textarea,select):focus {*/
-/*    border-color: orange;*/
-/*}*/
-
-/*.field.label.border:not(.fill)>:focus+label:after {*/
-/*    border-block-start:.125rem solid orange;*/
-/*}*/
-
-/*.field.label>:focus+label {*/
-/*    color: orange;*/
-/*}*/
-
-:is(input,select,textarea):-webkit-autofill {
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: white;
+.blogPost ul {
+    @apply my-4 pl-8;
 }
-/* these elements determine the color for the inputs when focused -- end*/
+
+.blogPost li {
+    @apply list-disc;
+}
+
+.blogPost li ul {
+    @apply my-0;
+}
+
+.blogPost a {
+    @apply text-orange-300 underline;
+}

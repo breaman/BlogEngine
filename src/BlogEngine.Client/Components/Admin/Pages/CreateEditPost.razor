@@ -19,46 +19,24 @@
         <FluentValidationValidator
             @ref="_fluentValidationValidator" DisableAssemblyScanning="true"/>
         <ValidationSummary class="text-sm text-red-500 px-8" role="alert"/>
-        <div class="field label border small-round">
-            <InputText Value="@Dto.Title" ValueExpression="() => Dto.Title" ValueChanged="@((string? title) => UpdateSlug(title))" id="title" placeholder=" "/>
-            <label for="title">Title</label>
+        <MuiInputText Value="@Dto.Title" ValueExpression="() => Dto.Title" ValueChanged="@((string? title) => UpdateSlug(title))" Label="Title" />
+        <MuiInputText @bind-Value="Dto.Subtitle" Label="Subtitle" />
+        <div class="flex">
+            <MuiInputText @bind-Value="Dto.Slug" Label="Slug" />
+            <button type="button" class="text-nowrap" @onclick="ReplaceSlug">Replace Slug</button>
         </div>
-        <div class="field label border small-round">
-            <InputText @bind-Value="Dto.Subtitle" id="subtitle" placeholder=" "/>
-            <label for="subtitle">Subtitle</label>
-        </div>
-        <div class="field">
-            <div class="row no-padding">
-                <div class="max">
-                    <div class="field label border small-round">
-                        <InputText @bind-Value="Dto.Slug" id="slug" placeholder=" "/>
-                        <label for="slug">Slug</label>
-                    </div>
-                </div>
-                <button type="button" class="text-nowrap" @onclick="ReplaceSlug">Replace Slug</button>
-            </div>
-        </div>
-        <div class="field label border small-round">
-            <InputText @bind-Value="Dto.Description" id="description" placeholder=" "/>
-            <label for="description">Description</label>
-        </div>
-        <div class="field textarea label border small-round">
-            <InputTextArea @bind-Value="Dto.Content" id="content" placeholder=" "></InputTextArea>
-            <label for="content">Content</label>
-        </div>
-        <div class="field label border small-round">
-            <InputDate Type="InputDateType.Date" @bind-Value="Dto.PublishDate" id="publishedDate" placeholder=" "/>
-            <label for="publishedDate">Date Posted</label>
-        </div>
+        <MuiInputText @bind-Value="Dto.Description" Label="Description" />
+        <MuiInputTextArea @bind-Value="Dto.Content" Label="Content" />
+        <MuiInputDate Type="InputDateType.Date" @bind-Value="Dto.PublishDate" Label="Date Posted" />
         <label class="checkbox">
             <InputCheckbox @bind-Value="Dto.IsPublished" id="published" placeholder=" "/>
             <span class="white-text" for="published">Is Published</span>
         </label>
         <div>
-            <button type="submit">
+            <button class="rounded-xl h-10 px-4 bg-amber-500 text-slate-800" type="submit">
                 <span>Save Post</span>
             </button>
-            <a href="/admin/posts" class="button secondary">Cancel</a>
+            <a href="/admin/posts" class="inline-block rounded-xl leading-10 h-10 px-4 bg-slate-500  text-white ml-4">Cancel</a>
         </div>
     </EditForm>
 </div>

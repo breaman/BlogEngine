@@ -1,5 +1,6 @@
 @page "/Account/Register"
 @using Microsoft.AspNetCore.Identity
+@using BlogEngine.Client.Components
 
 <h3>Register</h3>
 
@@ -15,27 +16,12 @@
     <EditForm Model="Dto" FormName="register" OnSubmit="RegisterUser">
         <FluentValidationValidator @ref="_fluentValidationValidator" DisableAssemblyScanning="true" />
         <ValidationSummary role="alert" />
-        <div class="field label border small-round">
-            <InputText @bind-Value="Dto.Email" id="email" autocomplete="username" placeholder=" " />
-            <label for="email">Email</label>
-        </div>
-        <div class="field label border small-round">
-            <InputText type="password" @bind-Value="Dto.Password" id="password" placeholder=" " />
-            <label for="password">Password</label>
-        </div>
-        <div class="field label border small-round">
-            <InputText type="password" @bind-Value="Dto.ConfirmPassword" id="confirmPassword" placeholder=" " />
-            <label for="confirmPassword">Confirm Password</label>
-        </div>
-        <div class="field label border small-round">
-            <InputText @bind-Value="Dto.FirstName" id="firstName" placeholder=" " />
-            <label for="firstName">First Name</label>
-        </div>
-        <div class="field label border small-round">
-            <InputText @bind-Value="Dto.LastName" id="lastName" placeholder=" " />
-            <label for="lastName">Last Name</label>
-        </div>
+        <MuiInputText @bind-Value="Dto.Email" Label="Email" />
+        <MuiInputText @bind-Value="Dto.Password" Type="password" Label="Password" />
+        <MuiInputText @bind-Value="Dto.ConfirmPassword" Type="password" Label="Confirm Password" />
+        <MuiInputText @bind-Value="Dto.FirstName" Label="First Name" />
+        <MuiInputText @bind-Value="Dto.LastName" Label="Last Name" />
         <button type="submit">Create Account</button>
-        <a class="button secondary">Cancel</a>
+        <a href="/">Cancel</a>
     </EditForm>
 </div>

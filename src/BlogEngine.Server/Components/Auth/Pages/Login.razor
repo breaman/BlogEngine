@@ -1,18 +1,13 @@
 @page "/account/login"
+@using BlogEngine.Client.Components
 <h3>Login</h3>
 <EditForm Model="Dto" method="post" OnSubmit="LoginUser" FormName="login">
     <FluentValidationValidator @ref="_fluentValidationValidator" DisableAssemblyScanning="true" />
     <ValidationSummary role="alert" />
-    <div class="field label border small-round">
-        <InputText @bind-Value="Dto.Email" id="email" autocomplete="username" placeholder=" " />
-        <label for="email">Email</label>
-    </div>
-    <div class="field label border small-round">
-        <InputText type="password" @bind-Value="Dto.Password" id="password" placeholder=" " />
-        <label for="password">Password</label>
-    </div>
-    <div>
-        <button type="submit">Log in</button>
-        <NavLink href="account/forgotpassword" class="button secondary">Forgot your password?</NavLink>
+    <MuiInputText @bind-Value="Dto.Email" Label="Email" />
+    <MuiInputText @bind-Value="Dto.Password" Type="password" Label="Password" />
+    <div class="mt-4">
+        <button class="rounded-xl h-10 px-4 bg-amber-500 text-slate-800" type="submit">Log in</button>
+        <NavLink href="account/forgotpassword" class="inline-block rounded-xl leading-10 h-10 px-4 bg-slate-500  text-white ml-4">Forgot your password?</NavLink>
     </div>
 </EditForm>

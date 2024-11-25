@@ -10,10 +10,10 @@
         {
             <div>
                 <span>@post.Title</span>
-                <a class="button" href=@($"/admin/posts/edit/{post.PostId}")>Edit</a>
+                <a class="inline-block rounded-xl leading-10 h-10 px-4 bg-amber-500  text-slate-800 ml-4" href=@($"/admin/posts/edit/{post.PostId}")>Edit</a>
             </div>
         }
     }
 </div>
 
-<a href="/admin/posts/create" class="button">Create Post</a>
+<a href="/admin/posts/create" class="inline-block rounded-xl leading-10 h-10 px-4 bg-amber-500  text-slate-800 ml-4">Create Post</a>
