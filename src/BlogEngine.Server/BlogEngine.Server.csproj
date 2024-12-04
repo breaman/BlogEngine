@@ -3,7 +3,6 @@
     <ProjectReference Include="..\..\aspire\BlogEngine.ServiceDefaults\BlogEngine.ServiceDefaults.csproj" />
     <ProjectReference Include="..\BlogEngine.Client\BlogEngine.Client.csproj" />
     <ProjectReference Include="..\BlogEngine.Data\BlogEngine.Data.csproj" />
-    <ProjectReference Include="..\BlogEngine.Shared\BlogEngine.Shared.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Blazored.FluentValidation" />
@@ -13,8 +12,5 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="wwwroot\" />
   </ItemGroup>
 </Project>

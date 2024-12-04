@@ -1,10 +1,10 @@
 @using Microsoft.AspNetCore.Components.Authorization
 <nav class="h-20 grid content-center px-10 bg-amber-800">
-    <div class="flex justify-between">
-        <h6 class="text-[1.5rem]">
+    <div class="md:flex md:justify-between">
+        <h6 class="text-center text-[1.5rem]">
             <NavLink href="/" Match="NavLinkMatch.All" ActiveClass="text-orange-300">Michael Stokesbary</NavLink>
         </h6>
-        <nav class="align-middle leading-8">
+        <nav class="text-center align-middle leading-8">
             <AuthorizeView>
                 <Authorized>
                     <AuthorizeView Roles="@SharedConstants.Administrator" Context="adminContext">
