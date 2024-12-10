@@ -63,23 +63,3 @@
 .loading-progress-text:after {
     content: var(--blazor-load-percentage-text, "Loading");
 }
-
-.blogPost p {
-    @apply my-4;
-}
-
-.blogPost ul {
-    @apply my-4 pl-8;
-}
-
-.blogPost li {
-    @apply list-disc;
-}
-
-.blogPost li ul {
-    @apply my-0;
-}
-
-.blogPost a {
-    @apply text-orange-300 underline;
-}

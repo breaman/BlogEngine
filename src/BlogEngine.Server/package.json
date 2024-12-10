@@ -3,6 +3,7 @@
   "name": "blogengine",
   "private": true,
   "devDependencies": {
+    "@tailwindcss/typography": "^0.5.15",
     "copyfiles": "^2.4.1",
     "cross-env": "^7.0.3",
     "rimraf": "^6.0.1",
