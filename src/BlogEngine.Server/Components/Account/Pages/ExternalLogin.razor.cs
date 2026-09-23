@@ -1,10 +1,11 @@
-using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Encodings.Web;
 
 using BlogEngine.Data.Models;
 using BlogEngine.Shared.Services;
+
+using FluentValidation;
 
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Identity;
@@ -196,8 +197,16 @@ public partial class ExternalLogin : ComponentBase
 
     private sealed class InputModel
     {
-        [Required]
-        [EmailAddress]
         public string Email { get; set; } = "";
+    }
+
+    private sealed class InputModelValidator : AbstractValidator<InputModel>
+    {
+        public InputModelValidator()
+        {
+            RuleFor(x => x.Email)
+                .NotEmpty()
+                .EmailAddress();
+        }
     }
 }

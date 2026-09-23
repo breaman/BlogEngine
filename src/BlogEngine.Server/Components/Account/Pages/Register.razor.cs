@@ -1,9 +1,10 @@
-using System.ComponentModel.DataAnnotations;
 using System.Text;
 using System.Text.Encodings.Web;
 
 using BlogEngine.Data.Models;
 using BlogEngine.Shared.Services;
+
+using FluentValidation;
 
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
@@ -118,30 +119,38 @@ public partial class Register : ComponentBase
 
     private sealed class InputModel
     {
-        [Required]
-        [MaxLength(50)]
-        [Display(Name = "First name")]
         public string FirstName { get; set; } = "";
-
-        [Required]
-        [MaxLength(50)]
-        [Display(Name = "Last name")]
         public string LastName { get; set; } = "";
-
-        [Required]
-        [EmailAddress]
-        [Display(Name = "Email")]
         public string Email { get; set; } = "";
-
-        [Required]
-        [StringLength(100, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 6)]
-        [DataType(DataType.Password)]
-        [Display(Name = "Password")]
         public string Password { get; set; } = "";
-
-        [DataType(DataType.Password)]
-        [Display(Name = "Confirm password")]
-        [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
         public string ConfirmPassword { get; set; } = "";
+    }
+
+    private sealed class InputModelValidator : AbstractValidator<InputModel>
+    {
+        public InputModelValidator()
+        {
+            RuleFor(x => x.FirstName)
+                .NotEmpty()
+                .MaximumLength(50)
+                .WithName("First name");
+
+            RuleFor(x => x.LastName)
+                .NotEmpty()
+                .MaximumLength(50)
+                .WithName("Last name");
+
+            RuleFor(x => x.Email)
+                .NotEmpty()
+                .EmailAddress();
+
+            RuleFor(x => x.Password)
+                .NotEmpty()
+                .Length(6, 100).WithMessage("The {PropertyName} must be at least {MinLength} and at max {MaxLength} characters long.");
+
+            RuleFor(x => x.ConfirmPassword)
+                .Equal(x => x.Password).WithMessage("The password and confirmation password do not match.")
+                .WithName("Confirm password");
+        }
     }
 }

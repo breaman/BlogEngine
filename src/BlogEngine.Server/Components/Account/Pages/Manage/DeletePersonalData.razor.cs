@@ -1,5 +1,3 @@
-using System.ComponentModel.DataAnnotations;
-
 using BlogEngine.Data.Models;
 
 using Microsoft.AspNetCore.Components;
@@ -67,7 +65,6 @@ public partial class DeletePersonalData : ComponentBase
 
     private sealed class InputModel
     {
-        [DataType(DataType.Password)]
         public string Password { get; set; } = "";
     }
 }

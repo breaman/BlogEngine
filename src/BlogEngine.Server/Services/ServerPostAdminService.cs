@@ -8,6 +8,8 @@ using BlogEngine.Shared.Services;
 using BlogEngine.Shared.Text;
 using BlogEngine.Shared.Validation;
 
+using FluentValidation;
+
 using Microsoft.EntityFrameworkCore;
 
 namespace BlogEngine.Server.Services;
@@ -39,6 +41,7 @@ public sealed class ServerPostAdminService(
     ISettingsService settingsService,
     PostHtmlSanitizer sanitizer,
     TimeProvider timeProvider,
+    IValidator<PostEditDto> postValidator,
     ILogger<ServerPostAdminService> logger) : IPostAdminService
 {
     /// <summary>Autosave revisions kept per post; older ones are pruned (design 6.7).</summary>
@@ -348,7 +351,7 @@ public sealed class ServerPostAdminService(
             : request.Slug.Trim();
 
         var probe = new PostEditDto { Title = "-", Slug = slug };
-        if (PostEditValidator.Validate(probe).TryGetValue(nameof(PostEditDto.Slug), out var errors))
+        if (postValidator.Validate(probe).ToDictionary().TryGetValue(nameof(PostEditDto.Slug), out var errors))
         {
             var suggestion = SlugGenerator.Generate(slug, SlugGenerator.DefaultMaxLength);
             return new SlugCheckResult(slug, IsValid: false, IsAvailable: false,
@@ -641,16 +644,16 @@ public sealed class ServerPostAdminService(
             : null;
     }
 
-    /// <summary>Validates the DTO, returning <see langword="null"/> when it is valid.</summary>
-    private static PostInvalid? Validate(PostEditDto post, bool requireRowVersion = false)
+    /// <summary>Validates the DTO with <see cref="PostEditValidator"/>, returning <see langword="null"/> when it is valid.</summary>
+    private PostInvalid? Validate(PostEditDto post, bool requireRowVersion = false)
     {
-        var errors = PostEditValidator.Validate(post).ToDictionary();
+        var errors = postValidator.Validate(post).ToDictionary();
         if (requireRowVersion && post.RowVersion is not { Length: > 0 })
         {
             errors[nameof(PostEditDto.RowVersion)] = ["The post's version is missing. Reload the post and try again."];
         }
 
-        return errors.Count == 0 ? null : new PostInvalid(errors);
+        return errors.Count == 0 ? null : new PostInvalid(errors.AsReadOnly());
     }
 
     /// <summary>Whether the caller's concurrency token matches the stored one.</summary>

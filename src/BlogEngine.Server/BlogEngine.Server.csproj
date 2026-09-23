@@ -4,6 +4,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Connects FluentValidation validators to the Identity and setup forms through <FluentValidator />. -->
+    <PackageReference Include="Blazilla" />
+    <!-- AddValidatorsFromAssemblyContaining, for the validators nested in server components. -->
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
     <!-- Sanitizes rendered comment and post HTML (design 5.3, 12.2). -->
     <PackageReference Include="HtmlSanitizer" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />

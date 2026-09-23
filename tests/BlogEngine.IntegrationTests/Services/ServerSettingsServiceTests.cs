@@ -1,10 +1,10 @@
-using System.ComponentModel.DataAnnotations;
-
 using BlogEngine.Data.Models;
 using BlogEngine.IntegrationTests.Infrastructure;
 using BlogEngine.Shared.Contracts;
 using BlogEngine.Shared.Enums;
 using BlogEngine.Shared.Services;
+
+using FluentValidation;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;

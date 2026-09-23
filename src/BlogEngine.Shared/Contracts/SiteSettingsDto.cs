@@ -1,7 +1,5 @@
-using System.ComponentModel.DataAnnotations;
-
-using BlogEngine.Shared.Common;
 using BlogEngine.Shared.Enums;
+using BlogEngine.Shared.Validation;
 
 namespace BlogEngine.Shared.Contracts;
 
@@ -11,30 +9,25 @@ namespace BlogEngine.Shared.Contracts;
 /// <remarks>
 /// A mutable class rather than a record so the settings form can bind to it directly. Instances handed
 /// out by the settings service are copies, so changing one never affects other callers until it is saved.
+/// The rules, such as lengths, ranges and a known time zone, are in <see cref="SiteSettingsValidator"/>.
 /// </remarks>
 public sealed class SiteSettingsDto
 {
     // Identity
 
     /// <summary>Site title shown in the header, browser tab and feeds.</summary>
-    [Required]
-    [MaxLength(FieldLengths.SiteTitle)]
     public string SiteTitle { get; set; } = string.Empty;
 
     /// <summary>Short tagline shown under the title.</summary>
-    [MaxLength(FieldLengths.Tagline)]
     public string? Tagline { get; set; }
 
     /// <summary>Site description used as the default meta description.</summary>
-    [MaxLength(FieldLengths.MetaDescription)]
     public string? Description { get; set; }
 
     /// <summary>Author display name used in bylines and feeds.</summary>
-    [MaxLength(FieldLengths.PersonName)]
     public string? AuthorName { get; set; }
 
     /// <summary>Author biography (Markdown).</summary>
-    [MaxLength(FieldLengths.AuthorBio)]
     public string? AuthorBioMarkdown { get; set; }
 
     /// <summary>Media library item used as the author avatar.</summary>
@@ -49,7 +42,6 @@ public sealed class SiteSettingsDto
     // Reading
 
     /// <summary>Posts per list page.</summary>
-    [Range(1, 100)]
     public int PostsPerPage { get; set; }
 
     /// <summary>Whether feeds carry full content or only summaries.</summary>
@@ -61,13 +53,9 @@ public sealed class SiteSettingsDto
     // Localization
 
     /// <summary>IANA time zone for URL dates and archives, for example <c>America/Chicago</c>.</summary>
-    [Required]
-    [MaxLength(FieldLengths.TimeZoneId)]
     public string TimeZoneId { get; set; } = string.Empty;
 
     /// <summary>.NET custom date format for displayed dates.</summary>
-    [Required]
-    [MaxLength(FieldLengths.DateFormat)]
     public string DateFormat { get; set; } = string.Empty;
 
     // Comments
@@ -82,11 +70,9 @@ public sealed class SiteSettingsDto
     public bool AutoApproveReturningCommenters { get; set; }
 
     /// <summary>Close comments this many days after publishing; 0 means never.</summary>
-    [Range(0, 3650)]
     public int CloseCommentsAfterDays { get; set; }
 
     /// <summary>Links allowed in a comment before the spam score increases.</summary>
-    [Range(0, 50)]
     public int MaxCommentLinks { get; set; }
 
     /// <summary>Whether commenter avatars (Gravatar) are shown.</summary>
@@ -100,11 +86,9 @@ public sealed class SiteSettingsDto
     // Media
 
     /// <summary>Largest accepted upload, in megabytes.</summary>
-    [Range(1, 500)]
     public int MaxUploadSizeMegabytes { get; set; }
 
     /// <summary>Downscale originals larger than this many pixels on either side; 0 disables downscaling.</summary>
-    [Range(0, 20000)]
     public int DownscaleOriginalsAbovePixels { get; set; }
 
     /// <summary>Widths of the responsive renditions, in pixels.</summary>
@@ -116,7 +100,6 @@ public sealed class SiteSettingsDto
     public int? DefaultSocialImageMediaId { get; set; }
 
     /// <summary>Extra lines appended to <c>robots.txt</c>.</summary>
-    [MaxLength(FieldLengths.RobotsTxtExtras)]
     public string? RobotsTxtExtras { get; set; }
 
     /// <summary>Ask search engines not to index the site (<c>noindex</c> everywhere); useful before launch.</summary>

@@ -1,9 +1,9 @@
-using System.ComponentModel.DataAnnotations;
-using System.Globalization;
-
 using BlogEngine.Data.Models;
 using BlogEngine.Shared.Contracts;
 using BlogEngine.Shared.Services;
+using BlogEngine.Shared.Validation;
+
+using FluentValidation;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
@@ -20,6 +20,10 @@ namespace BlogEngine.Server.Services;
 /// deserialized copy; a caller editing its copy cannot corrupt the cached value.
 /// </para>
 /// <para>
+/// Saves are checked with <see cref="SiteSettingsValidator"/> first, so an invalid value never reaches the
+/// database even if the caller skipped client-side validation.
+/// </para>
+/// <para>
 /// Cache misses load through their own scope rather than the request's <see cref="ApplicationDbContext"/>:
 /// during static SSR the layout and the page initialize concurrently, so a settings read in the layout would
 /// otherwise collide with the page's own queries on the shared context. It also keeps a load that
@@ -29,7 +33,8 @@ namespace BlogEngine.Server.Services;
 public sealed class ServerSettingsService(
     ApplicationDbContext dbContext,
     HybridCache cache,
-    IServiceScopeFactory scopeFactory) : ISettingsService
+    IServiceScopeFactory scopeFactory,
+    IValidator<SiteSettingsDto> validator) : ISettingsService
 {
     /// <summary>Cache key of the settings entry.</summary>
     public const string CacheKey = "site-settings";
@@ -50,7 +55,7 @@ public sealed class ServerSettingsService(
     public async Task SaveAsync(SiteSettingsDto settings, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        Validate(settings);
+        await validator.ValidateAndThrowAsync(settings, cancellationToken);
 
         var entity = await dbContext.SiteSettings
             .SingleOrDefaultAsync(s => s.Id == SiteSettings.SingletonId, cancellationToken);
@@ -81,61 +86,6 @@ public sealed class ServerSettingsService(
             .SingleOrDefaultAsync(s => s.Id == SiteSettings.SingletonId, cancellationToken);
 
         return ToDto(entity ?? new SiteSettings { Id = SiteSettings.SingletonId });
-    }
-
-    /// <summary>
-    /// Validates the data annotations on the settings and their social links, plus the rules annotations
-    /// can't express: a known time zone, a usable date format and sensible rendition widths.
-    /// </summary>
-    /// <exception cref="ValidationException">Any rule fails; the message lists every failure.</exception>
-    private static void Validate(SiteSettingsDto settings)
-    {
-        var results = new List<ValidationResult>();
-        Validator.TryValidateObject(settings, new ValidationContext(settings), results, validateAllProperties: true);
-
-        // The validator does not recurse into collections.
-        foreach (var link in settings.SocialLinks)
-        {
-            Validator.TryValidateObject(link, new ValidationContext(link), results, validateAllProperties: true);
-        }
-
-        if (!string.IsNullOrWhiteSpace(settings.TimeZoneId)
-            && !TimeZoneInfo.TryFindSystemTimeZoneById(settings.TimeZoneId, out _))
-        {
-            results.Add(new ValidationResult($"'{settings.TimeZoneId}' is not a known time zone.",
-                [nameof(SiteSettingsDto.TimeZoneId)]));
-        }
-
-        if (!string.IsNullOrWhiteSpace(settings.DateFormat) && !IsUsableDateFormat(settings.DateFormat))
-        {
-            results.Add(new ValidationResult($"'{settings.DateFormat}' is not a valid date format.",
-                [nameof(SiteSettingsDto.DateFormat)]));
-        }
-
-        if (settings.RenditionWidths.Count == 0 || settings.RenditionWidths.Any(w => w is < 16 or > 8192))
-        {
-            results.Add(new ValidationResult("Rendition widths must contain at least one width between 16 and 8192 pixels.",
-                [nameof(SiteSettingsDto.RenditionWidths)]));
-        }
-
-        if (results.Count > 0)
-        {
-            throw new ValidationException(string.Join(" ", results.Select(r => r.ErrorMessage)));
-        }
-    }
-
-    /// <summary>Checks that the format string formats a date without throwing.</summary>
-    private static bool IsUsableDateFormat(string format)
-    {
-        try
-        {
-            _ = DateTimeOffset.UnixEpoch.ToString(format, CultureInfo.InvariantCulture);
-            return true;
-        }
-        catch (FormatException)
-        {
-            return false;
-        }
     }
 
     /// <summary>Copies the entity's values into a new DTO.</summary>

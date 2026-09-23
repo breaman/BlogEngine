@@ -13,7 +13,7 @@
         }
 
         <EditForm Model="Input" method="post" OnValidSubmit="CreateAdminAsync" FormName="setup">
-            <DataAnnotationsValidator />
+            <FluentValidator />
             <ValidationSummary class="text-danger" role="alert" />
             <div class="form-floating mb-3">
                 <InputText @bind-Value="Input.DisplayName" id="Input.DisplayName" class="form-control" autocomplete="name" aria-required="true" placeholder="Display name" />

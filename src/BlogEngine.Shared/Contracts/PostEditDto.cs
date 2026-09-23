@@ -1,6 +1,3 @@
-using System.ComponentModel.DataAnnotations;
-
-using BlogEngine.Shared.Common;
 using BlogEngine.Shared.Enums;
 using BlogEngine.Shared.Validation;
 
@@ -12,8 +9,8 @@ namespace BlogEngine.Shared.Contracts;
 /// </summary>
 /// <remarks>
 /// <para>
-/// A mutable class rather than a record so the editor form can bind to it directly. Validate it with
-/// <see cref="PostEditValidator"/>, which adds the rules data annotations can't express (tag names).
+/// A mutable class rather than a record so the editor form can bind to it directly. The rules, such as
+/// lengths, the slug format and tag names, are in <see cref="PostEditValidator"/>.
 /// </para>
 /// <para>
 /// Blank <see cref="Slug"/> and <see cref="Summary"/> mean "generate it": the slug from the title (only
@@ -26,18 +23,12 @@ public sealed class PostEditDto
     public int Id { get; set; }
 
     /// <summary>Post title.</summary>
-    [Required(ErrorMessage = "A title is required.")]
-    [MaxLength(FieldLengths.PostTitle, ErrorMessage = "The title can be at most {1} characters.")]
     public string Title { get; set; } = string.Empty;
 
     /// <summary>URL slug; blank to generate it from the title.</summary>
-    [MaxLength(FieldLengths.Slug, ErrorMessage = "The slug can be at most {1} characters.")]
-    [RegularExpression(ValidationPatterns.Slug,
-        ErrorMessage = "The slug may contain only lowercase letters, digits and single hyphens between words.")]
     public string? Slug { get; set; }
 
     /// <summary>Listing summary and default meta description; blank to generate it from the content.</summary>
-    [MaxLength(FieldLengths.PostSummary, ErrorMessage = "The summary can be at most {1} characters.")]
     public string? Summary { get; set; }
 
     /// <summary>Markdown source.</summary>
@@ -53,11 +44,9 @@ public sealed class PostEditDto
     public bool IsFeatured { get; set; }
 
     /// <summary>Optional SEO title override.</summary>
-    [MaxLength(FieldLengths.MetaTitle, ErrorMessage = "The meta title can be at most {1} characters.")]
     public string? MetaTitle { get; set; }
 
     /// <summary>Optional SEO description override.</summary>
-    [MaxLength(FieldLengths.MetaDescription, ErrorMessage = "The meta description can be at most {1} characters.")]
     public string? MetaDescription { get; set; }
 
     /// <summary>

@@ -1,7 +1,7 @@
-using System.ComponentModel.DataAnnotations;
-
 using BlogEngine.Shared.Contracts;
 using BlogEngine.Shared.Services;
+
+using FluentValidation;
 
 using Microsoft.AspNetCore.Http.HttpResults;
 
@@ -27,8 +27,8 @@ public static class AdminSettingsEndpoints
         return TypedResults.Ok(await settingsService.GetAsync(cancellationToken));
     }
 
-    /// <summary>Saves the settings; validation failures come back as a 400 problem.</summary>
-    private static async Task<Results<NoContent, ProblemHttpResult>> SaveSettingsAsync(
+    /// <summary>Saves the settings; validation failures come back as a 400 validation problem keyed by field.</summary>
+    private static async Task<Results<NoContent, ValidationProblem>> SaveSettingsAsync(
         SiteSettingsDto settings, ISettingsService settingsService, CancellationToken cancellationToken)
     {
         try
@@ -38,10 +38,11 @@ public static class AdminSettingsEndpoints
         }
         catch (ValidationException ex)
         {
-            return TypedResults.Problem(
-                title: "The settings are invalid.",
-                detail: ex.Message,
-                statusCode: StatusCodes.Status400BadRequest);
+            var errors = ex.Errors
+                .GroupBy(e => e.PropertyName, e => e.ErrorMessage)
+                .ToDictionary(g => g.Key, g => g.ToArray());
+
+            return TypedResults.ValidationProblem(errors, title: "The settings are invalid.");
         }
     }
 }

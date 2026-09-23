@@ -8,7 +8,7 @@
         <section>
             <StatusMessage Message="@_errorMessage" />
             <EditForm EditContext="_editContext" method="post" OnSubmit="LoginUser" FormName="login">
-                <DataAnnotationsValidator />
+                <FluentValidator />
                 <h2>Use a local account to log in.</h2>
                 <hr />
                 <ValidationSummary class="text-danger" role="alert" />

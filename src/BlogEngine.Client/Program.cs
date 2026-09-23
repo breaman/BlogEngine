@@ -1,6 +1,7 @@
 using BlogEngine.Client.Services;
 using BlogEngine.Shared.Security;
 using BlogEngine.Shared.Services;
+using BlogEngine.Shared.Validation;
 
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
@@ -24,6 +25,9 @@ builder.Services.AddScoped(sp =>
 });
 
 builder.Services.AddScoped<IToastService, ToastService>();
+
+// FluentValidation validators for the admin forms, resolved by Blazilla's <FluentValidator />.
+builder.Services.AddBlogValidators();
 
 // Admin services over /api/admin; the server registers database-backed implementations of the same interfaces.
 builder.Services.AddScoped<IPostAdminService, ClientPostAdminService>();

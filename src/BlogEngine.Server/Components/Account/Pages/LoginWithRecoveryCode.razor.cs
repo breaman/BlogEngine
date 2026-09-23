@@ -1,6 +1,6 @@
-using System.ComponentModel.DataAnnotations;
-
 using BlogEngine.Data.Models;
+
+using FluentValidation;
 
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Identity;
@@ -59,9 +59,16 @@ public partial class LoginWithRecoveryCode : ComponentBase
 
     private sealed class InputModel
     {
-        [Required]
-        [DataType(DataType.Text)]
-        [Display(Name = "Recovery Code")]
         public string RecoveryCode { get; set; } = "";
+    }
+
+    private sealed class InputModelValidator : AbstractValidator<InputModel>
+    {
+        public InputModelValidator()
+        {
+            RuleFor(x => x.RecoveryCode)
+                .NotEmpty()
+                .WithName("Recovery Code");
+        }
     }
 }

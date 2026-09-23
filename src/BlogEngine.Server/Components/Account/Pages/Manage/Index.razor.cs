@@ -1,6 +1,8 @@
-using System.ComponentModel.DataAnnotations;
+using System.Text.RegularExpressions;
 
 using BlogEngine.Data.Models;
+
+using FluentValidation;
 
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Identity;
@@ -64,8 +66,24 @@ public partial class Index : ComponentBase
 
     private sealed class InputModel
     {
-        [Phone]
-        [Display(Name = "Phone number")]
         public string? PhoneNumber { get; set; }
+    }
+
+    private sealed class InputModelValidator : AbstractValidator<InputModel>
+    {
+        /// <summary>
+        /// Digits with optional spaces, dashes, dots and parentheses, an optional leading <c>+</c> and an optional
+        /// extension (<c>x123</c> or <c>ext. 123</c>); the same shapes the old <c>[Phone]</c> attribute accepted.
+        /// </summary>
+        private const string PhoneNumberPattern = @"^\+?[\d\s\-.()]*\d[\d\s\-.()]*(\s*(x|ext\.?)\s*\d+)?$";
+
+        public InputModelValidator()
+        {
+            // A blank number removes the phone number, so only a typed value has to match.
+            RuleFor(x => x.PhoneNumber)
+                .Matches(PhoneNumberPattern, RegexOptions.IgnoreCase).WithMessage("'{PropertyName}' is not a valid phone number.")
+                .When(x => !string.IsNullOrEmpty(x.PhoneNumber))
+                .WithName("Phone number");
+        }
     }
 }

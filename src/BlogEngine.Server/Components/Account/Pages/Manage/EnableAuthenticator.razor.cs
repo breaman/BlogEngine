@@ -1,9 +1,10 @@
-using System.ComponentModel.DataAnnotations;
 using System.Globalization;
 using System.Text;
 using System.Text.Encodings.Web;
 
 using BlogEngine.Data.Models;
+
+using FluentValidation;
 
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Identity;
@@ -126,10 +127,17 @@ public partial class EnableAuthenticator : ComponentBase
 
     private sealed class InputModel
     {
-        [Required]
-        [StringLength(7, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 6)]
-        [DataType(DataType.Text)]
-        [Display(Name = "Verification Code")]
         public string Code { get; set; } = "";
+    }
+
+    private sealed class InputModelValidator : AbstractValidator<InputModel>
+    {
+        public InputModelValidator()
+        {
+            RuleFor(x => x.Code)
+                .NotEmpty()
+                .Length(6, 7).WithMessage("The {PropertyName} must be at least {MinLength} and at max {MaxLength} characters long.")
+                .WithName("Verification Code");
+        }
     }
 }

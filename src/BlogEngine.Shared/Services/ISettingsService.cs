@@ -26,7 +26,7 @@ public interface ISettingsService
     /// <summary>
     /// Validates and saves the settings, making them visible to subsequent <see cref="GetAsync"/> calls.
     /// </summary>
-    /// <exception cref="System.ComponentModel.DataAnnotations.ValidationException">
+    /// <exception cref="FluentValidation.ValidationException">
     /// The settings are invalid, for example an unknown time zone.
     /// </exception>
     Task SaveAsync(SiteSettingsDto settings, CancellationToken cancellationToken = default);

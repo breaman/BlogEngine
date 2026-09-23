@@ -61,10 +61,36 @@ applyTo: '**/*.cs'
 - Demonstrate integration with Microsoft Entra ID (formerly Azure AD).
 - Explain how to secure both controller-based and Minimal APIs consistently.
 
-## Validation and Error Handling
+## Validation
 
-- Guide the implementation of model validation using data annotations and FluentValidation.
-- Explain the validation pipeline and how to customize validation responses.
+All validation uses [FluentValidation](https://github.com/FluentValidation/FluentValidation). Blazor forms connect those validators to the UI through Blazilla (see `blazor.instructions.md`).
+
+- **Never use .NET data annotations for validation.** Do not add `System.ComponentModel.DataAnnotations` attributes (`[Required]`, `[MaxLength]`, `[StringLength]`, `[Range]`, `[EmailAddress]`, `[Url]`, `[Phone]`, `[Compare]`, `[RegularExpression]`, etc.), implement `IValidatableObject`, or call `Validator.TryValidateObject`.
+- Write one `AbstractValidator<T>` per model, named `{Model}Validator`. Rules for a DTO shared by the client and server go in `BlogEngine.Shared/Validation` so both sides run the same rules. A form-only input model nested in a component keeps its validator nested next to it in the code-behind.
+- Use the constants in `FieldLengths` and `ValidationPatterns` for lengths and patterns rather than repeating literal numbers or regexes.
+- Use `.WithName("Display name")` when the property name isn't what the user should see, and `.WithMessage(...)` for custom messages. Placeholders such as `{PropertyName}`, `{MinLength}` and `{MaxLength}` keep messages in sync with the rule.
+- Validate child objects and collections with `RuleForEach(...).SetValidator(...)` or `ChildRules`, so one call reports every failure.
+- Register validators in DI as `IValidator<T>` (singleton, because validators are stateless):
+  - Shared validators are registered explicitly in `AddBlogValidators()` (`BlogEngine.Shared/Validation/ValidationServiceCollectionExtensions.cs`). Add new shared validators there. Don't use assembly scanning in the WebAssembly client: trimming can remove validators that are only found by reflection.
+  - The server also scans its own assembly with `AddValidatorsFromAssemblyContaining<App>(ServiceLifetime.Singleton, includeInternalTypes: true)`, which picks up validators nested in components.
+- Services receive `IValidator<T>` through constructor injection instead of creating validators with `new`.
+- The server always validates again, even when the client already checked. Endpoints return validation failures as `TypedResults.ValidationProblem(result.ToDictionary())`, and services that throw use `ValidateAndThrowAsync`, which throws `FluentValidation.ValidationException`.
+- Database schema constraints (max length, required, precision) belong in the entity's `IEntityTypeConfiguration<T>` through the EF Core Fluent API, not in attributes on the entity.
+
+```csharp
+public sealed class SocialLinkValidator : AbstractValidator<SocialLinkDto>
+{
+    public SocialLinkValidator()
+    {
+        RuleFor(l => l.Network).NotEmpty().MaximumLength(FieldLengths.SocialNetwork);
+        RuleFor(l => l.Url).NotEmpty().MaximumLength(FieldLengths.Url);
+    }
+}
+```
+
+## Error Handling
+
+- Explain how to customize validation responses.
 - Demonstrate a global exception handling strategy using middleware.
 - Show how to create consistent error responses across the API.
 - Explain problem details (RFC 9457) implementation for standardized error responses.

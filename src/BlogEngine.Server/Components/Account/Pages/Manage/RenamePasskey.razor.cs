@@ -1,7 +1,8 @@
 using System.Buffers.Text;
-using System.ComponentModel.DataAnnotations;
 
 using BlogEngine.Data.Models;
+
+using FluentValidation;
 
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Identity;
@@ -70,8 +71,16 @@ public partial class RenamePasskey : ComponentBase
 
     private sealed class InputModel
     {
-        [Required]
-        [StringLength(200, ErrorMessage = "Passkey names must be no longer than {1} characters.")]
         public string Name { get; set; } = "";
+    }
+
+    private sealed class InputModelValidator : AbstractValidator<InputModel>
+    {
+        public InputModelValidator()
+        {
+            RuleFor(x => x.Name)
+                .NotEmpty()
+                .MaximumLength(200).WithMessage("Passkey names must be no longer than {MaxLength} characters.");
+        }
     }
 }

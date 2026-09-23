@@ -12,6 +12,9 @@ using BlogEngine.Server.Services;
 using BlogEngine.ServiceDefaults;
 using BlogEngine.Shared.Security;
 using BlogEngine.Shared.Services;
+using BlogEngine.Shared.Validation;
+
+using FluentValidation;
 
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -97,6 +100,11 @@ try
     builder.Services.AddScoped<IPostAdminService, ServerPostAdminService>();
     builder.Services.AddScoped<ITagService, ServerTagService>();
     builder.Services.AddSingleton<PostHtmlSanitizer>();
+
+    // FluentValidation validators, resolved by services and by Blazilla's <FluentValidator /> in forms: the shared
+    // DTO validators, plus the validators nested next to the input models of the Identity and setup pages.
+    builder.Services.AddBlogValidators();
+    builder.Services.AddValidatorsFromAssemblyContaining<App>(ServiceLifetime.Singleton, includeInternalTypes: true);
 
     // First-run admin account: the /setup page, or seeding from the AdminSeed section (design 12.1).
     builder.Services.AddScoped<AdminAccountService>();

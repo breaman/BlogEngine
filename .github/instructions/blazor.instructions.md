@@ -43,7 +43,52 @@ Example structure:
 
 - Implement proper error handling for Blazor pages and API calls.
 - Use logging for error tracking in the backend and consider capturing UI-level errors in Blazor with tools like ErrorBoundary.
-- Implement validation using FluentValidation or DataAnnotations in forms.
+
+## Form Validation with Blazilla
+
+Forms are validated with FluentValidation validators (rules are in `csharp.instructions.md`). [Blazilla](https://github.com/loresoft/Blazilla) connects them to `EditForm`.
+
+- Every `EditForm` whose model has validation rules contains `<FluentValidator />` from Blazilla. **Never use `<DataAnnotationsValidator />`** or data annotation attributes on form models.
+- `@using Blazilla` is already in the `_Imports.razor` files of the Server and Client projects.
+- `<FluentValidator />` resolves `IValidator<TModel>` from DI, so make sure the model's validator is registered (see `csharp.instructions.md`). Pass `Validator="..."` only when a form needs a validator instance that differs from the registered one.
+- Keep using `<ValidationSummary />` and `<ValidationMessage For="..." />`. Blazilla sends FluentValidation's errors to them through the `EditContext`.
+- Rules that call async code (`MustAsync`, `CustomAsync`) need `<FluentValidator AsyncMode="true" />`, plus an `OnSubmit` handler that runs `await editContext.ValidateAsync()` in place of `OnValidSubmit`. Keep rules synchronous when you can, because static SSR forms validate synchronously.
+- Use `RuleSets="..."` when a form should run only some of a validator's rules.
+- Form input models in a component's code-behind get a nested validator:
+
+```csharp
+public partial class ForgotPassword : ComponentBase
+{
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = default!;
+
+    private sealed class InputModel
+    {
+        public string Email { get; set; } = "";
+    }
+
+    private sealed class InputModelValidator : AbstractValidator<InputModel>
+    {
+        public InputModelValidator()
+        {
+            RuleFor(x => x.Email).NotEmpty().EmailAddress();
+        }
+    }
+}
+```
+
+```razor
+<EditForm Model="Input" FormName="forgot-password" OnValidSubmit="OnValidSubmitAsync" method="post">
+    <FluentValidator />
+    <ValidationSummary class="text-danger" role="alert" />
+    <div class="form-floating mb-3">
+        <InputText @bind-Value="Input.Email" id="Input.Email" class="form-control" placeholder="name@example.com" />
+        <label for="Input.Email">Email</label>
+        <ValidationMessage For="() => Input.Email" class="text-danger" />
+    </div>
+    <button type="submit" class="w-100 btn btn-lg btn-primary">Reset password</button>
+</EditForm>
+```
 
 ## Blazor API and Performance Optimization
 

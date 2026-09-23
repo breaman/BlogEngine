@@ -11,7 +11,7 @@
             <AntiforgeryToken />
         </form>
         <EditForm Model="Input" FormName="change-email" OnValidSubmit="OnValidSubmitAsync" method="post">
-            <DataAnnotationsValidator />
+            <FluentValidator />
             <ValidationSummary class="text-danger" role="alert" />
             @if (_isEmailConfirmed)
             {

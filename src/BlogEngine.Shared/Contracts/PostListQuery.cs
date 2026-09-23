@@ -1,5 +1,3 @@
-using System.ComponentModel.DataAnnotations;
-
 using BlogEngine.Shared.Enums;
 
 namespace BlogEngine.Shared.Contracts;
@@ -25,11 +23,9 @@ public sealed class PostListQuery
     /// <summary>Text to find in the title, slug or summary.</summary>
     public string? Search { get; set; }
 
-    /// <summary>1-based page number.</summary>
-    [Range(1, int.MaxValue)]
+    /// <summary>1-based page number; values below 1 are treated as 1.</summary>
     public int Page { get; set; } = 1;
 
-    /// <summary>Posts per page.</summary>
-    [Range(1, MaxPageSize)]
+    /// <summary>Posts per page, clamped to 1 through <see cref="MaxPageSize"/>.</summary>
     public int PageSize { get; set; } = DefaultPageSize;
 }

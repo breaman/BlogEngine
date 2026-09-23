@@ -5,6 +5,8 @@
 
   <ItemGroup>
     <!-- Markdown rendering shared by the server and the WebAssembly editor preview (design 5.3). -->
+    <!-- Validation rules shared by the WebAssembly forms and the server (see ValidationServiceCollectionExtensions). -->
+    <PackageReference Include="FluentValidation" />
     <PackageReference Include="Markdig" />
     <!-- AuthorizationOptions, so the AdminOnly policy is defined once for server and WebAssembly (design 12.1). -->
     <PackageReference Include="Microsoft.AspNetCore.Authorization" />

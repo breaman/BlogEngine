@@ -1,6 +1,6 @@
-using System.ComponentModel.DataAnnotations;
-
 using BlogEngine.Data.Models;
+
+using FluentValidation;
 
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Identity;
@@ -65,20 +65,27 @@ public partial class ChangePassword : ComponentBase
 
     private sealed class InputModel
     {
-        [Required]
-        [DataType(DataType.Password)]
-        [Display(Name = "Current password")]
         public string OldPassword { get; set; } = "";
-
-        [Required]
-        [StringLength(100, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 6)]
-        [DataType(DataType.Password)]
-        [Display(Name = "New password")]
         public string NewPassword { get; set; } = "";
-
-        [DataType(DataType.Password)]
-        [Display(Name = "Confirm new password")]
-        [Compare("NewPassword", ErrorMessage = "The new password and confirmation password do not match.")]
         public string ConfirmPassword { get; set; } = "";
+    }
+
+    private sealed class InputModelValidator : AbstractValidator<InputModel>
+    {
+        public InputModelValidator()
+        {
+            RuleFor(x => x.OldPassword)
+                .NotEmpty()
+                .WithName("Current password");
+
+            RuleFor(x => x.NewPassword)
+                .NotEmpty()
+                .Length(6, 100).WithMessage("The {PropertyName} must be at least {MinLength} and at max {MaxLength} characters long.")
+                .WithName("New password");
+
+            RuleFor(x => x.ConfirmPassword)
+                .Equal(x => x.NewPassword).WithMessage("The new password and confirmation password do not match.")
+                .WithName("Confirm new password");
+        }
     }
 }

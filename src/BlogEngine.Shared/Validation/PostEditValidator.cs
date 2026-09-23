@@ -1,7 +1,8 @@
-using System.ComponentModel.DataAnnotations;
-
+using BlogEngine.Shared.Common;
 using BlogEngine.Shared.Contracts;
 using BlogEngine.Shared.Text;
+
+using FluentValidation;
 
 namespace BlogEngine.Shared.Validation;
 
@@ -9,54 +10,57 @@ namespace BlogEngine.Shared.Validation;
 /// Validates a <see cref="PostEditDto"/> the same way in the editor (WebAssembly) and on the server.
 /// </summary>
 /// <remarks>
-/// Runs the data annotations on the DTO (title required, lengths, slug format) plus the tag rules from
-/// <see cref="TagNormalizer"/>, which annotations can't express. The server always re-validates; the
-/// client runs it only to show errors early.
+/// Covers the title (required), field lengths, the slug format and the tag rules from
+/// <see cref="TagNormalizer"/>. The server always re-validates; the client runs it only to show errors early.
+/// Every tag error is reported under <see cref="PostEditDto.Tags"/> rather than per index, so the editor can
+/// show them next to the single tag input.
 /// </remarks>
 /// <example>
 /// <code>
-/// var errors = PostEditValidator.Validate(post);
+/// var errors = postValidator.Validate(post).ToDictionary();
 /// if (errors.Count &gt; 0)
 /// {
-///     return new PostInvalid(errors);
+///     return new PostInvalid(errors.AsReadOnly());
 /// }
 /// </code>
 /// </example>
-public static class PostEditValidator
+public sealed class PostEditValidator : AbstractValidator<PostEditDto>
 {
     /// <summary>Most tags a single post may have; keeps the tag list meaningful and the save bounded.</summary>
     public const int MaxTags = 20;
 
-    /// <summary>Validates the post.</summary>
-    /// <returns>Error messages keyed by property name; empty when the post is valid.</returns>
-    public static IReadOnlyDictionary<string, string[]> Validate(PostEditDto post)
+    /// <summary>Defines the post rules.</summary>
+    public PostEditValidator()
     {
-        ArgumentNullException.ThrowIfNull(post);
+        RuleFor(p => p.Title)
+            .NotEmpty().WithMessage("A title is required.")
+            .MaximumLength(FieldLengths.PostTitle).WithMessage("The title can be at most {MaxLength} characters.");
 
-        var results = new List<ValidationResult>();
-        Validator.TryValidateObject(post, new ValidationContext(post), results, validateAllProperties: true);
+        RuleFor(p => p.Slug)
+            .MaximumLength(FieldLengths.Slug).WithMessage("The slug can be at most {MaxLength} characters.")
+            .Matches(ValidationPatterns.Slug)
+            .WithMessage("The slug may contain only lowercase letters, digits and single hyphens between words.")
+            // Blank means "generate it from the title", so only a typed slug has to match the pattern.
+            .When(p => !string.IsNullOrEmpty(p.Slug), ApplyConditionTo.CurrentValidator);
 
-        var errors = results
-            .SelectMany(r => r.MemberNames.DefaultIfEmpty(string.Empty), (r, member) => (member, r.ErrorMessage ?? "Invalid value."))
-            .GroupBy(e => e.member, e => e.Item2)
-            .ToDictionary(g => g.Key, g => g.ToList());
+        RuleFor(p => p.Summary)
+            .MaximumLength(FieldLengths.PostSummary).WithMessage("The summary can be at most {MaxLength} characters.");
 
-        var tagErrors = ValidateTags(post.Tags);
-        if (tagErrors.Count > 0)
-        {
-            errors[nameof(PostEditDto.Tags)] = tagErrors;
-        }
+        RuleFor(p => p.MetaTitle)
+            .MaximumLength(FieldLengths.MetaTitle).WithMessage("The meta title can be at most {MaxLength} characters.");
 
-        return errors.ToDictionary(e => e.Key, e => e.Value.ToArray());
+        RuleFor(p => p.MetaDescription)
+            .MaximumLength(FieldLengths.MetaDescription).WithMessage("The meta description can be at most {MaxLength} characters.");
+
+        RuleFor(p => p.Tags).Custom(ValidateTags);
     }
 
     /// <summary>Checks every tag name and the number of distinct tags.</summary>
-    private static List<string> ValidateTags(IReadOnlyCollection<string>? tags)
+    private static void ValidateTags(List<string>? tags, ValidationContext<PostEditDto> context)
     {
-        var errors = new List<string>();
         if (tags is null)
         {
-            return errors;
+            return;
         }
 
         var distinct = new HashSet<string>(StringComparer.Ordinal);
@@ -65,7 +69,8 @@ public static class PostEditValidator
             var result = TagNormalizer.Normalize(tag);
             if (!result.IsValid)
             {
-                errors.Add(string.IsNullOrEmpty(result.Name) ? result.Error! : $"'{result.Name}': {result.Error}");
+                context.AddFailure(nameof(PostEditDto.Tags),
+                    string.IsNullOrEmpty(result.Name) ? result.Error! : $"'{result.Name}': {result.Error}");
                 continue;
             }
 
@@ -74,9 +79,7 @@ public static class PostEditValidator
 
         if (distinct.Count > MaxTags)
         {
-            errors.Add($"A post can have at most {MaxTags} tags.");
+            context.AddFailure(nameof(PostEditDto.Tags), $"A post can have at most {MaxTags} tags.");
         }
-
-        return errors;
     }
 }

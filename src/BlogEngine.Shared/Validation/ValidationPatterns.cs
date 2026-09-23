@@ -1,7 +1,7 @@
 namespace BlogEngine.Shared.Validation;
 
 /// <summary>
-/// Regular expressions shared by validation attributes on the client and server.
+/// Regular expressions shared by the FluentValidation validators on the client and server.
 /// </summary>
 public static class ValidationPatterns
 {

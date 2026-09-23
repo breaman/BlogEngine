@@ -1,7 +1,7 @@
-using System.ComponentModel.DataAnnotations;
-
 using BlogEngine.Data.Models;
 using BlogEngine.Shared.Services;
+
+using FluentValidation;
 
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Components;
@@ -97,17 +97,21 @@ public partial class Login : ComponentBase
 
     private sealed class InputModel
     {
-        [Required]
-        [EmailAddress]
         public string Email { get; set; } = "";
-
-        [Required]
-        [DataType(DataType.Password)]
         public string Password { get; set; } = "";
-
-        [Display(Name = "Remember me?")]
         public bool RememberMe { get; set; }
-
         public PasskeyInputModel? Passkey { get; set; }
+    }
+
+    private sealed class InputModelValidator : AbstractValidator<InputModel>
+    {
+        public InputModelValidator()
+        {
+            RuleFor(x => x.Email)
+                .NotEmpty()
+                .EmailAddress();
+
+            RuleFor(x => x.Password).NotEmpty();
+        }
     }
 }

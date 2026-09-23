@@ -1,8 +1,9 @@
-using System.ComponentModel.DataAnnotations;
 using System.Text;
 using System.Text.Encodings.Web;
 
 using BlogEngine.Data.Models;
+
+using FluentValidation;
 
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Identity;
@@ -98,9 +99,17 @@ public partial class Email : ComponentBase
 
     private sealed class InputModel
     {
-        [Required]
-        [EmailAddress]
-        [Display(Name = "New email")]
         public string? NewEmail { get; set; }
+    }
+
+    private sealed class InputModelValidator : AbstractValidator<InputModel>
+    {
+        public InputModelValidator()
+        {
+            RuleFor(x => x.NewEmail)
+                .NotEmpty()
+                .EmailAddress()
+                .WithName("New email");
+        }
     }
 }
