@@ -63,9 +63,11 @@ These apply to all tasks and are not repeated below:
 ### Project setup and cleanup
 
 - [ ] **T0.1 — Create test projects**
-  - Add `tests/BlogEngine.UnitTests` and `tests/BlogEngine.IntegrationTests` (xUnit v3) to `BlogEngine.slnx`, with package versions in `Directory.Packages.props`.
-  - Integration tests: `WebApplicationFactory<Program>` + a SQL Server test container (Testcontainers) with a shared fixture that applies migrations.
-  - **Done when:** both projects build, a placeholder test passes in each, and the tests run in Visual Studio Enterprise.
+  - Add `tests/BlogEngine.UnitTests` and `tests/BlogEngine.IntegrationTests` (**TUnit**) to `BlogEngine.slnx`, with package versions in `Directory.Packages.props`.
+  - TUnit runs on Microsoft.Testing.Platform: set `"test": { "runner": "Microsoft.Testing.Platform" }` in `global.json` so `dotnet test` works on the .NET 10 SDK.
+  - Snapshot tests (T0.13, T2.7) use `Verify.TUnit`.
+  - Integration tests: `TUnit.AspNetCore`'s `TestWebApplicationFactory<Program>` + a SQL Server test container (Testcontainers), shared across the run with `[ClassDataSource<…>(Shared = SharedType.PerTestSession)]`; the fixture applies migrations on startup.
+  - **Done when:** both projects build, a placeholder test passes in each, and the tests run in Visual Studio Enterprise and via `dotnet test`.
 
 - [ ] **T0.2 — Replace `FieldLengths` with blog-specific constants** (§2, §6.9)
   - Remove the barcode/promotion/payment constants; add the constants listed in §6.9.
