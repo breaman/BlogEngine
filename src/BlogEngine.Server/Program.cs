@@ -1,6 +1,7 @@
 using System.Diagnostics;
 
 using BlogEngine.Client.Services;
+using BlogEngine.Data.Interceptors;
 using BlogEngine.Data.Interfaces;
 using BlogEngine.Data.Models;
 using BlogEngine.Server.Components;
@@ -52,9 +53,11 @@ try
         .AddIdentityCookies();
     builder.Services.AddAuthorization();
 
-    builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    builder.Services.AddDataInterceptors();
+    builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =>
         options.UseSqlServer(builder.Configuration.GetConnectionString(Constants.DatabaseConnectionString))
-            .EnableSensitiveDataLogging());
+            .EnableSensitiveDataLogging()
+            .AddDataInterceptors(serviceProvider));
     builder.EnrichSqlServerDbContext<ApplicationDbContext>();
     builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 

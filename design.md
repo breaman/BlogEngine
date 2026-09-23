@@ -41,8 +41,8 @@ The design builds on the existing solution instead of replacing it.
 | Framework | .NET 10, Blazor Web App (`BlogEngine.Server` + `BlogEngine.Client`) | Public pages use static SSR, and admin pages use InteractiveWebAssembly. |
 | Render modes | **InteractiveWebAssembly only; InteractiveServer is forbidden** (`.claude/rules/blazor.instructions.md`) | Interactive admin components go in `BlogEngine.Client` and use the dual-service and `[PersistentState]` pattern. |
 | Shared code | `BlogEngine.Shared` | Holds DTOs, service interfaces, validation, `FieldLengths`, and the **Markdown pipeline**. |
-| Data | EF Core 10 + SQL Server; `ApplicationDbContext : AuthDbContext` | New entities go here. Built-in fingerprinting (`CreatedOn`/`ModifiedBy`) and audit logging apply automatically. |
-| Soft delete hook | `AuthDbContext.ApplySoftDeletes()` (empty) | Used to move posts to the trash (§6.8). |
+| Data | EF Core 10 + SQL Server; `ApplicationDbContext : AuthDbContext` | New entities go here. Fingerprinting (`CreatedOn`/`ModifiedBy`) and audit logging apply automatically through EF Core save interceptors (`BlogEngine.Data/Interceptors`). |
+| Soft delete hook | `SoftDeleteInterceptor` + `ISoftDeletable` | Used to move posts to the trash (§6.8). |
 | Identity | ASP.NET Core Identity with roles, passkeys, 2FA, and `IEmailSender` (currently no-op) | Reused for the admin login. Public registration is locked down (§12.1). |
 | Hosting | Aspire AppHost with a SQL Server container and an EF migrations resource | Adds a media storage resource (§9.3). |
 | Logging | Serilog to MSSQL and OpenTelemetry | Kept as is. Adds domain log events. |
@@ -418,7 +418,7 @@ So `C#` becomes `csharp`, `C++` becomes `cplusplus`, and `.NET` becomes `dotnet`
 
 ### 6.8 Soft Delete
 
-`AuthDbContext.ApplySoftDeletes()` is implemented for `Post` and `Page`. `Remove()` becomes `IsDeleted = true` plus `DeletedOn`. A global query filter hides deleted rows, and the admin Trash view uses `IgnoreQueryFilters()`. **Empty trash** permanently deletes the post and cascades to `PostTag`, `Comment`, `PostRevision`, `PostMedia` and `PreviewToken`.
+`Post` and `Page` implement `ISoftDeletable`, so `SoftDeleteInterceptor` turns `Remove()` into `IsDeleted = true` plus `DeletedOn`. Removing a row that is already in the trash goes through as a real delete. A global query filter hides deleted rows, and the admin Trash view uses `IgnoreQueryFilters()`. **Empty trash** permanently deletes the post and cascades to `PostTag`, `Comment`, `PostRevision`, `PostMedia` and `PreviewToken`.
 
 ### 6.9 Field Lengths (Replacing the Template Constants)
 
