@@ -20,8 +20,9 @@
   <!--
     Admin JavaScript (design 5.3, T1.9): the sources in scripts/ are bundled by esbuild into wwwroot/js
     (editor.js with CodeMirror and highlight.js, admin.js with small helpers). The npm packages are installed
-    in BlogEngine.Server, next to the Sass build, so this runs that project's "js-build" script. The bundles
-    are build output and are not committed (wwwroot/ is git-ignored).
+    in BlogEngine.Server, next to the Sass build, so this runs that project's build-js.mjs for the "admin"
+    bundles (BlogEngine.Server builds the "public" ones itself). The bundles are build output and are not
+    committed (wwwroot/ is git-ignored).
   -->
   <PropertyGroup>
     <AdminScriptsNpmDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\BlogEngine.Server'))</AdminScriptsNpmDir>
@@ -41,7 +42,7 @@
           Outputs="wwwroot\js\editor.js;wwwroot\js\admin.js">
     <Error Condition="!Exists('$(AdminScriptsNpmDir)\node_modules\esbuild')"
            Text="esbuild was not found. Run 'npm install' in $(AdminScriptsNpmDir)." />
-    <Exec Command="npm run js-build" WorkingDirectory="$(AdminScriptsNpmDir)" />
+    <Exec Command="node ./scripts/build-js.mjs admin" WorkingDirectory="$(AdminScriptsNpmDir)" />
   </Target>
 
   <!-- The wwwroot glob is evaluated before the bundles exist on a clean build, so add them to Content here

@@ -27,6 +27,12 @@ public class Post : FingerPrintEntityBase, ISoftDeletable
     /// <summary>Sanitized HTML rendered from <see cref="ContentMarkdown"/>, regenerated on save or when referenced media changes.</summary>
     public string ContentHtml { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Whether <see cref="ContentHtml"/> has code blocks, as flagged by the Markdown render on save, so the
+    /// public post page loads the highlighting and copy-button script only when it is needed (design 10.3).
+    /// </summary>
+    public bool HasCodeBlocks { get; set; }
+
     /// <summary>Draft or published.</summary>
     public PostStatus Status { get; set; }
 

@@ -60,6 +60,22 @@ public sealed class PostHtmlSanitizer
         return string.IsNullOrEmpty(html) ? string.Empty : sanitizer.Sanitize(html);
     }
 
+    /// <summary>
+    /// Returns <paramref name="html"/> sanitized like <see cref="Sanitize(string?)"/>, with relative URLs made
+    /// absolute against <paramref name="baseUrl"/>, for HTML that leaves the site, such as feed items (design 16).
+    /// </summary>
+    /// <param name="html">The HTML to sanitize.</param>
+    /// <param name="baseUrl">
+    /// The absolute URL of the page the HTML belongs to, so both root-relative links (<c>/media/…</c>) and
+    /// fragment links (footnotes, <c>#fn1</c>) keep pointing at the right place.
+    /// </param>
+    public string Sanitize(string? html, Uri baseUrl)
+    {
+        ArgumentNullException.ThrowIfNull(baseUrl);
+
+        return string.IsNullOrEmpty(html) ? string.Empty : sanitizer.Sanitize(html, baseUrl.AbsoluteUri);
+    }
+
     /// <summary>Removes iframes whose source isn't an https URL on an allowed video host.</summary>
     private static void RemoveForeignFrames(AngleSharp.Html.Dom.IHtmlDocument document)
     {

@@ -1,0 +1,22 @@
+@page "/tags/{Slug}"
+
+@if (_tag is not null && _page is not null)
+{
+    var title = $"Posts tagged {_tag.Name}";
+
+    <SeoHead Title="@(_page.Page > 1 ? $"{title}, page {_page.Page}" : title)" Description="@_tag.Description" CanonicalPath="@PostPaths.WithPage(_tag.Path, _page.Page)" TagFeed="_tag" />
+
+    <Breadcrumbs Items="@([new("Home", SitePaths.Home), new("Tags", TagPaths.Index), new(_tag.Name)])" />
+    <h1 class="mb-2">Posts tagged <span class="text-body-secondary">#</span>@_tag.Name</h1>
+    <p class="text-body-secondary mb-3">
+        @(_tag.PostCount == 1 ? "1 post" : $"{_tag.PostCount} posts")
+        <span aria-hidden="true">&middot;</span>
+        <a class="link-secondary" href="@TagPaths.Feed(_tag.Slug)"><span class="bi bi-rss" aria-hidden="true"></span> Feed</a>
+    </p>
+    @if (!string.IsNullOrWhiteSpace(_tag.Description))
+    {
+        <p class="lead">@_tag.Description</p>
+    }
+
+    <PostList Page="_page" BasePath="@_tag.Path" DateFormat="@_dateFormat" />
+}

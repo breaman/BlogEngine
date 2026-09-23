@@ -1,4 +1,5 @@
 using BlogEngine.Data.Models;
+using BlogEngine.Server.Services.Public;
 using BlogEngine.Shared.Contracts;
 using BlogEngine.Shared.Services;
 using BlogEngine.Shared.Validation;
@@ -28,6 +29,10 @@ namespace BlogEngine.Server.Services;
 /// (<see cref="PostLocalDateMaintenance"/>, T1.16), in the same transaction as the settings.
 /// </para>
 /// <para>
+/// A save evicts the settings and, through <see cref="CacheInvalidator"/>, every public page, feed and
+/// <c>robots.txt</c> response they affect, so readers see the new values on their next request.
+/// </para>
+/// <para>
 /// Cache misses load through their own scope rather than the request's <see cref="ApplicationDbContext"/>:
 /// during static SSR the layout and the page initialize concurrently, so a settings read in the layout would
 /// otherwise collide with the page's own queries on the shared context. It also keeps a load that
@@ -39,6 +44,7 @@ public sealed class ServerSettingsService(
     HybridCache cache,
     IServiceScopeFactory scopeFactory,
     IValidator<SiteSettingsDto> validator,
+    CacheInvalidator cacheInvalidator,
     ILogger<ServerSettingsService> logger) : ISettingsService
 {
     /// <summary>Cache key of the settings entry.</summary>
@@ -89,7 +95,7 @@ public sealed class ServerSettingsService(
         }
 
         // Evict only after the save commits, so a concurrent read can't re-cache the old values after this.
-        await cache.RemoveAsync(CacheKey, cancellationToken);
+        await cacheInvalidator.SettingsChangedAsync(CacheKey);
     }
 
     /// <summary>

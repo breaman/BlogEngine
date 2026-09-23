@@ -13,7 +13,7 @@
 | Phase | Goal | Tasks | Done |
 |---|---|---|---|
 | [0: Foundation](#phase-0--foundation) | Admin can log in to an empty dashboard | 16 | 16 |
-| [1: Posts MVP](#phase-1--posts-mvp) | Can write and publish posts end to end | 25 | 16 |
+| [1: Posts MVP](#phase-1--posts-mvp) | Can write and publish posts end to end | 25 | 25 |
 | [2: Media MVP](#phase-2--media-mvp) | Can add, edit and insert photos | 13 | 0 |
 | [3: Comments MVP](#phase-3--comments-mvp) | Readers can comment; the author moderates | 11 | 0 |
 | [4: V1 Polish](#phase-4--v1-polish) | Ready for public launch | 35 | 0 |
@@ -242,45 +242,49 @@ These apply to all tasks and are not repeated below:
 
 ### Public site (static SSR)
 
-- [ ] **T1.17 — `PublicPostQueries` + `HybridCache` + `CacheInvalidator`** (§11)
+- [x] **T1.17 — `PublicPostQueries` + `HybridCache` + `CacheInvalidator`** (§11)
   - Queries for lists, archives, tag counts, single post by slug — all via `VisibleToPublic`.
   - Cache entries tagged `posts`, `post:{id}`, `tag:{id}`; `CacheInvalidator` evicts on publish, update, unpublish, delete and settings change.
   - **Done when:** an integration test proves a publish is visible immediately despite caching.
+  - *Status:* lists, archives, tag counts and the sitemap are sliced in memory from one cached snapshot of the visible posts (`PublicPostIndex`), so arbitrary URLs can't grow the cache; post content and feeds are cached per post/feed. Keys also carry a generation number that `CacheInvalidator` bumps after each commit, closing the race where a load started before a save is stored as fresh. `PublicCacheTests` covers both.
 
-- [ ] **T1.18 — Public layout and shared blog components** (§5.2, §14)
+- [x] **T1.18 — Public layout and shared blog components** (§5.2, §14)
   - Public `MainLayout` with site title/tagline, nav, search box placeholder (GET form, wired in Phase 4), footer with social links.
   - Components: `PostCard`, `Pager` (« Newer / Page X of Y / Older »), `TagBadge`, `Breadcrumbs`, basic `SeoHead` (title, meta description, canonical URL, feed autodiscovery `<link>`).
   - **Done when:** components render with no WebAssembly loaded on public pages.
+  - *Status:* the WebAssembly `ToastContainer` moved out of the public layout (admin has its own). `PublicLayoutTests` checks public pages render no WebAssembly markers or preloads; a browser check confirmed no `.wasm`/`dotnet.js` requests.
 
-- [ ] **T1.19 — `/posts` index and home page** (§7.1, P3)
+- [x] **T1.19 — `/posts` index and home page** (§7.1, P3)
   - `/posts`: title, date, reading time, tags, summary, newest first, `?page=N` (canonical omits `?page=1`).
   - `/`: featured post(s) then latest N posts, with a link to `/posts`.
   - **Done when:** paging, ordering and featured pinning work, and out-of-range pages 404.
 
-- [ ] **T1.20 — Year, month and day archives** (§7.1, P2, P4)
+- [x] **T1.20 — Year, month and day archives** (§7.1, P2, P4)
   - `/posts/{year}`, `/posts/{year}/{month}`, `/posts/{year}/{month}/{day}` reusing the list component; headings like "Posts from September 2026"; breadcrumbs to parent periods; accept `9` and `09` but always link with two digits.
   - A valid date with no visible posts returns 404.
   - **Done when:** integration tests cover 200, 404 (empty period and invalid date) for each level.
 
-- [ ] **T1.21 — Post page** (`/posts/{yyyy}/{mm}/{dd}/{slug}`; §7.1, §14.2, P1)
+- [x] **T1.21 — Post page** (`/posts/{yyyy}/{mm}/{dd}/{slug}`; §7.1, §14.2, P1)
   - Resolution: find visible post by slug → 301 to canonical if the date doesn't match → else check `Redirect` table (301) → else `NavigationManager.NotFound()`.
   - Renders title, date (linked to the day archive), reading time, tags, cached `ContentHtml`, tags again, share links (plain links).
   - **Done when:** integration tests cover 200, wrong-date 301, redirect-table 301, draft 404 and unknown 404.
 
-- [ ] **T1.22 — Tag index and tag pages** (§7.1, P5)
+- [x] **T1.22 — Tag index and tag pages** (§7.1, P5)
   - `/tags` with post counts (only tags with ≥1 visible post); `/tags/{slug}` paginated using the list component.
   - **Done when:** tags with no visible posts don't appear and their pages 404.
 
-- [ ] **T1.23 — Code highlighting and copy button** (§10.3, P12, Q7)
+- [x] **T1.23 — Code highlighting and copy button** (§10.3, P12, Q7)
   - Add `highlight.js` to npm; build a small deferred module in `BlogEngine.Server/wwwroot/js` that highlights and adds copy buttons.
   - Load it only when the post's render result flags code blocks.
   - **Done when:** a text-only post loads no highlighting JS; a code post is highlighted with working copy buttons.
+  - *Status:* the flag is persisted as `Post.HasCodeBlocks` (migration backfills existing posts). Every page loads a ~300-byte `js/public.js`, which imports `js/code-blocks.js` only when the post is flagged, and again after enhanced navigation. Verified in a browser: highlighting, clipboard copy, enhanced navigation, and no `code-blocks.js` on a text-only post.
 
-- [ ] **T1.24 — RSS and Atom feeds** (§16, P6)
+- [x] **T1.24 — RSS and Atom feeds** (§16, P6)
   - `/feed.xml` (RSS 2.0), `/atom.xml`, `/tags/{slug}/feed.xml`: latest 20 visible posts, full sanitized HTML with absolute URLs, tags as categories. Output-cached; evicted by `CacheInvalidator`.
   - **Done when:** feeds validate (W3C feed validator) and drafts never appear.
+  - *Status:* RSS and Atom output was submitted to validator.w3.org/feed: valid, 0 errors (the only warning is "self reference doesn't match document location", expected for an uploaded localhost feed). Output-cached and evicted by `CacheInvalidator`, which also covers the sitemap and `robots.txt` ahead of T4.31.
 
-- [ ] **T1.25 — Sitemap and robots.txt** (§16, P7)
+- [x] **T1.25 — Sitemap and robots.txt** (§16, P7)
   - `/sitemap.xml`: home, `/posts`, every visible post (`lastmod = LastUpdatedOn ?? PublishedOn`), tag pages with posts.
   - `/robots.txt`: `Disallow: /admin`, `/api`, `/preview`, `/Account`, a `Sitemap:` line, and `Disallow: /` when "discourage search engines" is on (plus `noindex` meta sitewide).
   - **Done when:** integration tests verify contents for both settings states.

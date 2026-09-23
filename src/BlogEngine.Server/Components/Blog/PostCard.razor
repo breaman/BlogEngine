@@ -1,0 +1,15 @@
+@* One post in a list: title, meta line and summary (design 14.1). *@
+<article class="post-card py-3 border-bottom">
+    <h2 class="h4 mb-1">
+        <a class="link-body-emphasis text-decoration-none" href="@Post.Path">@Post.Title</a>
+        @if (ShowFeatured && Post.IsFeatured)
+        {
+            <span class="badge text-bg-warning align-middle fs-6 fw-normal ms-1"><span class="bi bi-pin-angle-fill" aria-hidden="true"></span> Featured</span>
+        }
+    </h2>
+    <PostMeta Post="Post" DateFormat="@DateFormat" Class="mb-2" />
+    @if (!string.IsNullOrWhiteSpace(Post.Summary))
+    {
+        <p class="mb-0">@Post.Summary</p>
+    }
+</article>

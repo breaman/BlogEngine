@@ -108,4 +108,19 @@ public class PostHtmlSanitizerTests
     {
         await Assert.That(Sanitizer.Sanitize(html)).IsEmpty();
     }
+
+    /// <summary>
+    /// With a base URL (feeds), relative links become absolute: root-relative against the site, fragments against
+    /// the post itself, so footnotes still work in a feed reader.
+    /// </summary>
+    [Test]
+    public async Task Sanitize_WithBaseUrl_MakesUrlsAbsolute()
+    {
+        var html = Sanitizer.Sanitize("""<a href="/tags/csharp">C#</a><a href="#fn:1">1</a><img src="/media/abc/cat.jpg" alt="">""",
+            new Uri("https://blog.example/posts/2026/09/22/hello"));
+
+        await Assert.That(html).Contains("href=\"https://blog.example/tags/csharp\"");
+        await Assert.That(html).Contains("href=\"https://blog.example/posts/2026/09/22/hello#fn:1\"");
+        await Assert.That(html).Contains("src=\"https://blog.example/media/abc/cat.jpg\"");
+    }
 }

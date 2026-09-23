@@ -9,6 +9,7 @@ using BlogEngine.Server.Components.Account;
 using BlogEngine.Server.Components.Email;
 using BlogEngine.Server.Endpoints;
 using BlogEngine.Server.Services;
+using BlogEngine.Server.Services.Public;
 using BlogEngine.ServiceDefaults;
 using BlogEngine.Shared.Security;
 using BlogEngine.Shared.Services;
@@ -72,6 +73,8 @@ try
 
     // In-memory (L1) cache for settings and public queries; tags let whole groups be evicted (design 11).
     builder.Services.AddHybridCache();
+    // Whole-response cache for feeds, the sitemap and robots.txt, evicted by tag like HybridCache (design 11).
+    builder.Services.AddPublicOutputCache();
 
     builder.Services.AddIdentityCore<User>(options =>
         {
@@ -100,6 +103,12 @@ try
     builder.Services.AddScoped<IPostAdminService, ServerPostAdminService>();
     builder.Services.AddScoped<ITagService, ServerTagService>();
     builder.Services.AddSingleton<PostHtmlSanitizer>();
+
+    // Public site (static SSR, design 5.1, 11): cached read queries, cache eviction on writes, redirects and feeds.
+    builder.Services.AddSingleton<PublicPostQueries>();
+    builder.Services.AddSingleton<CacheInvalidator>();
+    builder.Services.AddSingleton<RedirectLookup>();
+    builder.Services.AddSingleton<SyndicationFeedWriter>();
 
     // Client services injected by admin pages; they only touch the browser after prerendering (T1.13).
     builder.Services.AddScoped<DraftBackupStore>();
@@ -155,6 +164,7 @@ try
     app.UseAuthentication();
     app.UseAuthorization();
     app.UseAntiforgery();
+    app.UseOutputCache();
     app.MapStaticAssets();
 
     app.MapRazorComponents<App>()
@@ -164,6 +174,9 @@ try
     app.MapAdditionalIdentityEndpoints();
 
     app.MapAdminApi();
+
+    app.MapFeedEndpoints();
+    app.MapSitemapEndpoints();
 
     app.Run();
 }

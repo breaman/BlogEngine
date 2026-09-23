@@ -1,0 +1,44 @@
+@page "/posts/{Year:int}/{Month:int}/{Day:int}/{Slug}"
+
+@if (_post is not null)
+{
+    var post = _post.Post;
+
+    <SeoHead Title="@(_post.MetaTitle ?? post.Title)" Description="@(_post.MetaDescription ?? post.Summary)" CanonicalPath="@post.Path" />
+
+    <article class="post mx-auto">
+        <header class="mb-4">
+            <h1 class="post-title mb-2">@post.Title</h1>
+            <PostMeta Post="post" DateFormat="@_dateFormat" LinkDate="true" />
+        </header>
+
+        @* data-code-blocks tells js/public.js to load highlighting and copy buttons (design 10.3). *@
+        <div class="post-content" data-code-blocks="@(_post.HasCodeBlocks ? "true" : null)">
+            @((MarkupString)_post.Html)
+        </div>
+
+        <footer class="post-footer mt-5 pt-3 border-top">
+            @if (post.Tags.Count > 0)
+            {
+                <p class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                    <span class="bi bi-tags text-body-secondary" aria-hidden="true"></span>
+                    <span class="visually-hidden">Tags:</span>
+                    @foreach (var tag in post.Tags)
+                    {
+                        <TagBadge Name="@tag.Name" Slug="@tag.Slug" />
+                    }
+                </p>
+            }
+
+            <p class="share-links d-flex flex-wrap align-items-center gap-3 small mb-0">
+                <span class="text-body-secondary">Share:</span>
+                @foreach (var link in _shareLinks)
+                {
+                    <a class="link-secondary" href="@link.Href" target="_blank" rel="noopener noreferrer">
+                        <span class="bi @link.Icon" aria-hidden="true"></span> @link.Network
+                    </a>
+                }
+            </p>
+        </footer>
+    </article>
+}

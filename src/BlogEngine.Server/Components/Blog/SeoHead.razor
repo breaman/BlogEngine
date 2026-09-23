@@ -1,0 +1,16 @@
+@* Title and head tags for a public page (design 14.2, 16). The only <HeadContent> on a page, since the last
+   rendered one wins. Open Graph, Twitter cards and JSON-LD arrive with the full SeoHead in T4.7. *@
+<PageTitle>@_fullTitle</PageTitle>
+<HeadContent>
+    @if (!string.IsNullOrWhiteSpace(_description))
+    {
+        <meta name="description" content="@_description" />
+    }
+    <link rel="canonical" href="@Absolute(CanonicalPath)" />
+    <link rel="alternate" type="application/rss+xml" title="@($"{_siteTitle} (RSS)")" href="@Absolute(SitePaths.RssFeed)" />
+    <link rel="alternate" type="application/atom+xml" title="@($"{_siteTitle} (Atom)")" href="@Absolute(SitePaths.AtomFeed)" />
+    @if (TagFeed is not null)
+    {
+        <link rel="alternate" type="application/rss+xml" title="@($"{_siteTitle}: {TagFeed.Name} (RSS)")" href="@Absolute(TagPaths.Feed(TagFeed.Slug))" />
+    }
+</HeadContent>

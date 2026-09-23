@@ -1,0 +1,12 @@
+@page "/posts/{Year:int}"
+@page "/posts/{Year:int}/{Month:int}"
+@page "/posts/{Year:int}/{Month:int}/{Day:int}"
+
+@if (_page is not null && _period is not null)
+{
+    <SeoHead Title="@(_page.Page > 1 ? $"{_heading}, page {_page.Page}" : _heading)" CanonicalPath="@PostPaths.WithPage(_period.Path, _page.Page)" />
+
+    <Breadcrumbs Items="_breadcrumbs" />
+    <h1 class="mb-3">@_heading</h1>
+    <PostList Page="_page" BasePath="@_period.Path" DateFormat="@_dateFormat" />
+}

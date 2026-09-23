@@ -1,0 +1,21 @@
+@* The line under a post title: date · reading time · tags (design 14.1, 14.2). *@
+<p class="post-meta small text-body-secondary d-flex flex-wrap align-items-center column-gap-2 row-gap-1 @Class">
+    @if (LinkDate)
+    {
+        <a class="link-secondary" href="@PostPaths.Day(Post.PublishedDateLocal)"><time datetime="@PublicDates.Iso(Post.PublishedDateLocal)">@PublicDates.Format(Post.PublishedDateLocal, DateFormat)</time></a>
+    }
+    else
+    {
+        <time datetime="@PublicDates.Iso(Post.PublishedDateLocal)">@PublicDates.Format(Post.PublishedDateLocal, DateFormat)</time>
+    }
+    <span aria-hidden="true">&middot;</span>
+    <span>@Post.ReadingMinutes min read</span>
+    @if (ShowTags && Post.Tags.Count > 0)
+    {
+        <span aria-hidden="true">&middot;</span>
+        @foreach (var tag in Post.Tags)
+        {
+            <TagBadge Name="@tag.Name" Slug="@tag.Slug" />
+        }
+    }
+</p>

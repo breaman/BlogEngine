@@ -13,15 +13,21 @@ cd src/BlogEngine.Server
 npm run sass-dev (or sass-prod depending on which one you want)
 ```
 
-## Admin JavaScript
-The admin editor uses CodeMirror 6 and highlight.js, bundled with esbuild. The sources are in `src/BlogEngine.Client/scripts` and the bundles are written to `src/BlogEngine.Client/wwwroot/js` (`editor.js`, `editor.css`, `admin.js`). The bundles are build output and are not committed.
+## JavaScript
+The site's JavaScript is bundled with esbuild (`src/BlogEngine.Server/scripts/build-js.mjs`) into two groups. The bundles are build output and are not committed.
 
-You don't normally run anything by hand: building `BlogEngine.Client` (and so the server, or `aspire run`) runs `npm run js-build` whenever a script or the npm packages changed. It uses the same `node_modules` as the Sass build, so `npm install` in `src/BlogEngine.Server` is the only setup. To build or watch the bundles yourself:
+- **admin**: the editor (CodeMirror 6 and highlight.js) and small admin helpers. Sources in `src/BlogEngine.Client/scripts`, written to `src/BlogEngine.Client/wwwroot/js` (`editor.js`, `editor.css`, `admin.js`).
+- **public**: `public.js`, a tiny loader on every public page, and `code-blocks.js`/`code-blocks.css` (highlight.js and copy buttons), which it imports only for posts with code blocks. Sources in `src/BlogEngine.Server/scripts`, written to `src/BlogEngine.Server/wwwroot/js`.
+
+You don't normally run anything by hand: building `BlogEngine.Client` builds the admin group and building `BlogEngine.Server` (or `aspire run`) builds the public group, whenever a script or the npm packages changed. They use the same `node_modules` as the Sass build, so `npm install` in `src/BlogEngine.Server` is the only setup. To build or watch the bundles yourself:
 
 ```
 cd src/BlogEngine.Server
-npm run js-build   (or js-watch to rebuild on every change)
+npm run js-build   (or js-watch to rebuild on every change; add "admin" or "public" to build one group:
+                    node ./scripts/build-js.mjs public)
 ```
+
+The Sass output (`wwwroot/css/site.css`) is not rebuilt automatically; run `npm run sass-dev` or `sass-prod` after changing `styles/site.scss`.
 
 ## EF Migrations
 This project adds EF as a dotnet tool, so before running any EF commands, one needs to run the following command from the project folder (there is also a command in the Aspire dashboard to run this restore command if the app is started before the restore command is run manually):

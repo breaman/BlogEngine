@@ -1,0 +1,22 @@
+@page "/tags"
+
+<SeoHead Title="Tags" CanonicalPath="@TagPaths.Index" />
+
+<Breadcrumbs Items="@([new("Home", SitePaths.Home), new("Tags")])" />
+<h1 class="mb-3">Tags</h1>
+
+@if (_tags.Count == 0)
+{
+    <p class="text-body-secondary">No tags yet.</p>
+}
+else
+{
+    <ul class="tag-index list-inline">
+        @foreach (var tag in _tags)
+        {
+            <li class="list-inline-item mb-2">
+                <TagBadge Name="@tag.Name" Slug="@tag.Slug" Count="tag.PostCount" />
+            </li>
+        }
+    </ul>
+}

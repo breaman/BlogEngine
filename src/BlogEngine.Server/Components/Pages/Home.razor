@@ -1,12 +1,41 @@
 @page "/"
 
-<PageTitle>@_siteTitle</PageTitle>
+<SeoHead CanonicalPath="@SitePaths.Home" />
 
-@* The full home page (featured and latest posts) arrives with T1.19. *@
-<h1>@_siteTitle</h1>
-@if (!string.IsNullOrWhiteSpace(_tagline))
+<section class="home-intro mb-4">
+    <h1 class="mb-1">@_siteTitle</h1>
+    @if (!string.IsNullOrWhiteSpace(_tagline))
+    {
+        <p class="lead text-body-secondary mb-0">@_tagline</p>
+    }
+</section>
+
+@if (_featured.Count == 0 && _latest.Count == 0)
 {
-    <p class="lead text-body-secondary">@_tagline</p>
+    <p class="text-body-secondary">No posts yet.</p>
 }
+else
+{
+    @if (_featured.Count > 0)
+    {
+        <section class="featured-posts mb-4" aria-labelledby="featured-heading">
+            <h2 id="featured-heading" class="visually-hidden">Featured posts</h2>
+            @foreach (var post in _featured)
+            {
+                <PostCard Post="post" DateFormat="@_dateFormat" ShowFeatured="true" />
+            }
+        </section>
+    }
 
-<p>No posts yet.</p>
+    <section class="latest-posts" aria-labelledby="latest-heading">
+        <h2 id="latest-heading" class="@(_featured.Count > 0 ? "h5 text-body-secondary mb-0" : "visually-hidden")">Latest posts</h2>
+        @foreach (var post in _latest)
+        {
+            <PostCard Post="post" DateFormat="@_dateFormat" />
+        }
+    </section>
+
+    <p class="mt-4">
+        <a class="btn btn-outline-primary" href="@PostPaths.Index">All posts <span class="bi bi-arrow-right" aria-hidden="true"></span></a>
+    </p>
+}

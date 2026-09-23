@@ -1,0 +1,5 @@
+@* A link to a tag page, styled as a small pill (design 14.1). *@
+<a class="tag-badge badge rounded-pill text-bg-light border text-decoration-none fw-normal" href="@TagPaths.Tag(Slug)"><span>#@Name</span>@if (Count is { } count)
+{
+    <span class="ms-1 text-body-secondary">@count</span>
+}</a>

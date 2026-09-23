@@ -38,6 +38,36 @@
           SkipUnchangedFiles="true" />
   </Target>
 
+  <!--
+    Public-site JavaScript (design 10.3, T1.23): scripts/public.js (the tiny loader on every page) and
+    scripts/code-blocks.js (highlight.js and copy buttons, loaded only for posts with code) are built by
+    esbuild into wwwroot/js. The "admin" bundles are built by BlogEngine.Client. Incremental, and skipped in
+    Visual Studio design-time builds, which must not start external processes. The output is not committed.
+  -->
+  <ItemGroup>
+    <PublicScriptSource Include="scripts\**\*.js;scripts\build-js.mjs;package-lock.json;..\BlogEngine.Client\scripts\highlighter.js" />
+  </ItemGroup>
+
+  <Target Name="BuildPublicScripts"
+          BeforeTargets="BeforeBuild"
+          Condition="'$(DesignTimeBuild)' != 'true'"
+          Inputs="@(PublicScriptSource)"
+          Outputs="wwwroot\js\public.js;wwwroot\js\code-blocks.js">
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)\node_modules\esbuild')"
+           Text="esbuild was not found. Run 'npm install' in $(MSBuildProjectDirectory)." />
+    <Exec Command="node ./scripts/build-js.mjs public" WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+
+  <!-- The wwwroot glob is evaluated before the bundles exist on a clean build, so add them to Content here
+       for the static web assets pipeline to serve (and fingerprint) them. -->
+  <Target Name="IncludePublicScripts" AfterTargets="BuildPublicScripts" Condition="'$(DesignTimeBuild)' != 'true'">
+    <ItemGroup>
+      <_PublicScriptOutput Include="wwwroot\js\public.*;wwwroot\js\code-blocks.*" />
+      <Content Remove="@(_PublicScriptOutput)" />
+      <Content Include="@(_PublicScriptOutput)" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    </ItemGroup>
+  </Target>
+
   <!-- Self-hosted Bootstrap Icons font files, referenced from site.css as ../fonts/ (see styles/site.scss). -->
   <Target Name="CopyBootstrapIconFonts" BeforeTargets="Build">
     <ItemGroup>

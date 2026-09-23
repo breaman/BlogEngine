@@ -1,0 +1,25 @@
+@* « Newer / Page X of Y / Older » (design 14.1). Plain links, so paging works without JavaScript. *@
+@if (TotalPages > 1)
+{
+    <nav class="pager d-flex justify-content-between align-items-center gap-2 my-4" aria-label="Pages">
+        @if (Page > 1)
+        {
+            <a class="btn btn-outline-secondary btn-sm" rel="prev" href="@PageHref(Page - 1)">&laquo; Newer</a>
+        }
+        else
+        {
+            <span class="btn btn-outline-secondary btn-sm invisible" aria-hidden="true">&laquo; Newer</span>
+        }
+
+        <span class="text-body-secondary small">Page @Page of @TotalPages</span>
+
+        @if (Page < TotalPages)
+        {
+            <a class="btn btn-outline-secondary btn-sm" rel="next" href="@PageHref(Page + 1)">Older &raquo;</a>
+        }
+        else
+        {
+            <span class="btn btn-outline-secondary btn-sm invisible" aria-hidden="true">Older &raquo;</span>
+        }
+    </nav>
+}

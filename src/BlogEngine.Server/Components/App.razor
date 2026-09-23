@@ -5,6 +5,11 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
+    @if (_discourageSearchEngines)
+    {
+        @* "Discourage search engines" (design 13, 16): noindex on every page, alongside Disallow: / in robots.txt. *@
+        <meta name="robots" content="noindex, nofollow" />
+    }
     <ResourcePreloader />
     <link rel="stylesheet" href="@Assets["css/site.css"]" />
     @* Scoped CSS from .razor.css files, including those of BlogEngine.Client components. *@
@@ -14,10 +19,13 @@
     <HeadOutlet />
 </head>
 
-<body>
+<body class="d-flex flex-column min-vh-100">
 <Routes />
 <script src="@Assets["_framework/blazor.web.js"]"></script>
 <script src="@Assets["js/bootstrap.bundle.min.js"]"></script>
 <script src="@Assets["Components/Account/Shared/PasskeySubmit.razor.js"]" type="module"></script>
+@* Public page enhancements (design 5.1, 10.3). A few hundred bytes; it loads the highlight.js bundle only on
+   pages whose post has code blocks. *@
+<script src="@Assets["js/public.js"]" type="module"></script>
 </body>
 </html>

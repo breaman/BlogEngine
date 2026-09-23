@@ -1,0 +1,21 @@
+<footer class="site-footer border-top bg-body-tertiary py-4 mt-auto">
+    <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
+        <p class="mb-0 small text-body-secondary">&copy; @_year @_owner</p>
+
+        <ul class="list-inline mb-0">
+            @foreach (var link in _socialLinks)
+            {
+                <li class="list-inline-item">
+                    <a class="link-secondary fs-5" href="@link.Url" rel="me noopener" title="@link.Network" aria-label="@link.Network">
+                        <span class="bi @SocialIcons.For(link.Network)" aria-hidden="true"></span>
+                    </a>
+                </li>
+            }
+            <li class="list-inline-item">
+                <a class="link-secondary fs-5" href="@SitePaths.RssFeed" title="RSS feed" aria-label="RSS feed">
+                    <span class="bi bi-rss-fill" aria-hidden="true"></span>
+                </a>
+            </li>
+        </ul>
+    </div>
+</footer>

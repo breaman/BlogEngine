@@ -440,6 +440,9 @@ namespace BlogEngine.Data.Migrations
                     b.Property<DateTimeOffset?>("DeletedOn")
                         .HasColumnType("datetimeoffset(7)");
 
+                    b.Property<bool>("HasCodeBlocks")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 

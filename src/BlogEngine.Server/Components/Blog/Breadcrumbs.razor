@@ -1,0 +1,20 @@
+@* Bootstrap breadcrumb trail; the last item is the current page and isn't a link (design 14.1). *@
+@if (Items.Count > 0)
+{
+    <nav aria-label="Breadcrumb">
+        <ol class="breadcrumb small">
+            @for (var i = 0; i < Items.Count; i++)
+            {
+                var item = Items[i];
+                if (i == Items.Count - 1 || item.Href is null)
+                {
+                    <li class="breadcrumb-item active" aria-current="@(i == Items.Count - 1 ? "page" : null)">@item.Text</li>
+                }
+                else
+                {
+                    <li class="breadcrumb-item"><a href="@item.Href">@item.Text</a></li>
+                }
+            }
+        </ol>
+    </nav>
+}

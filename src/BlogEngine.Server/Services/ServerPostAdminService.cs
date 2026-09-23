@@ -1,5 +1,6 @@
 using BlogEngine.Data.Common;
 using BlogEngine.Data.Models;
+using BlogEngine.Server.Services.Public;
 using BlogEngine.Shared.Common;
 using BlogEngine.Shared.Contracts;
 using BlogEngine.Shared.Enums;
@@ -31,6 +32,12 @@ namespace BlogEngine.Server.Services;
 /// the write. Either way the caller gets <see cref="PostConflict"/> rather than overwriting another tab.
 /// </para>
 /// <para>
+/// Public caches: once a save that changes what readers can see has committed (anything touching a published
+/// post, publishing, unpublishing, trashing a published post), <see cref="CacheInvalidator"/> evicts the
+/// cached lists, pages and feeds, so the change is visible on the next request (T1.17). Draft-only saves and
+/// autosaves never change public content, so they leave the caches alone.
+/// </para>
+/// <para>
 /// Races on unique indexes (two saves creating the same tag, or claiming the same slug) are resolved by
 /// clearing the context and running the whole operation again: the retry sees the winner's row and reuses
 /// it or picks the next free slug.
@@ -42,6 +49,7 @@ public sealed class ServerPostAdminService(
     PostHtmlSanitizer sanitizer,
     TimeProvider timeProvider,
     IValidator<PostEditDto> postValidator,
+    CacheInvalidator cacheInvalidator,
     ILogger<ServerPostAdminService> logger) : IPostAdminService
 {
     /// <summary>Autosave revisions kept per post; older ones are pruned (design 6.7).</summary>
@@ -198,6 +206,11 @@ public sealed class ServerPostAdminService(
             MarkModified(entity);
 
             await dbContext.SaveChangesAsync(ct);
+            if (entity.Status == PostStatus.Published)
+            {
+                await cacheInvalidator.PostChangedAsync(entity.Id);
+            }
+
             return new PostSaved(await ToEditDtoAsync(entity, ct));
         }, cancellationToken);
     }
@@ -290,6 +303,8 @@ public sealed class ServerPostAdminService(
             MarkModified(entity);
 
             await dbContext.SaveChangesAsync(ct);
+            await cacheInvalidator.PostChangedAsync(entity.Id);
+
             return new PostSaved(await ToEditDtoAsync(entity, ct));
         }, cancellationToken);
     }
@@ -319,6 +334,7 @@ public sealed class ServerPostAdminService(
                 entity.Status = PostStatus.Draft;
                 MarkModified(entity);
                 await dbContext.SaveChangesAsync(ct);
+                await cacheInvalidator.PostChangedAsync(entity.Id);
             }
 
             return new PostSaved(await ToEditDtoAsync(entity, ct));
@@ -335,8 +351,14 @@ public sealed class ServerPostAdminService(
         }
 
         // SoftDeleteInterceptor turns this into IsDeleted = true (the trash), which hides the post everywhere.
+        var wasPublished = entity.Status == PostStatus.Published;
         dbContext.Posts.Remove(entity);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        if (wasPublished)
+        {
+            await cacheInvalidator.PostChangedAsync(entity.Id);
+        }
 
         return true;
     }
@@ -409,7 +431,9 @@ public sealed class ServerPostAdminService(
 
         post.Title = title;
         post.ContentMarkdown = markdown;
-        post.ContentHtml = sanitizer.Sanitize(BlogMarkdownPipeline.Default.RenderPost(markdown).Html);
+        var rendered = BlogMarkdownPipeline.Default.RenderPost(markdown);
+        post.ContentHtml = sanitizer.Sanitize(rendered.Html);
+        post.HasCodeBlocks = rendered.ContainsCodeBlocks;
 
         var stats = ReadingTime.Calculate(markdown);
         post.WordCount = stats.WordCount;

@@ -1,11 +1,13 @@
-﻿@inherits LayoutComponentBase
-@using BlogEngine.Client.Components
+@inherits LayoutComponentBase
+
+@* The public layout (design 5.1, 14): static SSR only, so readers never download WebAssembly. Interactive
+   admin pages use AdminLayout in BlogEngine.Client, which has its own toast container. *@
 
 <NavMenu />
-<main class="mt-2 container">
+<main class="container py-4 flex-grow-1">
     @Body
-    <ToastContainer @rendermode="InteractiveWebAssembly" />
 </main>
+<SiteFooter />
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.

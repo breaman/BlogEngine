@@ -152,3 +152,56 @@ $bootstrap-icons-font-dir: "../fonts";
     list-style: none;
   }
 }
+
+// Public site (design 14). Readable line length for a post, and a little breathing room in lists.
+.post {
+  max-width: 48rem;
+}
+
+.post-card:last-child {
+  border-bottom: 0 !important;
+}
+
+.navbar .site-tagline {
+  font-size: 0.8rem;
+}
+
+// The navbar search box: a compact floating label, so it fits the bar.
+.site-search .form-floating {
+  > .form-control {
+    height: calc(2.75rem + 2px);
+    min-height: calc(2.75rem + 2px);
+    padding-top: 1.25rem;
+    padding-bottom: 0.25rem;
+  }
+
+  > label {
+    padding: 0.7rem 0.75rem;
+  }
+}
+
+// Copy buttons that scripts/code-blocks.js adds to code blocks on public post pages (design 10.3).
+.post-content pre.has-copy-button {
+  position: relative;
+}
+
+.code-copy-button {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s ease-in-out;
+}
+
+.post-content pre:hover .code-copy-button,
+.code-copy-button:focus-visible {
+  opacity: 1;
+}
+
+// Touch screens have no hover, so the button is always visible there.
+@media (hover: none) {
+  .code-copy-button {
+    opacity: 1;
+  }
+}

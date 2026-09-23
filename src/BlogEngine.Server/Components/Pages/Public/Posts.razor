@@ -1,0 +1,10 @@
+@page "/posts"
+
+@if (_page is not null)
+{
+    <SeoHead Title="@(_page.Page > 1 ? $"Posts, page {_page.Page}" : "Posts")" CanonicalPath="@PostPaths.WithPage(PostPaths.Index, _page.Page)" />
+
+    <Breadcrumbs Items="@([new("Home", SitePaths.Home), new("Posts")])" />
+    <h1 class="mb-3">Posts</h1>
+    <PostList Page="_page" BasePath="@PostPaths.Index" DateFormat="@_dateFormat" />
+}
