@@ -1,0 +1,8 @@
+{
+  "appHost": {
+    "path": "aspire/BlogEngine.AppHost/BlogEngine.AppHost.csproj"
+  },
+  "features": {
+    "defaultWatchEnabled": "true"
+  }
+}
