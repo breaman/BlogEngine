@@ -94,6 +94,9 @@ try
     builder.Services.AddScoped<IUserService, HttpUserService>();
     builder.Services.AddScoped<IToastService, ToastService>();
     builder.Services.AddScoped<ISettingsService, ServerSettingsService>();
+    builder.Services.AddScoped<IPostAdminService, ServerPostAdminService>();
+    builder.Services.AddScoped<ITagService, ServerTagService>();
+    builder.Services.AddSingleton<PostHtmlSanitizer>();
 
     // First-run admin account: the /setup page, or seeding from the AdminSeed section (design 12.1).
     builder.Services.AddScoped<AdminAccountService>();
@@ -130,6 +133,12 @@ try
     }
 
     app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+
+    // API callers need the real 401/403/404/409, not the not-found page re-executed with their PUT or POST.
+    app.UseApiWithoutStatusCodePages();
+
+    // Inside the status code pages middleware, so a 404 can become a stored 301 before the not-found page renders.
+    app.UseMiddleware<RedirectFallbackMiddleware>();
 
     app.UseHttpsRedirection();
     app.UseAuthentication();

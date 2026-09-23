@@ -18,6 +18,8 @@
     <ProjectReference Include="..\..\src\BlogEngine.Data\BlogEngine.Data.csproj" />
     <!-- For WebAssembly-side services such as AntiforgeryHandler. -->
     <ProjectReference Include="..\..\src\BlogEngine.Client\BlogEngine.Client.csproj" />
+    <!-- For server services with no database dependency, such as PostHtmlSanitizer. -->
+    <ProjectReference Include="..\..\src\BlogEngine.Server\BlogEngine.Server.csproj" />
   </ItemGroup>
 
 </Project>

@@ -25,4 +25,8 @@ builder.Services.AddScoped(sp =>
 
 builder.Services.AddScoped<IToastService, ToastService>();
 
+// Admin services over /api/admin; the server registers database-backed implementations of the same interfaces.
+builder.Services.AddScoped<IPostAdminService, ClientPostAdminService>();
+builder.Services.AddScoped<ITagService, ClientTagService>();
+
 await builder.Build().RunAsync();

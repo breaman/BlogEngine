@@ -26,6 +26,8 @@ public static class AdminApiEndpoints
             .WithTags("Admin");
 
         group.MapAdminSettingsEndpoints();
+        group.MapAdminPostsEndpoints();
+        group.MapAdminTagsEndpoints();
 
         return group;
     }

@@ -13,7 +13,7 @@
 | Phase | Goal | Tasks | Done |
 |---|---|---|---|
 | [0: Foundation](#phase-0--foundation) | Admin can log in to an empty dashboard | 16 | 16 |
-| [1: Posts MVP](#phase-1--posts-mvp) | Can write and publish posts end to end | 25 | 0 |
+| [1: Posts MVP](#phase-1--posts-mvp) | Can write and publish posts end to end | 25 | 7 |
 | [2: Media MVP](#phase-2--media-mvp) | Can add, edit and insert photos | 13 | 0 |
 | [3: Comments MVP](#phase-3--comments-mvp) | Readers can comment; the author moderates | 11 | 0 |
 | [4: V1 Polish](#phase-4--v1-polish) | Ready for public launch | 35 | 0 |
@@ -160,34 +160,34 @@ These apply to all tasks and are not repeated below:
 
 ### Post services and API
 
-- [ ] **T1.1 — Post DTOs, validators and `IPostAdminService` contract** (§5.2)
+- [x] **T1.1 — Post DTOs, validators and `IPostAdminService` contract** (§5.2)
   - DTOs: `PostEditDto`, `PostSummaryDto`, `PostListQuery`, `TagDto`, publish request (`publishOn?`). Shared validators (title required, lengths, slug format `[a-z0-9-]`).
   - **Done when:** contracts compile in Shared and validators have unit tests.
 
-- [ ] **T1.2 — `ServerPostAdminService`: create, update, save pipeline** (§6.2, §7.2)
+- [x] **T1.2 — `ServerPostAdminService`: create, update, save pipeline** (§6.2, §7.2)
   - On save: render `ContentHtml` (sanitized with the permissive post allowlist: `iframe` only from YouTube/Vimeo), compute word count/reading time, auto-summary if blank, slug from title while draft, `PublishedDateLocal`, rebuild `PostMedia`.
   - Optimistic concurrency via `RowVersion` → a typed conflict result.
   - **Done when:** integration tests cover create, update, slug uniqueness (`-2` suffix), and a stale `RowVersion` conflict.
 
-- [ ] **T1.3 — Tag resolution on save** (§6.4, A4)
+- [x] **T1.3 — Tag resolution on save** (§6.4, A4)
   - Match existing tags by `NormalizedName` (keeping original casing); create new ones in the same transaction; on a unique-violation race, reload and reuse the existing tag.
   - **Done when:** an integration test with two concurrent saves creating `c#` and `C#` ends with exactly one tag.
 
-- [ ] **T1.4 — Publish and unpublish** (§6.3, A3)
+- [x] **T1.4 — Publish and unpublish** (§6.3, A3)
   - Publish now sets `Status = Published`, `PublishedOn` (first publish only unless edited), writes a `Publish` revision, and locks the slug.
   - Unpublish returns to `Draft` (public URL 404s). MVP rejects a future `publishOn` (scheduling is T4.1).
   - **Done when:** integration tests prove a draft is never visible publicly and a published post is.
 
-- [ ] **T1.5 — Automatic redirects on slug/date change** (§6.7, P16)
+- [x] **T1.5 — Automatic redirects on slug/date change** (§6.7, P16)
   - When a published post's slug or `PublishedDateLocal` changes, insert a `Redirect` (old path → new path, 301). Collapse chains so old redirects point to the newest URL.
   - **Done when:** an integration test changes a published slug and the old URL returns 301 to the new one.
 
-- [ ] **T1.6 — Autosave with staged changes** (§10.2, A6, Q3)
+- [x] **T1.6 — Autosave with staged changes** (§10.2, A6, Q3)
   - Autosave writes a `PostRevision(Kind = Autosave)`, keeping only the latest 20 autosaves per post.
   - Drafts: autosave also updates the post. Published posts: autosave stores a pending revision only; **Update** applies it.
   - **Done when:** an integration test proves autosaving a published post leaves the public content unchanged until Update.
 
-- [ ] **T1.7 — Admin post and tag API endpoints** (§7.4)
+- [x] **T1.7 — Admin post and tag API endpoints** (§7.4)
   - `GET /posts` (status/tag/text filter, paged), `GET /posts/{id}`, `POST /posts`, `PUT /posts/{id}`, `POST /posts/{id}/autosave`, `POST /posts/{id}/publish`, `POST /posts/{id}/unpublish`, `DELETE /posts/{id}` (to trash via soft delete), `POST /posts/slug-check`.
   - `GET /tags?search=` (top 10 by usage, case-insensitive).
   - **Done when:** each endpoint has an integration test including a 401/403 for non-admins and 409 for concurrency conflicts.
@@ -195,6 +195,7 @@ These apply to all tasks and are not repeated below:
 - [ ] **T1.8 — Client service implementations**
   - `ClientPostAdminService`, `ClientTagService` over `HttpClient`; register in `Client/Program.cs`; server implementations registered in `Server/Program.cs`.
   - **Done when:** admin pages work both prerendered and after WASM hydration.
+  - *Status:* both implementations are written, registered and unit-tested (HTTP status → `PostSaveResult` mapping). No admin page consumes them yet, so the "Done when" check happens with T1.13/T1.14.
 
 ### Admin UI
 
