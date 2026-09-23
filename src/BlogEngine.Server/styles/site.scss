@@ -96,3 +96,11 @@ $bootstrap-icons-font-dir: "../fonts";
 .blazor-error-boundary::after {
   content: "An error has occurred."
 }
+
+
+// Small icon the Markdown pipeline's ExternalLinkRewriter appends inside links to other sites.
+.external-link-icon {
+  font-size: 0.75em;
+  margin-left: 0.2em;
+  vertical-align: baseline;
+}

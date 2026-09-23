@@ -14,6 +14,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\BlogEngine.Shared\BlogEngine.Shared.csproj" />
+    <!-- For query rules such as VisibleToPublic, tested with LINQ to Objects and SQL translation. -->
+    <ProjectReference Include="..\..\src\BlogEngine.Data\BlogEngine.Data.csproj" />
   </ItemGroup>
 
 </Project>

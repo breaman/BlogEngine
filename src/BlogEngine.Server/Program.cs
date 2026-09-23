@@ -89,6 +89,9 @@ try
     builder.Services.AddScoped<IToastService, ToastService>();
     builder.Services.AddScoped<ISettingsService, ServerSettingsService>();
 
+    // The clock behind the public visibility rule and scheduling; tests replace it with a fake (design 6.3).
+    builder.Services.AddSingleton(TimeProvider.System);
+
     // Add route configuration to enforce lowercase URLs for better SEO
     builder.Services.Configure<RouteOptions>(options =>
     {

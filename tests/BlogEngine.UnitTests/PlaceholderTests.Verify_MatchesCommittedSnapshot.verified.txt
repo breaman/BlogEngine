@@ -1,4 +1,0 @@
-﻿{
-  MetaTitle: 70,
-  MetaDescription: 160
-}

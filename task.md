@@ -12,7 +12,7 @@
 
 | Phase | Goal | Tasks | Done |
 |---|---|---|---|
-| [0: Foundation](#phase-0--foundation) | Admin can log in to an empty dashboard | 16 | 8 |
+| [0: Foundation](#phase-0--foundation) | Admin can log in to an empty dashboard | 16 | 13 |
 | [1: Posts MVP](#phase-1--posts-mvp) | Can write and publish posts end to end | 25 | 0 |
 | [2: Media MVP](#phase-2--media-mvp) | Can add, edit and insert photos | 13 | 0 |
 | [3: Comments MVP](#phase-3--comments-mvp) | Readers can comment; the author moderates | 11 | 0 |
@@ -111,27 +111,27 @@ These apply to all tasks and are not repeated below:
 
 ### Shared utilities (with unit tests)
 
-- [ ] **T0.10 — `SlugGenerator`** (§7.2)
+- [x] **T0.10 — `SlugGenerator`** (§7.2)
   - Lowercase, strip diacritics, non-alphanumeric runs → `-`, trim hyphens, truncate to 80 chars at a word boundary; helper for `-2`, `-3` collision suffixes.
   - **Done when:** unit tests cover diacritics, punctuation, long titles, empty/whitespace input and collision suffixing.
 
-- [ ] **T0.11 — `TagNormalizer` and tag slugs** (§6.4)
+- [x] **T0.11 — `TagNormalizer` and tag slugs** (§6.4)
   - Trim, collapse whitespace, NFKC; `NormalizedName = ToUpperInvariant()`; reject empty, >50 chars, commas/semicolons.
   - Tag slugs map `#`→`sharp`, `+`→`plus`, leading `.`→`dot`, `&`→`and` before slugifying.
   - **Done when:** tests prove `C#`/`c#`/` c# ` collide, `C#` ≠ `C`, `C++` → `cplusplus`, `.NET` → `dotnet`, and Unicode cases behave.
 
-- [ ] **T0.12 — `ReadingTime` and summary generation** (§6.2, A7, A12)
+- [x] **T0.12 — `ReadingTime` and summary generation** (§6.2, A7, A12)
   - Word count and reading minutes from Markdown (ignoring code fences/syntax); auto-summary from the first ~160 characters of plain text.
   - **Done when:** unit tests pass for plain text, code-heavy and very short posts.
 
-- [ ] **T0.13 — `BlogMarkdownPipeline` (post + comment pipelines)** (§10.1, §8.2)
+- [x] **T0.13 — `BlogMarkdownPipeline` (post + comment pipelines)** (§10.1, §8.2)
   - Post pipeline: pipe/grid tables, task lists, footnotes, auto identifiers, emphasis extras, auto links, media links (YouTube/Vimeo → `youtube-nocookie.com`), generic attributes, figures, precise source locations. Raw HTML allowed.
   - Comment pipeline: paragraphs, emphasis, inline code, code blocks, links, blockquotes, lists only; `DisableHtml()`.
   - `ExternalLinkRewriter`: `rel="noopener"` + external-link icon. Expose a "contains code blocks" flag on the render result.
   - Must run in WebAssembly (no server-only APIs).
   - **Done when:** snapshot tests cover each extension and prove the comment pipeline drops headings, images, tables and HTML.
 
-- [ ] **T0.14 — Public visibility rule** (§6.3)
+- [x] **T0.14 — Public visibility rule** (§6.3)
   - `IQueryable<Post>.VisibleToPublic(TimeProvider)` = `Published && PublishedOn <= now && !IsDeleted`. Register `TimeProvider.System` in DI.
   - Time-zone helper that computes `PublishedDateLocal` from a UTC `DateTimeOffset` and `TimeZoneId`.
   - **Done when:** unit tests cover draft, scheduled, published, deleted, and midnight/DST edge cases for the local date.
