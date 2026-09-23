@@ -27,6 +27,17 @@ See: https://learn.microsoft.com/visualstudio/msbuild/customize-your-build
   If you want project to have their own, set it to a different GUID on each project.
   See: https://learn.microsoft.com/dotnet/architecture/microservices/secure-net-microservices-web-applications/developer-app-secrets-storage
   -->
+  <!--
+  Verify (snapshot testing) requires a declared sponsorship status or the build fails with SC021.
+  BlogEngine is a non-revenue open source project, so it claims the OpenSource exemption.
+  The exemption is time-bounded (at most 12 months out) and must be renewed before it expires.
+  See https://github.com/VerifyTests/Verify/blob/main/docs/maintenance-fee.md
+  -->
+  <PropertyGroup Label="Verify SponsorCheck">
+    <Verify_SponsorshipExemption>OpenSource</Verify_SponsorshipExemption>
+    <Verify_SponsorshipExemptionUntil>2027-09</Verify_SponsorshipExemptionUntil>
+  </PropertyGroup>
+
   <PropertyGroup Label="User Secrets">
     <UserSecretsId>268b63b0-cb60-44c9-b134-9a9b4aa17252</UserSecretsId>
   </PropertyGroup>

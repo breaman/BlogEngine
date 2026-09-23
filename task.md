@@ -12,7 +12,7 @@
 
 | Phase | Goal | Tasks | Done |
 |---|---|---|---|
-| [0: Foundation](#phase-0--foundation) | Admin can log in to an empty dashboard | 16 | 0 |
+| [0: Foundation](#phase-0--foundation) | Admin can log in to an empty dashboard | 16 | 4 |
 | [1: Posts MVP](#phase-1--posts-mvp) | Can write and publish posts end to end | 25 | 0 |
 | [2: Media MVP](#phase-2--media-mvp) | Can add, edit and insert photos | 13 | 0 |
 | [3: Comments MVP](#phase-3--comments-mvp) | Readers can comment; the author moderates | 11 | 0 |
@@ -62,26 +62,26 @@ These apply to all tasks and are not repeated below:
 
 ### Project setup and cleanup
 
-- [ ] **T0.1 — Create test projects**
+- [x] **T0.1 — Create test projects**
   - Add `tests/BlogEngine.UnitTests` and `tests/BlogEngine.IntegrationTests` (**TUnit**) to `BlogEngine.slnx`, with package versions in `Directory.Packages.props`.
   - TUnit runs on Microsoft.Testing.Platform: set `"test": { "runner": "Microsoft.Testing.Platform" }` in `global.json` so `dotnet test` works on the .NET 10 SDK.
   - Snapshot tests (T0.13, T2.7) use `Verify.TUnit`.
   - Integration tests: `TUnit.AspNetCore`'s `TestWebApplicationFactory<Program>` + a SQL Server test container (Testcontainers), shared across the run with `[ClassDataSource<…>(Shared = SharedType.PerTestSession)]`; the fixture applies migrations on startup.
   - **Done when:** both projects build, a placeholder test passes in each, and the tests run in Visual Studio Enterprise and via `dotnet test`.
 
-- [ ] **T0.2 — Replace `FieldLengths` with blog-specific constants** (§2, §6.9)
+- [x] **T0.2 — Replace `FieldLengths` with blog-specific constants** (§2, §6.9)
   - Remove the barcode/promotion/payment constants; add the constants listed in §6.9.
   - **Done when:** the solution builds with no references to the old constants.
 
-- [ ] **T0.3 — Remove template sample content**
+- [x] **T0.3 — Remove template sample content**
   - Remove `ClientHello.razor` and any other sample pages/nav links that aren't part of the blog.
   - **Done when:** nav shows only real routes; solution builds.
 
-- [ ] **T0.4 — Self-host Bootstrap Icons** (§12.2)
+- [x] **T0.4 — Self-host Bootstrap Icons** (§12.2)
   - Add `bootstrap-icons` to `src/BlogEngine.Server/package.json`, copy/bundle the font + CSS into `wwwroot`, and remove the CDN `<link>` from `App.razor`.
   - **Done when:** icons render with no external requests.
 
-- [ ] **T0.5 — Add core NuGet packages** (§5.3)
+- [x] **T0.5 — Add core NuGet packages** (§5.3)
   - `Markdig` (Shared), `HtmlSanitizer` (Server), `System.ServiceModel.Syndication` (Server). (ImageSharp is added in Phase 2.)
   - **Done when:** packages are centrally versioned and restore cleanly.
 

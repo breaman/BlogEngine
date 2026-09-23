@@ -1,4 +1,11 @@
 ## Bootstrap
+Bootstrap and Bootstrap Icons come from npm and are self-hosted (no CDN), so install the npm packages once after cloning. The build copies `bootstrap.bundle.min.js` and the Bootstrap Icons font files from `node_modules` into `wwwroot`, and it fails if they are missing:
+
+```
+cd src/BlogEngine.Server
+npm install
+```
+
 Since this template utilizes bootstrap scss, the initial css file needs to be generated. There are two scripts included for doing this, one is sass-dev that will run the process in watch mode and the other is sass-prod that will compress the css file for production use. In order to do this perform the following steps in your terminal:
 
 ```
@@ -27,4 +34,16 @@ This project is configured with aspire and should use the aspire cli, so the rec
 
 ```
 aspire run
+```
+
+## Tests
+The tests use [TUnit](https://tunit.dev) on Microsoft.Testing.Platform (enabled for `dotnet test` in `global.json`):
+
+- `tests/BlogEngine.UnitTests`: fast tests for shared utilities. Snapshot tests use [Verify](https://github.com/VerifyTests/Verify); commit `*.verified.*` files, never `*.received.*` files. Verify requires a sponsorship declaration: this repo claims the OpenSource exemption in `Directory.Build.props`, which expires 2027-09 and must be renewed.
+- `tests/BlogEngine.IntegrationTests`: hosts the server in memory against a SQL Server container (Testcontainers) shared by the whole test run, with migrations applied on startup. **Docker must be running.**
+
+Run everything from the repository root:
+
+```
+dotnet test
 ```

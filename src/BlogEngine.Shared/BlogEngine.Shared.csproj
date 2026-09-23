@@ -3,4 +3,9 @@
   <PropertyGroup>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- Markdown rendering shared by the server and the WebAssembly editor preview (design 5.3). -->
+    <PackageReference Include="Markdig" />
+  </ItemGroup>
+
 </Project>

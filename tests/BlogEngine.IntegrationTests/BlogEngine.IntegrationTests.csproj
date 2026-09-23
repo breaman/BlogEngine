@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- TUnit test projects are self-hosting executables on Microsoft.Testing.Platform. -->
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="TUnit" />
+    <!-- Provides TestWebApplicationFactory<TEntryPoint> for in-memory hosting of BlogEngine.Server. -->
+    <PackageReference Include="TUnit.AspNetCore" />
+    <!-- Throwaway SQL Server instance per test session. Requires a running Docker engine. -->
+    <PackageReference Include="Testcontainers.MsSql" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\BlogEngine.Server\BlogEngine.Server.csproj" />
+  </ItemGroup>
+
+</Project>

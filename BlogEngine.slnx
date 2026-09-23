@@ -19,4 +19,8 @@
     <Project Path="src/BlogEngine.Server/BlogEngine.Server.csproj" />
     <Project Path="src/BlogEngine.Shared/BlogEngine.Shared.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/BlogEngine.IntegrationTests/BlogEngine.IntegrationTests.csproj" />
+    <Project Path="tests/BlogEngine.UnitTests/BlogEngine.UnitTests.csproj" />
+  </Folder>
 </Solution>

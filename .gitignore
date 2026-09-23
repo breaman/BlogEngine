@@ -482,3 +482,7 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Verify snapshot testing: received files are transient, verified files are committed
+*.received.*
+*.received/
