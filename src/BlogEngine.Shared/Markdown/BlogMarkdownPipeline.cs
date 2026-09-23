@@ -1,8 +1,11 @@
+using System.Globalization;
+
 using Markdig;
 using Markdig.Extensions.AutoIdentifiers;
 using Markdig.Extensions.AutoLinks;
 using Markdig.Extensions.EmphasisExtras;
 using Markdig.Parsers;
+using Markdig.Renderers.Html;
 using Markdig.Syntax;
 
 namespace BlogEngine.Shared.Markdown;
@@ -38,6 +41,9 @@ public sealed class BlogMarkdownPipeline
     /// <summary>A pipeline with no internal hosts configured; every absolute http(s) link counts as external.</summary>
     public static BlogMarkdownPipeline Default { get; } = new();
 
+    /// <summary>Name of the attribute holding a preview block's 0-based source line.</summary>
+    public const string SourceLineAttribute = "data-line";
+
     /// <summary>Builds both pipelines.</summary>
     /// <param name="options">Host-specific settings; defaults are used when <see langword="null"/>.</param>
     public BlogMarkdownPipeline(BlogMarkdownOptions? options = null)
@@ -71,6 +77,26 @@ public sealed class BlogMarkdownPipeline
         return Render(markdown, PostPipeline);
     }
 
+    /// <summary>
+    /// Renders post Markdown for the editor's live preview (design 10.2): the same HTML as
+    /// <see cref="RenderPost"/>, except that every top-level block carries a
+    /// <c>data-line</c> attribute with its 0-based source line, so the preview can scroll in step with the editor.
+    /// </summary>
+    /// <remarks>
+    /// Only top-level blocks are annotated: they are enough for scroll sync, and nested blocks would make the
+    /// preview lookup ambiguous. Blocks rendered verbatim (raw HTML) can't carry attributes and are skipped.
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// var html = pipeline.RenderPostPreview("# Title\n\nText").Html;
+    /// // &lt;h1 id="title" data-line="0"&gt;Title&lt;/h1&gt;\n&lt;p data-line="2"&gt;Text&lt;/p&gt;
+    /// </code>
+    /// </example>
+    public MarkdownRenderResult RenderPostPreview(string? markdown)
+    {
+        return Render(markdown, PostPipeline, AddSourceLines);
+    }
+
     /// <summary>Renders comment Markdown to HTML with the restricted comment pipeline.</summary>
     public MarkdownRenderResult RenderComment(string? markdown)
     {
@@ -78,15 +104,29 @@ public sealed class BlogMarkdownPipeline
     }
 
     /// <summary>Parses once, then renders the document and inspects it for code blocks.</summary>
-    private static MarkdownRenderResult Render(string? markdown, MarkdownPipeline pipeline)
+    private static MarkdownRenderResult Render(string? markdown, MarkdownPipeline pipeline,
+        Action<MarkdownDocument>? beforeRender = null)
     {
         var document = Markdig.Markdown.Parse(markdown ?? string.Empty, pipeline);
+        beforeRender?.Invoke(document);
         var html = document.ToHtml(pipeline);
 
         // FencedCodeBlock derives from CodeBlock, so this covers fenced and indented blocks.
         var containsCodeBlocks = document.Descendants<CodeBlock>().Any();
 
         return new MarkdownRenderResult(html, containsCodeBlocks);
+    }
+
+    /// <summary>Tags each top-level block with the source line it starts on (see <see cref="RenderPostPreview"/>).</summary>
+    private static void AddSourceLines(MarkdownDocument document)
+    {
+        foreach (var block in document)
+        {
+            if (block is not HtmlBlock)
+            {
+                block.GetAttributes().AddProperty(SourceLineAttribute, block.Line.ToString(CultureInfo.InvariantCulture));
+            }
+        }
     }
 
     /// <summary>Bare <c>www.</c> links default to https rather than Markdig's http.</summary>

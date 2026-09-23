@@ -26,11 +26,18 @@ builder.Services.AddScoped(sp =>
 
 builder.Services.AddScoped<IToastService, ToastService>();
 
+// The clock for timestamps such as local backups and the time zone list; the server registers the same.
+builder.Services.AddSingleton(TimeProvider.System);
+
 // FluentValidation validators for the admin forms, resolved by Blazilla's <FluentValidator />.
 builder.Services.AddBlogValidators();
 
 // Admin services over /api/admin; the server registers database-backed implementations of the same interfaces.
 builder.Services.AddScoped<IPostAdminService, ClientPostAdminService>();
 builder.Services.AddScoped<ITagService, ClientTagService>();
+builder.Services.AddScoped<ISettingsService, ClientSettingsService>();
+
+// Browser-side helpers for the post editor; the server registers them too, for prerendering.
+builder.Services.AddScoped<DraftBackupStore>();
 
 await builder.Build().RunAsync();

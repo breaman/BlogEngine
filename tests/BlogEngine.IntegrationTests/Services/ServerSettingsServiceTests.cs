@@ -131,6 +131,10 @@ public class ServerSettingsServiceTests(BlogEngineWebApplicationFactory factory)
     }
 
     /// <summary>A valid IANA time zone is accepted.</summary>
+    /// <remarks>
+    /// Abidjan is UTC+0 all year, so the change re-dates no posts (T1.16) and can't disturb post tests running in
+    /// parallel. A zone with an offset would rewrite the URL dates, and row versions, of their posts.
+    /// </remarks>
     [Test]
     public async Task SaveAsync_AcceptsIanaTimeZone()
     {
@@ -138,11 +142,11 @@ public class ServerSettingsServiceTests(BlogEngineWebApplicationFactory factory)
         try
         {
             var changed = await GetSettingsAsync();
-            changed.TimeZoneId = "America/Chicago";
+            changed.TimeZoneId = "Africa/Abidjan";
             await SaveSettingsAsync(changed);
 
             var reloaded = await GetSettingsAsync();
-            await Assert.That(reloaded.TimeZoneId).IsEqualTo("America/Chicago");
+            await Assert.That(reloaded.TimeZoneId).IsEqualTo("Africa/Abidjan");
         }
         finally
         {

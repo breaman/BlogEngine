@@ -1,0 +1,213 @@
+@page "/admin/settings"
+@layout AdminLayout
+@attribute [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
+@rendermode InteractiveWebAssembly
+
+<PageTitle>Settings · BlogEngine Admin</PageTitle>
+
+<h1 class="h3 mb-4">Settings</h1>
+
+@if (_loadError is not null)
+{
+    <div class="alert alert-danger" role="alert">@_loadError</div>
+}
+else if (Model is null || _editContext is null)
+{
+    <p class="text-body-secondary"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Loading settings…</p>
+}
+else
+{
+    <EditForm EditContext="_editContext" OnValidSubmit="SaveAsync">
+        <FluentValidator />
+        <ValidationSummary class="text-danger" role="alert" />
+
+        <div class="row g-4">
+            <div class="col-12 col-xl-6">
+                <section class="card mb-4" aria-labelledby="settings-identity">
+                    <div class="card-header"><h2 class="h6 mb-0" id="settings-identity"><span class="bi bi-person-badge me-1" aria-hidden="true"></span> Identity</h2></div>
+                    <div class="card-body">
+                        <div class="form-floating mb-3">
+                            <InputText @bind-Value="Model.SiteTitle" id="settings-site-title" class="form-control" placeholder="Site title" maxlength="@FieldLengths.SiteTitle" />
+                            <label for="settings-site-title">Site title</label>
+                            <ValidationMessage For="() => Model.SiteTitle" class="text-danger" />
+                        </div>
+                        <div class="form-floating mb-3">
+                            <InputText @bind-Value="Model.Tagline" id="settings-tagline" class="form-control" placeholder="Tagline" maxlength="@FieldLengths.Tagline" />
+                            <label for="settings-tagline">Tagline</label>
+                            <ValidationMessage For="() => Model.Tagline" class="text-danger" />
+                        </div>
+                        <div class="form-floating mb-3">
+                            <InputTextArea @bind-Value="Model.Description" id="settings-description" class="form-control" placeholder="Description" rows="2" maxlength="@FieldLengths.MetaDescription" />
+                            <label for="settings-description">Description (default meta description)</label>
+                            <ValidationMessage For="() => Model.Description" class="text-danger" />
+                        </div>
+                        <div class="form-floating mb-3">
+                            <InputText @bind-Value="Model.AuthorName" id="settings-author-name" class="form-control" placeholder="Author name" maxlength="@FieldLengths.PersonName" />
+                            <label for="settings-author-name">Author name</label>
+                            <ValidationMessage For="() => Model.AuthorName" class="text-danger" />
+                        </div>
+                        <div class="form-floating mb-3">
+                            <InputTextArea @bind-Value="Model.AuthorBioMarkdown" id="settings-author-bio" class="form-control" placeholder="Author bio" rows="4" maxlength="@FieldLengths.AuthorBio" />
+                            <label for="settings-author-bio">Author bio (Markdown)</label>
+                            <ValidationMessage For="() => Model.AuthorBioMarkdown" class="text-danger" />
+                        </div>
+
+                        <h3 class="h6 mt-4">Social links</h3>
+                        @if (Model.SocialLinks.Count == 0)
+                        {
+                            <p class="text-body-secondary small">No social links yet.</p>
+                        }
+                        @for (var i = 0; i < Model.SocialLinks.Count; i++)
+                        {
+                            var index = i;
+                            var link = Model.SocialLinks[i];
+                            <div class="row g-2 align-items-start mb-2">
+                                <div class="col-12 col-sm-4">
+                                    <div class="form-floating">
+                                        <InputText @bind-Value="link.Network" id="@($"settings-social-network-{index}")" class="form-control" placeholder="Network" maxlength="@FieldLengths.SocialNetwork" />
+                                        <label for="@($"settings-social-network-{index}")">Network</label>
+                                        <ValidationMessage For="() => link.Network" class="text-danger" />
+                                    </div>
+                                </div>
+                                <div class="col">
+                                    <div class="form-floating">
+                                        <InputText @bind-Value="link.Url" id="@($"settings-social-url-{index}")" type="url" class="form-control" placeholder="https://" maxlength="@FieldLengths.Url" />
+                                        <label for="@($"settings-social-url-{index}")">Profile URL</label>
+                                        <ValidationMessage For="() => link.Url" class="text-danger" />
+                                    </div>
+                                </div>
+                                <div class="col-auto pt-2">
+                                    <button type="button" class="btn btn-outline-danger" title="Remove link" aria-label="Remove social link @(index + 1)" @onclick="() => RemoveSocialLink(link)">
+                                        <span class="bi bi-trash" aria-hidden="true"></span>
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="AddSocialLink">
+                            <span class="bi bi-plus-lg" aria-hidden="true"></span> Add social link
+                        </button>
+                    </div>
+                </section>
+            </div>
+
+            <div class="col-12 col-xl-6">
+                <section class="card mb-4" aria-labelledby="settings-reading">
+                    <div class="card-header"><h2 class="h6 mb-0" id="settings-reading"><span class="bi bi-book me-1" aria-hidden="true"></span> Reading</h2></div>
+                    <div class="card-body">
+                        <div class="form-floating mb-3">
+                            <InputNumber @bind-Value="Model.PostsPerPage" id="settings-posts-per-page" class="form-control" placeholder="10" min="1" max="100" />
+                            <label for="settings-posts-per-page">Posts per page</label>
+                            <ValidationMessage For="() => Model.PostsPerPage" class="text-danger" />
+                        </div>
+                        <div class="form-floating mb-3">
+                            <InputSelect @bind-Value="Model.FeedContentMode" id="settings-feed-mode" class="form-select">
+                                <option value="@FeedContentMode.FullContent">Full content</option>
+                                <option value="@FeedContentMode.Summary">Summary only</option>
+                            </InputSelect>
+                            <label for="settings-feed-mode">RSS and Atom feeds show</label>
+                        </div>
+                        <div class="form-floating mb-3">
+                            <InputSelect @bind-Value="Model.HomePageMode" id="settings-home-mode" class="form-select">
+                                <option value="@HomePageMode.FeaturedThenLatest">Featured posts, then the latest posts</option>
+                                <option value="@HomePageMode.LatestPosts">Latest posts only</option>
+                            </InputSelect>
+                            <label for="settings-home-mode">Home page shows</label>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card mb-4" aria-labelledby="settings-localization">
+                    <div class="card-header"><h2 class="h6 mb-0" id="settings-localization"><span class="bi bi-globe2 me-1" aria-hidden="true"></span> Time zone and dates</h2></div>
+                    <div class="card-body">
+                        <div class="form-floating mb-3">
+                            <InputSelect @bind-Value="Model.TimeZoneId" id="settings-time-zone" class="form-select">
+                                @foreach (var zone in TimeZones ?? [])
+                                {
+                                    <option value="@zone.Id">@zone.DisplayName</option>
+                                }
+                            </InputSelect>
+                            <label for="settings-time-zone">Time zone</label>
+                            <ValidationMessage For="() => Model.TimeZoneId" class="text-danger" />
+                            <div class="form-text">Dates in post URLs and archives use this time zone.</div>
+                        </div>
+                        @if (TimeZoneChanging)
+                        {
+                            <div class="alert alert-warning small" role="status">
+                                <span class="bi bi-exclamation-triangle me-1" aria-hidden="true"></span>
+                                Saving recalculates the dates in post URLs. Posts whose date changes get a new URL, and
+                                their old URLs redirect to it.
+                            </div>
+                        }
+                        <div class="form-floating mb-3">
+                            <InputText @bind-Value="Model.DateFormat" id="settings-date-format" class="form-control" placeholder="MMMM d, yyyy" maxlength="@FieldLengths.DateFormat" />
+                            <label for="settings-date-format">Date format</label>
+                            <ValidationMessage For="() => Model.DateFormat" class="text-danger" />
+                            <div class="form-text">A .NET custom date format, for example <code>MMMM d, yyyy</code>.</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card mb-4" aria-labelledby="settings-comments">
+                    <div class="card-header"><h2 class="h6 mb-0" id="settings-comments"><span class="bi bi-chat-left-text me-1" aria-hidden="true"></span> Comments</h2></div>
+                    <div class="card-body">
+                        <div class="form-check form-switch mb-2">
+                            <InputCheckbox @bind-Value="Model.CommentsEnabled" id="settings-comments-enabled" class="form-check-input" role="switch" />
+                            <label class="form-check-label" for="settings-comments-enabled">Allow reader comments</label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            @* Every comment requires approval for now (Q2), so this is shown but locked on. *@
+                            <input type="checkbox" id="settings-require-approval" class="form-check-input" role="switch" checked disabled />
+                            <label class="form-check-label" for="settings-require-approval">Hold new comments for approval</label>
+                            <div class="form-text mt-0">Always on for now.</div>
+                        </div>
+                        <div class="form-check form-switch mb-3">
+                            <InputCheckbox @bind-Value="Model.AutoApproveReturningCommenters" id="settings-auto-approve" class="form-check-input" role="switch" />
+                            <label class="form-check-label" for="settings-auto-approve">Approve commenters who have an approved comment already</label>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-sm-6">
+                                <div class="form-floating">
+                                    <InputNumber @bind-Value="Model.CloseCommentsAfterDays" id="settings-close-after" class="form-control" placeholder="0" min="0" max="3650" />
+                                    <label for="settings-close-after">Close after days (0 = never)</label>
+                                    <ValidationMessage For="() => Model.CloseCommentsAfterDays" class="text-danger" />
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="form-floating">
+                                    <InputNumber @bind-Value="Model.MaxCommentLinks" id="settings-max-links" class="form-control" placeholder="2" min="0" max="50" />
+                                    <label for="settings-max-links">Links allowed per comment</label>
+                                    <ValidationMessage For="() => Model.MaxCommentLinks" class="text-danger" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card mb-4" aria-labelledby="settings-seo">
+                    <div class="card-header"><h2 class="h6 mb-0" id="settings-seo"><span class="bi bi-search me-1" aria-hidden="true"></span> Search engines</h2></div>
+                    <div class="card-body">
+                        <div class="form-check form-switch">
+                            <InputCheckbox @bind-Value="Model.DiscourageSearchEngines" id="settings-discourage" class="form-check-input" role="switch" />
+                            <label class="form-check-label" for="settings-discourage">Discourage search engines from indexing this site</label>
+                            <div class="form-text mt-0">Useful before launch. Adds <code>noindex</code> to every page.</div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary" disabled="@_saving">
+                @if (_saving)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                }
+                else
+                {
+                    <span class="bi bi-check-lg me-1" aria-hidden="true"></span>
+                }
+                Save settings
+            </button>
+        </div>
+    </EditForm>
+}

@@ -13,13 +13,11 @@ namespace BlogEngine.UnitTests.Client;
 /// </summary>
 public class ClientPostAdminServiceTests
 {
-    private static readonly Uri BaseAddress = new("https://blog.example/");
-
     /// <summary>A 200 carries the saved post back.</summary>
     [Test]
     public async Task UpdateAsync_Ok_ReturnsSavedPost()
     {
-        var handler = new StubHandler(_ => JsonResponse(HttpStatusCode.OK, new PostEditDto { Id = 7, Title = "Saved" }));
+        var handler = new StubHttpHandler(_ => JsonResponse(HttpStatusCode.OK, new PostEditDto { Id = 7, Title = "Saved" }));
         var service = CreateService(handler);
 
         var result = await service.UpdateAsync(7, new PostEditDto { Title = "Saved" });
@@ -36,7 +34,7 @@ public class ClientPostAdminServiceTests
     [Arguments(HttpStatusCode.Conflict, typeof(PostConflict))]
     public async Task AutosaveAsync_MapsStatusCodes(HttpStatusCode status, Type expected)
     {
-        var service = CreateService(new StubHandler(_ => new HttpResponseMessage(status)));
+        var service = CreateService(new StubHttpHandler(_ => new HttpResponseMessage(status)));
 
         var result = await service.AutosaveAsync(3, new PostEditDto { Title = "x" });
 
@@ -48,7 +46,7 @@ public class ClientPostAdminServiceTests
     public async Task CreateAsync_ValidationProblem_ReturnsFieldErrors()
     {
         var problem = new { title = "One or more validation errors occurred.", errors = new Dictionary<string, string[]> { ["Title"] = ["A title is required."] } };
-        var service = CreateService(new StubHandler(_ => JsonResponse(HttpStatusCode.BadRequest, problem)));
+        var service = CreateService(new StubHttpHandler(_ => JsonResponse(HttpStatusCode.BadRequest, problem)));
 
         var result = await service.CreateAsync(new PostEditDto());
 
@@ -61,7 +59,7 @@ public class ClientPostAdminServiceTests
     public async Task PublishAsync_ProblemWithoutErrors_ReturnsFormLevelError()
     {
         var problem = new { title = "Invalid antiforgery token", detail = "Reload the page and try again." };
-        var service = CreateService(new StubHandler(_ => JsonResponse(HttpStatusCode.BadRequest, problem)));
+        var service = CreateService(new StubHttpHandler(_ => JsonResponse(HttpStatusCode.BadRequest, problem)));
 
         var result = await service.PublishAsync(1, new PublishPostRequest());
 
@@ -72,7 +70,7 @@ public class ClientPostAdminServiceTests
     [Test]
     public async Task UnpublishAsync_ServerError_Throws()
     {
-        var service = CreateService(new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError)));
+        var service = CreateService(new StubHttpHandler(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError)));
 
         await Assert.That(async () => await service.UnpublishAsync(1, new UnpublishPostRequest())).Throws<HttpRequestException>();
     }
@@ -81,7 +79,7 @@ public class ClientPostAdminServiceTests
     [Test]
     public async Task GetAndDelete_NotFound_ReturnNullAndFalse()
     {
-        var service = CreateService(new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.NotFound)));
+        var service = CreateService(new StubHttpHandler(_ => new HttpResponseMessage(HttpStatusCode.NotFound)));
 
         await Assert.That(await service.GetPostAsync(99)).IsNull();
         await Assert.That(await service.DeleteAsync(99)).IsFalse();
@@ -91,7 +89,7 @@ public class ClientPostAdminServiceTests
     [Test]
     public async Task GetPostsAsync_SendsFiltersInQueryString()
     {
-        var handler = new StubHandler(_ => JsonResponse(HttpStatusCode.OK, new PagedResult<PostSummaryDto>([], 0, 2, 5)));
+        var handler = new StubHttpHandler(_ => JsonResponse(HttpStatusCode.OK, new PagedResult<PostSummaryDto>([], 0, 2, 5)));
         var service = CreateService(handler);
 
         await service.GetPostsAsync(new PostListQuery { Status = PostListStatus.Draft, Tag = "C#", Search = "a b", Page = 2, PageSize = 5 });
@@ -100,25 +98,13 @@ public class ClientPostAdminServiceTests
         await Assert.That(query).IsEqualTo("?status=Draft&page=2&pageSize=5&tag=C%23&search=a%20b");
     }
 
-    private static ClientPostAdminService CreateService(StubHandler handler)
+    private static ClientPostAdminService CreateService(StubHttpHandler handler)
     {
-        return new ClientPostAdminService(new HttpClient(handler) { BaseAddress = BaseAddress });
+        return new ClientPostAdminService(handler.CreateClient());
     }
 
     private static HttpResponseMessage JsonResponse<T>(HttpStatusCode status, T body)
     {
         return new HttpResponseMessage(status) { Content = JsonContent.Create(body) };
-    }
-
-    /// <summary>Answers every request with the given function and records what was sent.</summary>
-    private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
-    {
-        public List<HttpRequestMessage> Requests { get; } = [];
-
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            Requests.Add(request);
-            return Task.FromResult(respond(request));
-        }
     }
 }

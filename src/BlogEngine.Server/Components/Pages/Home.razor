@@ -1,7 +1,12 @@
 @page "/"
 
-<PageTitle>BlogEngine</PageTitle>
+<PageTitle>@_siteTitle</PageTitle>
 
-<h1>BlogEngine</h1>
+@* The full home page (featured and latest posts) arrives with T1.19. *@
+<h1>@_siteTitle</h1>
+@if (!string.IsNullOrWhiteSpace(_tagline))
+{
+    <p class="lead text-body-secondary">@_tagline</p>
+}
 
-<p class="lead">No posts yet.</p>
+<p>No posts yet.</p>

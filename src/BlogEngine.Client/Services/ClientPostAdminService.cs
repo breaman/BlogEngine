@@ -129,7 +129,7 @@ public sealed class ClientPostAdminService(HttpClient http) : IPostAdminService
             case HttpStatusCode.Conflict:
                 return PostSaveResult.Conflict;
             case HttpStatusCode.BadRequest:
-                return new PostInvalid(await ReadErrorsAsync(response, cancellationToken));
+                return new PostInvalid(await ProblemResponseReader.ReadErrorsAsync(response, cancellationToken));
         }
 
         response.EnsureSuccessStatusCode();
@@ -138,33 +138,4 @@ public sealed class ClientPostAdminService(HttpClient http) : IPostAdminService
 
         return new PostSaved(post);
     }
-
-    /// <summary>
-    /// Reads the field errors of a validation problem. Other 400 problems (such as a rejected antiforgery
-    /// token) have no field errors, so their detail is reported under an empty key as a form-level error.
-    /// </summary>
-    private static async Task<IReadOnlyDictionary<string, string[]>> ReadErrorsAsync(HttpResponseMessage response,
-        CancellationToken cancellationToken)
-    {
-        ProblemResponse? problem = null;
-        try
-        {
-            problem = await response.Content.ReadFromJsonAsync<ProblemResponse>(cancellationToken);
-        }
-        catch (System.Text.Json.JsonException)
-        {
-            // Not a problem document; fall through to the generic message.
-        }
-
-        if (problem?.Errors is { Count: > 0 } errors)
-        {
-            return errors;
-        }
-
-        var message = problem?.Detail ?? problem?.Title ?? "The request was rejected.";
-        return new Dictionary<string, string[]> { [string.Empty] = [message] };
-    }
-
-    /// <summary>The parts of an RFC 9457 problem document this client reads.</summary>
-    private sealed record ProblemResponse(string? Title, string? Detail, Dictionary<string, string[]>? Errors);
 }

@@ -101,6 +101,9 @@ try
     builder.Services.AddScoped<ITagService, ServerTagService>();
     builder.Services.AddSingleton<PostHtmlSanitizer>();
 
+    // Client services injected by admin pages; they only touch the browser after prerendering (T1.13).
+    builder.Services.AddScoped<DraftBackupStore>();
+
     // FluentValidation validators, resolved by services and by Blazilla's <FluentValidator /> in forms: the shared
     // DTO validators, plus the validators nested next to the input models of the Identity and setup pages.
     builder.Services.AddBlogValidators();

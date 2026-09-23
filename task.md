@@ -13,7 +13,7 @@
 | Phase | Goal | Tasks | Done |
 |---|---|---|---|
 | [0: Foundation](#phase-0--foundation) | Admin can log in to an empty dashboard | 16 | 16 |
-| [1: Posts MVP](#phase-1--posts-mvp) | Can write and publish posts end to end | 25 | 7 |
+| [1: Posts MVP](#phase-1--posts-mvp) | Can write and publish posts end to end | 25 | 16 |
 | [2: Media MVP](#phase-2--media-mvp) | Can add, edit and insert photos | 13 | 0 |
 | [3: Comments MVP](#phase-3--comments-mvp) | Readers can comment; the author moderates | 11 | 0 |
 | [4: V1 Polish](#phase-4--v1-polish) | Ready for public launch | 35 | 0 |
@@ -192,34 +192,34 @@ These apply to all tasks and are not repeated below:
   - `GET /tags?search=` (top 10 by usage, case-insensitive).
   - **Done when:** each endpoint has an integration test including a 401/403 for non-admins and 409 for concurrency conflicts.
 
-- [ ] **T1.8 — Client service implementations**
+- [x] **T1.8 — Client service implementations**
   - `ClientPostAdminService`, `ClientTagService` over `HttpClient`; register in `Client/Program.cs`; server implementations registered in `Server/Program.cs`.
   - **Done when:** admin pages work both prerendered and after WASM hydration.
-  - *Status:* both implementations are written, registered and unit-tested (HTTP status → `PostSaveResult` mapping). No admin page consumes them yet, so the "Done when" check happens with T1.13/T1.14.
+  - *Status:* verified with T1.13–T1.15: `AdminPagesTests` cover the prerendered pages, and a browser smoke test exercised them after hydration. `ClientSettingsService` was added for T1.15.
 
 ### Admin UI
 
-- [ ] **T1.9 — JS build pipeline (esbuild)** (§5.3)
+- [x] **T1.9 — JS build pipeline (esbuild)** (§5.3)
   - Add `esbuild`, `codemirror` v6 and `@codemirror/lang-markdown` to npm; add a `js-build` script next to `sass-dev`/`sass-prod` that outputs `BlogEngine.Client/wwwroot/js/editor.js`. Wire it into the build (or document the manual step in `README.md`).
   - **Done when:** a clean clone can produce `editor.js` with one command.
 
-- [ ] **T1.10 — `MarkdownEditor` component (CodeMirror interop)** (§10.2, A1, A11)
+- [x] **T1.10 — `MarkdownEditor` component (CodeMirror interop)** (§10.2, A1, A11)
   - CodeMirror with Markdown highlighting, line wrapping, list continuation.
   - Toolbar + shortcuts: `Ctrl/Cmd+B`, `I`, `K` (link), `` ` `` (code), heading, quote, list, `Shift+I` (image — wired in Phase 2), `S` (save).
   - Debounce changes 200 ms in JS before calling .NET. Dispose interop cleanly.
   - **Done when:** typing, toolbar actions and shortcuts work, and navigating away doesn't leak JS instances.
 
-- [ ] **T1.11 — `MarkdownPreview` and split layout** (§10.1–10.2, A2)
+- [x] **T1.11 — `MarkdownPreview` and split layout** (§10.1–10.2, A2)
   - Renders with the shared `BlogMarkdownPipeline` in WASM (no server round trip); runs highlight.js on the preview.
   - Layout toggle: split / editor only / preview only; tabs on narrow screens.
   - Scroll sync using Markdig source positions.
   - **Done when:** preview output matches the published page for the same Markdown.
 
-- [ ] **T1.12 — `TagInput` component** (§6.4, A4)
+- [x] **T1.12 — `TagInput` component** (§6.4, A4)
   - Chips; autocomplete from `GET /tags?search=`; Enter/Tab/comma commits; typing a match of an existing tag produces that tag's original casing; client-side duplicate prevention via `TagNormalizer`.
   - **Done when:** typing `c#` with an existing `C#` tag yields the chip `C#`, and duplicates can't be added.
 
-- [ ] **T1.13 — Post editor page** (`/admin/posts/new`, `/admin/posts/{id}`; §10.2)
+- [x] **T1.13 — Post editor page** (`/admin/posts/new`, `/admin/posts/{id}`; §10.2)
   - Title, editor + preview, sidebar: publish controls (Publish now / Update / Unpublish), slug with inline validation and "changing this creates a redirect" warning once published, summary, tags, allow comments, featured, word count and reading time.
   - Autosave every 30 s and on blur when dirty; status indicator ("Saved 10:42").
   - `localStorage` backup under `draft:{postId}` with a "Restore unsaved changes from 10:42?" prompt.
@@ -227,16 +227,16 @@ These apply to all tasks and are not repeated below:
   - Concurrency conflict dialog: "Changed in another tab. Reload or overwrite?"
   - **Done when:** a post can be created, autosaved, recovered after a simulated crash, and published from this page.
 
-- [ ] **T1.14 — Posts list page** (`/admin/posts`; O2)
+- [x] **T1.14 — Posts list page** (`/admin/posts`; O2)
   - Status filter tabs (All, Drafts, Published; Scheduled/Trash added in Phase 4), tag filter, text search, paging; row actions: edit, view, unpublish, delete.
   - **Done when:** filters combine correctly and prerendered state carries over to WASM.
 
-- [ ] **T1.15 — Settings page** (`/admin/settings`; O4)
+- [x] **T1.15 — Settings page** (`/admin/settings`; O4)
   - Edit the §13 settings that matter for MVP: identity (title, tagline, description, author name/bio, social links), reading (posts per page, feed mode, home mode), time zone (IANA picker), comments policy, SEO "discourage search engines".
   - `GET/PUT /api/admin/settings` endpoints. *(Already added with T0.16 as the first admin API endpoints; this task adds the client service and page.)*
   - **Done when:** settings save, cache is evicted, and public pages reflect changes.
 
-- [ ] **T1.16 — Time zone change maintenance** (§7.1)
+- [x] **T1.16 — Time zone change maintenance** (§7.1)
   - When `TimeZoneId` changes, recompute `PublishedDateLocal` for all posts and create redirects for any URLs that changed.
   - **Done when:** an integration test changes the time zone and old post URLs 301 to the new ones.
 

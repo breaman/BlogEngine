@@ -13,6 +13,16 @@ cd src/BlogEngine.Server
 npm run sass-dev (or sass-prod depending on which one you want)
 ```
 
+## Admin JavaScript
+The admin editor uses CodeMirror 6 and highlight.js, bundled with esbuild. The sources are in `src/BlogEngine.Client/scripts` and the bundles are written to `src/BlogEngine.Client/wwwroot/js` (`editor.js`, `editor.css`, `admin.js`). The bundles are build output and are not committed.
+
+You don't normally run anything by hand: building `BlogEngine.Client` (and so the server, or `aspire run`) runs `npm run js-build` whenever a script or the npm packages changed. It uses the same `node_modules` as the Sass build, so `npm install` in `src/BlogEngine.Server` is the only setup. To build or watch the bundles yourself:
+
+```
+cd src/BlogEngine.Server
+npm run js-build   (or js-watch to rebuild on every change)
+```
+
 ## EF Migrations
 This project adds EF as a dotnet tool, so before running any EF commands, one needs to run the following command from the project folder (there is also a command in the Aspire dashboard to run this restore command if the app is started before the restore command is run manually):
 

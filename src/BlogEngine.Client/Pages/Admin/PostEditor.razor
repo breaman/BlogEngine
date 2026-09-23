@@ -1,0 +1,234 @@
+@page "/admin/posts/new"
+@page "/admin/posts/{Id:int}"
+@layout AdminLayout
+@attribute [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
+@rendermode InteractiveWebAssembly
+
+<PageTitle>@(Post is { Title.Length: > 0 } ? $"{Post.Title} · " : null)@PageHeading · BlogEngine Admin</PageTitle>
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb mb-2">
+        <li class="breadcrumb-item"><a href="admin/posts">Posts</a></li>
+        <li class="breadcrumb-item active" aria-current="page">@PageHeading</li>
+    </ol>
+</nav>
+
+@if (_loadError is not null)
+{
+    <div class="alert alert-danger" role="alert">@_loadError</div>
+}
+else if (PostMissing)
+{
+    <div class="alert alert-warning" role="alert">
+        This post doesn't exist or is in the trash. <a href="admin/posts" class="alert-link">Back to posts</a>
+    </div>
+}
+else if (Post is null || _editContext is null)
+{
+    <p class="text-body-secondary"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Loading post…</p>
+}
+else
+{
+    <NavigationLock ConfirmExternalNavigation="HasUnsavedChanges" OnBeforeInternalNavigation="OnBeforeInternalNavigationAsync" />
+
+    @if (_backupOffer is not null)
+    {
+        <div class="alert alert-info d-flex flex-wrap align-items-center gap-2" role="alert">
+            <span class="bi bi-life-preserver" aria-hidden="true"></span>
+            <span>Restore unsaved changes from @TimeText(_backupOffer.SavedAt)?</span>
+            <div class="ms-auto d-flex gap-2">
+                <button type="button" class="btn btn-sm btn-primary" @onclick="RestoreBackupAsync">Restore</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="DiscardBackupAsync">Discard</button>
+            </div>
+        </div>
+    }
+
+    @if (_showPendingChanges && Post.PendingChanges is { } pending)
+    {
+        <div class="alert alert-warning d-flex flex-wrap align-items-center gap-2" role="alert">
+            <span class="bi bi-hourglass-split" aria-hidden="true"></span>
+            <span>This post has changes from @TimeText(pending.SavedOn) that aren't live yet.</span>
+            <div class="ms-auto d-flex gap-2">
+                <button type="button" class="btn btn-sm btn-primary" @onclick="RestorePendingChanges">Continue editing them</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="DismissPendingChanges">Dismiss</button>
+            </div>
+        </div>
+    }
+
+    @if (_formError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@_formError</div>
+    }
+
+    <EditForm EditContext="_editContext">
+        <FluentValidator />
+
+        <div class="row g-4">
+            <div class="col-12 col-xl-9">
+                <div class="form-floating mb-3">
+                    <input id="post-title" type="text" class="form-control form-control-lg @_editContext.FieldCssClass(() => Post.Title)"
+                           placeholder="Title" maxlength="@FieldLengths.PostTitle" autocomplete="off"
+                           @bind="Post.Title" @bind:event="oninput" @bind:after="OnTitleEditedAsync" />
+                    <label for="post-title">Title</label>
+                    <ValidationMessage For="() => Post.Title" class="text-danger" />
+                </div>
+
+                <MarkdownEditor @ref="_markdownEditor"
+                                @bind-Value="Post.ContentMarkdown" @bind-Value:after="OnContentEditedAsync"
+                                Placeholder="Write your post in Markdown…"
+                                OnSave="SaveShortcutAsync" OnBlur="AutosaveAsync" />
+            </div>
+
+            <aside class="col-12 col-xl-3" aria-label="Post settings">
+                @* Publishing *@
+                <section class="card mb-3" aria-labelledby="post-publish-heading">
+                    <div class="card-header d-flex align-items-center">
+                        <h2 class="h6 mb-0" id="post-publish-heading">Publish</h2>
+                        @if (IsPublished)
+                        {
+                            <span class="badge text-bg-success ms-auto">Published</span>
+                        }
+                        else
+                        {
+                            <span class="badge text-bg-secondary ms-auto">Draft</span>
+                        }
+                    </div>
+                    <div class="card-body">
+                        @if (IsPublished && Post.PublishedDateLocal is { } publishedDate)
+                        {
+                            <p class="small mb-2">Published on @DateText(publishedDate)</p>
+                        }
+
+                        @{ var status = StatusLine; }
+                        <p class="small mb-3 @status.CssClass" role="status" aria-live="polite">
+                            <span class="bi @status.Icon me-1" aria-hidden="true"></span>@status.Text
+                        </p>
+
+                        @if (HasChangesNotLive)
+                        {
+                            <div class="alert alert-warning small py-2">Your changes aren't live yet. Click <strong>Update</strong> to publish them.</div>
+                        }
+
+                        <div class="d-grid gap-2">
+                            @if (IsPublished)
+                            {
+                                <button type="button" class="btn btn-primary" disabled="@(!CanAct)" @onclick="UpdateAsync">
+                                    <span class="bi bi-cloud-upload me-1" aria-hidden="true"></span> Update
+                                </button>
+                                <div class="d-flex gap-2">
+                                    @if (Post.PublicPath is { } path)
+                                    {
+                                        <a class="btn btn-outline-secondary flex-fill" href="@path" target="_blank" rel="noopener">
+                                            <span class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></span> View
+                                        </a>
+                                    }
+                                    <button type="button" class="btn btn-outline-warning flex-fill" disabled="@(!CanAct)" @onclick="UnpublishAsync">
+                                        <span class="bi bi-eye-slash me-1" aria-hidden="true"></span> Unpublish
+                                    </button>
+                                </div>
+                            }
+                            else
+                            {
+                                <button type="button" class="btn btn-primary" disabled="@(!CanAct)" @onclick="PublishAsync">
+                                    <span class="bi bi-send me-1" aria-hidden="true"></span> Publish now
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" disabled="@(!CanAct)" @onclick="SaveDraftAsync">
+                                    <span class="bi bi-floppy me-1" aria-hidden="true"></span> Save draft
+                                </button>
+                            }
+                        </div>
+                    </div>
+                </section>
+
+                @* URL *@
+                <section class="card mb-3" aria-labelledby="post-url-heading">
+                    <div class="card-header"><h2 class="h6 mb-0" id="post-url-heading">URL</h2></div>
+                    <div class="card-body">
+                        <div class="form-floating">
+                            <InputText id="post-slug" class="form-control font-monospace" placeholder="slug" maxlength="@FieldLengths.Slug"
+                                       autocomplete="off" spellcheck="false"
+                                       @bind-Value="Post.Slug" @bind-Value:after="OnSlugEditedAsync" />
+                            <label for="post-slug">Slug</label>
+                        </div>
+                        <ValidationMessage For="() => Post.Slug" class="text-danger small" />
+                        @if (_slugCheck is { Message: { } slugMessage })
+                        {
+                            <div class="small mt-1 @(_slugCheck.IsValid ? "text-warning" : "text-danger")">@slugMessage</div>
+                        }
+                        @if (SlugWillRedirect)
+                        {
+                            <div class="alert alert-warning small py-2 mt-2 mb-0" role="status">
+                                <span class="bi bi-signpost-split me-1" aria-hidden="true"></span>
+                                Changing the slug creates a redirect from <code>@_stored?.PublicPath</code> when you click Update.
+                            </div>
+                        }
+                        else if (IsPublished)
+                        {
+                            <div class="form-text">Changing this creates a redirect from the current URL.</div>
+                        }
+                        else
+                        {
+                            <div class="form-text">Generated from the title until the first publish. Leave blank to generate it again.</div>
+                        }
+                    </div>
+                </section>
+
+                @* Summary *@
+                <section class="card mb-3" aria-labelledby="post-summary-heading">
+                    <div class="card-header"><h2 class="h6 mb-0" id="post-summary-heading">Summary</h2></div>
+                    <div class="card-body">
+                        <div class="form-floating">
+                            <InputTextArea id="post-summary" class="form-control" placeholder="Summary" rows="4" maxlength="@FieldLengths.PostSummary"
+                                           @bind-Value="Post.Summary" @bind-Value:after="OnEditedAsync" />
+                            <label for="post-summary">Summary</label>
+                        </div>
+                        <ValidationMessage For="() => Post.Summary" class="text-danger small" />
+                        <div class="form-text">Shown in post lists and search results. Leave blank to use the start of the post.</div>
+                    </div>
+                </section>
+
+                @* Tags *@
+                <section class="card mb-3" aria-labelledby="post-tags-heading">
+                    <div class="card-header"><h2 class="h6 mb-0" id="post-tags-heading">Tags</h2></div>
+                    <div class="card-body">
+                        <TagInput Id="post-tags" Disabled="@(!_interactive)"
+                                  @bind-Tags="Post.Tags" @bind-Tags:after="OnTagsEditedAsync" />
+                        <ValidationMessage For="() => Post.Tags" class="text-danger small" />
+                    </div>
+                </section>
+
+                @* Options *@
+                <section class="card mb-3" aria-labelledby="post-options-heading">
+                    <div class="card-header"><h2 class="h6 mb-0" id="post-options-heading">Options</h2></div>
+                    <div class="card-body">
+                        <div class="form-check form-switch mb-2">
+                            <InputCheckbox id="post-allow-comments" class="form-check-input" role="switch"
+                                           @bind-Value="Post.AllowComments" @bind-Value:after="OnEditedAsync" />
+                            <label class="form-check-label" for="post-allow-comments">Allow comments</label>
+                        </div>
+                        <div class="form-check form-switch">
+                            <InputCheckbox id="post-featured" class="form-check-input" role="switch"
+                                           @bind-Value="Post.IsFeatured" @bind-Value:after="OnEditedAsync" />
+                            <label class="form-check-label" for="post-featured">Feature on the home page</label>
+                        </div>
+                    </div>
+                </section>
+
+                @* Stats, computed live from the Markdown with the same rules the server uses. *@
+                <section class="card mb-3" aria-labelledby="post-stats-heading">
+                    <div class="card-header"><h2 class="h6 mb-0" id="post-stats-heading">Stats</h2></div>
+                    <div class="card-body">
+                        <dl class="row small mb-0">
+                            <dt class="col-7 fw-normal text-body-secondary">Words</dt>
+                            <dd class="col-5 text-end mb-1">@_stats.WordCount.ToString("N0")</dd>
+                            <dt class="col-7 fw-normal text-body-secondary">Reading time</dt>
+                            <dd class="col-5 text-end mb-0">@_stats.ReadingMinutes min</dd>
+                        </dl>
+                    </div>
+                </section>
+            </aside>
+        </div>
+    </EditForm>
+}
+
+<ConfirmDialog @ref="_confirm" />

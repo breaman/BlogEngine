@@ -1,0 +1,176 @@
+@page "/admin/posts"
+@layout AdminLayout
+@attribute [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
+@rendermode InteractiveWebAssembly
+
+<PageTitle>Posts · BlogEngine Admin</PageTitle>
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <h1 class="h3 mb-0">Posts</h1>
+    <a class="btn btn-primary" href="admin/posts/new">
+        <span class="bi bi-plus-lg" aria-hidden="true"></span> New post
+    </a>
+</div>
+
+<ul class="nav nav-tabs mb-3">
+    @foreach (var tab in StatusTabs)
+    {
+        <li class="nav-item">
+            <a class="nav-link @(tab.Status == Status ? "active" : null)" aria-current="@(tab.Status == Status ? "page" : null)"
+               href="@ListUri(status: tab.Status)">@tab.Label</a>
+        </li>
+    }
+</ul>
+
+<form class="row g-2 align-items-center mb-3" role="search" @onsubmit="ApplyFilters" @onsubmit:preventDefault>
+    <div class="col-12 col-md-5">
+        <div class="form-floating">
+            <input type="search" id="posts-search" class="form-control" placeholder="Search" @bind="_searchFilter" />
+            <label for="posts-search">Search titles, slugs and summaries</label>
+        </div>
+    </div>
+    <div class="col-12 col-md-4">
+        <div class="form-floating">
+            <input type="text" id="posts-tag" class="form-control" placeholder="Tag" @bind="_tagFilter" />
+            <label for="posts-tag">Tag</label>
+        </div>
+    </div>
+    <div class="col-12 col-md-3 d-flex gap-2">
+        <button type="submit" class="btn btn-outline-primary">
+            <span class="bi bi-funnel" aria-hidden="true"></span> Filter
+        </button>
+        @if (HasFilters)
+        {
+            <button type="button" class="btn btn-outline-secondary" @onclick="ClearFilters">
+                <span class="bi bi-x-lg" aria-hidden="true"></span> Clear
+            </button>
+        }
+    </div>
+</form>
+
+@if (_loadError is not null)
+{
+    <div class="alert alert-danger d-flex align-items-center gap-2" role="alert">
+        <span>@_loadError</span>
+        <button type="button" class="btn btn-sm btn-outline-danger ms-auto" @onclick="ReloadAsync">Retry</button>
+    </div>
+}
+else if (Result is null)
+{
+    <p class="text-body-secondary"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Loading posts…</p>
+}
+else if (Result.Items.Count == 0)
+{
+    <div class="card">
+        <div class="card-body text-center text-body-secondary py-5">
+            @if (HasFilters || Status != PostListStatus.All)
+            {
+                <p class="mb-0">No posts match these filters.</p>
+            }
+            else
+            {
+                <p>No posts yet.</p>
+                <a class="btn btn-primary" href="admin/posts/new">Write your first post</a>
+            }
+        </div>
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover align-middle @(_loading ? "opacity-50" : null)">
+            <thead>
+                <tr>
+                    <th scope="col">Title</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Tags</th>
+                    <th scope="col">Date</th>
+                    <th scope="col" class="text-end">Words</th>
+                    <th scope="col" class="text-end"><span class="visually-hidden">Actions</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var post in Result.Items)
+                {
+                    var busy = _busyPostId == post.Id;
+                    <tr @key="post.Id">
+                        <td>
+                            <a class="fw-semibold text-decoration-none" href="@($"admin/posts/{post.Id}")">@post.Title</a>
+                            @if (post.IsFeatured)
+                            {
+                                <span class="bi bi-star-fill text-warning ms-1" title="Featured" aria-label="Featured"></span>
+                            }
+                            <div class="small text-body-secondary font-monospace">@post.Slug</div>
+                        </td>
+                        <td>
+                            @if (post.Status == PostStatus.Published)
+                            {
+                                <span class="badge text-bg-success">Published</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-secondary">Draft</span>
+                            }
+                        </td>
+                        <td>
+                            @foreach (var tag in post.Tags)
+                            {
+                                <button type="button" class="btn btn-link btn-sm p-0 me-2 text-decoration-none" title="Show posts tagged @tag"
+                                        @onclick="() => FilterByTag(tag)">#@tag</button>
+                            }
+                        </td>
+                        <td class="text-nowrap">@DateText(post)</td>
+                        <td class="text-end">@post.WordCount.ToString("N0")</td>
+                        <td class="text-end text-nowrap">
+                            <a class="btn btn-sm btn-outline-primary" href="@($"admin/posts/{post.Id}")" title="Edit" aria-label="Edit @post.Title">
+                                <span class="bi bi-pencil" aria-hidden="true"></span>
+                            </a>
+                            @if (post.PublicPath is { } path)
+                            {
+                                <a class="btn btn-sm btn-outline-secondary" href="@path" target="_blank" rel="noopener" title="View" aria-label="View @post.Title">
+                                    <span class="bi bi-box-arrow-up-right" aria-hidden="true"></span>
+                                </a>
+                                <button type="button" class="btn btn-sm btn-outline-warning" title="Unpublish" aria-label="Unpublish @post.Title"
+                                        disabled="@busy" @onclick="() => UnpublishAsync(post)">
+                                    <span class="bi bi-eye-slash" aria-hidden="true"></span>
+                                </button>
+                            }
+                            <button type="button" class="btn btn-sm btn-outline-danger" title="Move to trash" aria-label="Move @post.Title to trash"
+                                    disabled="@busy" @onclick="() => DeleteAsync(post)">
+                                <span class="bi bi-trash" aria-hidden="true"></span>
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (Result.TotalPages > 1)
+    {
+        <nav aria-label="Posts pages" class="d-flex align-items-center justify-content-between">
+            <span class="text-body-secondary small">@Result.TotalCount.ToString("N0") posts</span>
+            <ul class="pagination mb-0">
+                <li class="page-item @(Result.Page <= 1 ? "disabled" : null)">
+                    <a class="page-link" href="@ListUri(page: Result.Page - 1)" aria-label="Previous page">
+                        <span class="bi bi-chevron-left" aria-hidden="true"></span> Previous
+                    </a>
+                </li>
+                <li class="page-item disabled">
+                    <span class="page-link">Page @Result.Page of @Result.TotalPages</span>
+                </li>
+                <li class="page-item @(Result.Page >= Result.TotalPages ? "disabled" : null)">
+                    <a class="page-link" href="@ListUri(page: Result.Page + 1)" aria-label="Next page">
+                        Next <span class="bi bi-chevron-right" aria-hidden="true"></span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    }
+    else
+    {
+        <p class="text-body-secondary small">@Result.TotalCount.ToString("N0") @(Result.TotalCount == 1 ? "post" : "posts")</p>
+    }
+}
+
+<ConfirmDialog @ref="_confirm" />

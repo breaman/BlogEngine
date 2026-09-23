@@ -83,4 +83,25 @@ public sealed class PostEditDto
 
     /// <summary>Autosaved changes to a published post that aren't live yet, if any.</summary>
     public PostPendingChangesDto? PendingChanges { get; set; }
+
+    /// <summary>
+    /// A copy that shares nothing mutable with this instance, so the editor can send a snapshot while the author
+    /// keeps typing into the original.
+    /// </summary>
+    public PostEditDto Clone()
+    {
+        var copy = (PostEditDto)MemberwiseClone();
+        copy.Tags = [.. Tags];
+        copy.RowVersion = RowVersion?.ToArray();
+        copy.PendingChanges = PendingChanges is null
+            ? null
+            : new PostPendingChangesDto
+            {
+                Title = PendingChanges.Title,
+                ContentMarkdown = PendingChanges.ContentMarkdown,
+                SavedOn = PendingChanges.SavedOn
+            };
+
+        return copy;
+    }
 }

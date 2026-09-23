@@ -1,0 +1,61 @@
+<div class="markdown-editor card">
+    <div class="card-header d-flex flex-wrap align-items-center gap-2 py-2">
+        @* Narrow screens: the panes become tabs (design 10.2). *@
+        <ul class="nav nav-pills d-lg-none" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button type="button" role="tab" class="nav-link py-1 @(_narrowTab == NarrowTab.Write ? "active" : null)"
+                        aria-selected="@AriaBool(_narrowTab == NarrowTab.Write)" @onclick="() => SelectNarrowTab(NarrowTab.Write)">
+                    <span class="bi bi-pencil" aria-hidden="true"></span> Write
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button type="button" role="tab" class="nav-link py-1 @(_narrowTab == NarrowTab.Preview ? "active" : null)"
+                        aria-selected="@AriaBool(_narrowTab == NarrowTab.Preview)" @onclick="() => SelectNarrowTab(NarrowTab.Preview)">
+                    <span class="bi bi-eye" aria-hidden="true"></span> Preview
+                </button>
+            </li>
+        </ul>
+
+        <div class="btn-toolbar gap-1" role="toolbar" aria-label="Formatting">
+            @foreach (var group in ToolbarGroups)
+            {
+                <div class="btn-group btn-group-sm" role="group">
+                    @foreach (var button in group)
+                    {
+                        <button type="button" class="btn btn-outline-secondary" title="@button.Title" aria-label="@button.Title"
+                                disabled="@(!CanFormat)" @onclick="() => RunCommandAsync(button.Command)">
+                            <span class="bi @button.Icon" aria-hidden="true"></span>
+                        </button>
+                    }
+                </div>
+            }
+        </div>
+
+        @* Wide screens: split, editor only or preview only. *@
+        <div class="btn-group btn-group-sm ms-auto d-none d-lg-inline-flex" role="group" aria-label="Layout">
+            @foreach (var option in LayoutOptions)
+            {
+                <button type="button" class="btn btn-outline-secondary @(_layout == option.Layout ? "active" : null)"
+                        title="@option.Title" aria-label="@option.Title" aria-pressed="@AriaBool(_layout == option.Layout)"
+                        @onclick="() => SelectLayout(option.Layout)">
+                    <span class="bi @option.Icon" aria-hidden="true"></span>
+                </button>
+            }
+        </div>
+    </div>
+
+    <div class="row g-0 markdown-editor-panes">
+        <div class="@EditorPaneClass">
+            @* CodeMirror owns this element's children, so Blazor must never render into it. *@
+            <div class="markdown-editor-host" @ref="_host"></div>
+            @if (!_ready)
+            {
+                @* Shown while prerendered and until WebAssembly starts, so the content is visible immediately. *@
+                <pre class="markdown-editor-fallback">@_editorValue</pre>
+            }
+        </div>
+        <div class="@PreviewPaneClass" @ref="_previewPane">
+            <MarkdownPreview Markdown="@_editorValue" OnRendered="OnPreviewRenderedAsync" />
+        </div>
+    </div>
+</div>

@@ -24,6 +24,10 @@ namespace BlogEngine.Server.Services;
 /// database even if the caller skipped client-side validation.
 /// </para>
 /// <para>
+/// Changing the time zone recomputes every post's URL date and redirects the URLs that moved
+/// (<see cref="PostLocalDateMaintenance"/>, T1.16), in the same transaction as the settings.
+/// </para>
+/// <para>
 /// Cache misses load through their own scope rather than the request's <see cref="ApplicationDbContext"/>:
 /// during static SSR the layout and the page initialize concurrently, so a settings read in the layout would
 /// otherwise collide with the page's own queries on the shared context. It also keeps a load that
@@ -34,7 +38,8 @@ public sealed class ServerSettingsService(
     ApplicationDbContext dbContext,
     HybridCache cache,
     IServiceScopeFactory scopeFactory,
-    IValidator<SiteSettingsDto> validator) : ISettingsService
+    IValidator<SiteSettingsDto> validator,
+    ILogger<ServerSettingsService> logger) : ISettingsService
 {
     /// <summary>Cache key of the settings entry.</summary>
     public const string CacheKey = "site-settings";
@@ -66,8 +71,22 @@ public sealed class ServerSettingsService(
             dbContext.SiteSettings.Add(entity);
         }
 
+        var previousTimeZoneId = entity.TimeZoneId;
         Apply(settings, entity);
+
+        var redatedPosts = 0;
+        if (!string.Equals(previousTimeZoneId, entity.TimeZoneId, StringComparison.Ordinal))
+        {
+            redatedPosts = await PostLocalDateMaintenance.RecomputeAsync(dbContext, entity.TimeZoneId, cancellationToken);
+        }
+
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        if (redatedPosts > 0)
+        {
+            logger.LogInformation("Time zone changed from {OldTimeZone} to {NewTimeZone}; {PostCount} posts got new URL dates.",
+                previousTimeZoneId, entity.TimeZoneId, redatedPosts);
+        }
 
         // Evict only after the save commits, so a concurrent read can't re-cache the old values after this.
         await cache.RemoveAsync(CacheKey, cancellationToken);

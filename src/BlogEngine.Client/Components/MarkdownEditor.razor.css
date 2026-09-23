@@ -1,0 +1,42 @@
+/* Both panes share one height and scroll on their own, so the preview can follow the editor (design 10.2). */
+.markdown-editor-panes {
+    height: clamp(24rem, 70vh, 60rem);
+}
+
+.markdown-editor-pane,
+.markdown-preview-pane {
+    height: 100%;
+    min-height: 0;
+}
+
+.markdown-editor-pane {
+    position: relative;
+}
+
+/* Scroll sync measures preview blocks with offsetTop, which needs the pane as their offset parent. */
+.markdown-preview-pane {
+    position: relative;
+    overflow-y: auto;
+    padding: 1rem 1.25rem;
+}
+
+@media (min-width: 992px) {
+    .markdown-editor-pane.split {
+        border-right: var(--bs-border-width) solid var(--bs-border-color);
+    }
+}
+
+.markdown-editor-host {
+    height: 100%;
+}
+
+.markdown-editor-fallback {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    padding: 0.75rem;
+    overflow: auto;
+    white-space: pre-wrap;
+    font-size: 0.95rem;
+    color: var(--bs-secondary-color);
+}

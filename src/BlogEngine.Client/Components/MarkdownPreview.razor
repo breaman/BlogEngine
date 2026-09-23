@@ -1,0 +1,12 @@
+@* The HTML comes from the shared BlogMarkdownPipeline, the same code the server uses on save, and .post-content
+   (site.scss) is the class the public post page uses, so the preview looks like the published post. *@
+<div class="markdown-preview post-content" @ref="_element">
+    @if (string.IsNullOrWhiteSpace(Markdown))
+    {
+        <p class="text-body-secondary fst-italic">@EmptyText</p>
+    }
+    else
+    {
+        @((MarkupString)_html)
+    }
+</div>

@@ -8,6 +8,8 @@
 
   <ItemGroup>
     <PackageReference Include="TUnit" />
+    <!-- Renders Blazor components in memory for component tests (TagInput, ConfirmDialog, MarkdownPreview). -->
+    <PackageReference Include="bunit" />
     <!-- Snapshot testing for rendered output such as the Markdown pipelines. -->
     <PackageReference Include="Verify.TUnit" />
   </ItemGroup>

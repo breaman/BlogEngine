@@ -3,12 +3,21 @@
   "version": "1.0.0",
   "private": true,
   "devDependencies": {
+    "@codemirror/commands": "~6.11.1",
+    "@codemirror/lang-markdown": "~6.5.2",
+    "@codemirror/language": "~6.12.4",
+    "@codemirror/state": "~6.7.6",
+    "@codemirror/view": "~6.43.13",
     "bootstrap": "~5.3.8",
     "bootstrap-icons": "~1.13.1",
+    "esbuild": "~0.28.2",
+    "highlight.js": "~11.12.0",
     "sass": "~1.97.1"
   },
   "scripts": {
     "sass-dev": "sass --watch ./styles/site.scss ./wwwroot/css/site.css",
-    "sass-prod": "sass --style=compressed ./styles/site.scss ./wwwroot/css/site.css"
+    "sass-prod": "sass --style=compressed ./styles/site.scss ./wwwroot/css/site.css",
+    "js-build": "node ./scripts/build-js.mjs",
+    "js-watch": "node ./scripts/build-js.mjs --watch"
   }
 }

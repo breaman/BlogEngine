@@ -1,4 +1,5 @@
 using BlogEngine.Server.Services;
+using BlogEngine.Shared.Common;
 using BlogEngine.Shared.Services;
 
 using Microsoft.AspNetCore.Components;
@@ -17,9 +18,14 @@ public partial class NavMenu : ComponentBase
 
     private bool _registrationAllowed;
 
+    /// <summary>The site title from the settings (design 13), shown as the brand.</summary>
+    private string _siteTitle = SiteSettingsDefaults.SiteTitle;
+
     protected override async Task OnInitializedAsync()
     {
-        _registrationAllowed = (await SettingsService.GetAsync()).AllowRegistration;
+        var settings = await SettingsService.GetAsync();
+        _registrationAllowed = settings.AllowRegistration;
+        _siteTitle = settings.SiteTitle;
 
         if (AuthenticationStateTask is not null)
         {

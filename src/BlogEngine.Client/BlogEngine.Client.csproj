@@ -17,4 +17,41 @@
     <ProjectReference Include="..\BlogEngine.Shared\BlogEngine.Shared.csproj" />
   </ItemGroup>
 
+  <!--
+    Admin JavaScript (design 5.3, T1.9): the sources in scripts/ are bundled by esbuild into wwwroot/js
+    (editor.js with CodeMirror and highlight.js, admin.js with small helpers). The npm packages are installed
+    in BlogEngine.Server, next to the Sass build, so this runs that project's "js-build" script. The bundles
+    are build output and are not committed (wwwroot/ is git-ignored).
+  -->
+  <PropertyGroup>
+    <AdminScriptsNpmDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\BlogEngine.Server'))</AdminScriptsNpmDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AdminScriptSource Include="scripts\**\*.js" />
+    <AdminScriptSource Include="$(AdminScriptsNpmDir)\scripts\build-js.mjs;$(AdminScriptsNpmDir)\package-lock.json" />
+  </ItemGroup>
+
+  <!-- Incremental: esbuild only runs when a source, the build script or the locked npm packages changed.
+       Skipped in Visual Studio design-time builds, which must not start external processes. -->
+  <Target Name="BuildAdminScripts"
+          BeforeTargets="BeforeBuild"
+          Condition="'$(DesignTimeBuild)' != 'true'"
+          Inputs="@(AdminScriptSource)"
+          Outputs="wwwroot\js\editor.js;wwwroot\js\admin.js">
+    <Error Condition="!Exists('$(AdminScriptsNpmDir)\node_modules\esbuild')"
+           Text="esbuild was not found. Run 'npm install' in $(AdminScriptsNpmDir)." />
+    <Exec Command="npm run js-build" WorkingDirectory="$(AdminScriptsNpmDir)" />
+  </Target>
+
+  <!-- The wwwroot glob is evaluated before the bundles exist on a clean build, so add them to Content here
+       for the static web assets pipeline to serve them. -->
+  <Target Name="IncludeAdminScripts" AfterTargets="BuildAdminScripts" Condition="'$(DesignTimeBuild)' != 'true'">
+    <ItemGroup>
+      <_AdminScriptOutput Include="wwwroot\js\editor.*;wwwroot\js\admin.*" />
+      <Content Remove="@(_AdminScriptOutput)" />
+      <Content Include="@(_AdminScriptOutput)" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+    </ItemGroup>
+  </Target>
+
 </Project>

@@ -1,0 +1,49 @@
+<div class="tag-input">
+    @if (Tags.Count > 0)
+    {
+        <ul class="list-unstyled d-flex flex-wrap gap-1 mb-2" aria-label="Tags">
+            @foreach (var tag in Tags)
+            {
+                <li class="badge text-bg-secondary d-inline-flex align-items-center fw-normal fs-6 py-1">
+                    <span>@tag</span>
+                    <button type="button" class="btn-close btn-close-white ms-1 tag-remove" aria-label="Remove tag @tag"
+                            disabled="@Disabled" @onclick="() => RemoveAsync(tag)"></button>
+                </li>
+            }
+        </ul>
+    }
+
+    <div class="form-floating position-relative">
+        <input @ref="_input" id="@Id" type="text" class="form-control" placeholder="@Label" autocomplete="off"
+               maxlength="@FieldLengths.TagName" disabled="@Disabled"
+               role="combobox" aria-autocomplete="list" aria-expanded="@(IsOpen ? "true" : "false")"
+               aria-controls="@ListId" aria-activedescendant="@ActiveDescendant" aria-describedby="@HelpId"
+               value="@_text" @oninput="OnInputAsync" @onkeydown="OnKeyDownAsync" @onblur="OnBlurAsync" />
+        <label for="@Id">@Label</label>
+
+        @if (IsOpen)
+        {
+            <ul id="@ListId" class="dropdown-menu show w-100 mt-1" role="listbox" aria-label="Tag suggestions">
+                @for (var i = 0; i < _suggestions.Count; i++)
+                {
+                    var index = i;
+                    var suggestion = _suggestions[i];
+                    <li id="@OptionId(index)" role="option" aria-selected="@(index == _activeIndex ? "true" : "false")">
+                        @* mousedown would blur the input first and close the list before the click lands. *@
+                        <button type="button" class="dropdown-item d-flex justify-content-between @(index == _activeIndex ? "active" : null)"
+                                tabindex="-1" @onmousedown:preventDefault @onclick="() => CommitAsync(suggestion.Name)">
+                            <span>@suggestion.Name</span>
+                            <span class="small opacity-75">@suggestion.PostCount</span>
+                        </button>
+                    </li>
+                }
+            </ul>
+        }
+    </div>
+
+    @if (_error is not null)
+    {
+        <div class="text-danger small mt-1" role="alert">@_error</div>
+    }
+    <div id="@HelpId" class="form-text">Press Enter, Tab or comma to add a tag.</div>
+</div>

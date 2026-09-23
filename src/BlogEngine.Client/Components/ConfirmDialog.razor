@@ -1,0 +1,33 @@
+@if (_options is not null)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="@_titleId"
+         @onkeydown="OnKeyDownAsync">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title fs-5" id="@_titleId">@_options.Title</h2>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="() => CloseAsync(DialogChoice.Cancel)"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-0">@_options.Message</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => CloseAsync(DialogChoice.Cancel)">
+                        @_options.CancelText
+                    </button>
+                    @if (_options.AlternateText is { } alternateText)
+                    {
+                        <button type="button" class="btn btn-outline-primary" @onclick="() => CloseAsync(DialogChoice.Alternate)">
+                            @alternateText
+                        </button>
+                    }
+                    <button type="button" class="btn @_options.ConfirmButtonClass" @ref="_confirmButton"
+                            @onclick="() => CloseAsync(DialogChoice.Confirm)">
+                        @_options.ConfirmText
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
