@@ -61,6 +61,9 @@ try
     builder.EnrichSqlServerDbContext<ApplicationDbContext>();
     builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
+    // In-memory (L1) cache for settings and public queries; tags let whole groups be evicted (design 11).
+    builder.Services.AddHybridCache();
+
     builder.Services.AddIdentityCore<User>(options =>
         {
             options.Password.RequireDigit = false;
@@ -84,6 +87,7 @@ try
     builder.Services.AddSingleton<IEmailSender<User>, IdentityNoOpEmailSender>();
     builder.Services.AddScoped<IUserService, HttpUserService>();
     builder.Services.AddScoped<IToastService, ToastService>();
+    builder.Services.AddScoped<ISettingsService, ServerSettingsService>();
 
     // Add route configuration to enforce lowercase URLs for better SEO
     builder.Services.Configure<RouteOptions>(options =>

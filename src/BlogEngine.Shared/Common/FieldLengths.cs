@@ -54,4 +54,52 @@ public static class FieldLengths
 
     /// <summary>Storage key (path) of a media object inside <c>IMediaStorage</c>.</summary>
     public const int StorageKey = 400;
+
+    /// <summary>Short random media identifier used in public media URLs (fixed length).</summary>
+    public const int MediaPublicId = 12;
+
+    /// <summary>Media type detected by decoding an upload, such as <c>image/jpeg</c>.</summary>
+    public const int ContentType = 50;
+
+    /// <summary>Rendition encoding, such as <c>webp</c> or <c>jpeg</c>.</summary>
+    public const int RenditionFormat = 10;
+
+    /// <summary>Lowercase hex SHA-256 digest (fixed length): media content hashes and commenter IP hashes.</summary>
+    public const int Sha256Hex = 64;
+
+    /// <summary>Commenter user agent kept for moderation context.</summary>
+    public const int UserAgent = 300;
+
+    /// <summary>Human-readable reasons recorded by the spam guard.</summary>
+    public const int SpamReasons = 500;
+
+    /// <summary>Value of a comment block entry; long enough for a full email address.</summary>
+    public const int CommentBlockValue = Email;
+
+    /// <summary>Free-text note on a comment block entry.</summary>
+    public const int CommentBlockNote = 500;
+
+    /// <summary>URL-safe preview token; 256 bits encode to 43 base64url characters.</summary>
+    public const int PreviewToken = 64;
+
+    /// <summary>Site title shown in the header and browser tab.</summary>
+    public const int SiteTitle = 100;
+
+    /// <summary>Site tagline shown under the title.</summary>
+    public const int Tagline = 200;
+
+    /// <summary>Author biography (Markdown source).</summary>
+    public const int AuthorBio = 2000;
+
+    /// <summary>Name of a social network in the site's social links, such as <c>GitHub</c>.</summary>
+    public const int SocialNetwork = 50;
+
+    /// <summary>IANA time zone identifier, such as <c>America/Chicago</c>.</summary>
+    public const int TimeZoneId = 64;
+
+    /// <summary>.NET custom date format string used for displayed dates.</summary>
+    public const int DateFormat = 50;
+
+    /// <summary>Extra lines appended to the generated <c>robots.txt</c>.</summary>
+    public const int RobotsTxtExtras = 2000;
 }

@@ -12,7 +12,7 @@
 
 | Phase | Goal | Tasks | Done |
 |---|---|---|---|
-| [0: Foundation](#phase-0--foundation) | Admin can log in to an empty dashboard | 16 | 4 |
+| [0: Foundation](#phase-0--foundation) | Admin can log in to an empty dashboard | 16 | 8 |
 | [1: Posts MVP](#phase-1--posts-mvp) | Can write and publish posts end to end | 25 | 0 |
 | [2: Media MVP](#phase-2--media-mvp) | Can add, edit and insert photos | 13 | 0 |
 | [3: Comments MVP](#phase-3--comments-mvp) | Readers can comment; the author moderates | 11 | 0 |
@@ -87,25 +87,25 @@ These apply to all tasks and are not repeated below:
 
 ### Domain model and database
 
-- [ ] **T0.6 — Add enums and core entities** (§6.2–6.7)
+- [x] **T0.6 — Add enums and core entities** (§6.2–6.7)
   - Enums: `PostStatus` (`Draft`, `Published`), `CommentStatus` (`Pending`, `Approved`, `Rejected`, `Spam`), `CommentBlockKind` (`Email`, `IpHash`, `Keyword`, `Domain`), `RevisionKind` (`Autosave`, `Manual`, `Publish`).
   - Entities: `Post`, `PostRevision`, `Tag`, `PostTag`, `Comment`, `CommentBlock`, `MediaItem`, `MediaRendition`, `PostMedia`, `Page`, `Redirect`, `SiteSettings`, `PreviewToken`.
   - `Post` and `Page` implement `ISoftDeletable`; `Post` has a `RowVersion` concurrency token.
   - **Done when:** all entities exist with properties matching §6 and are registered as `DbSet`s on `ApplicationDbContext`.
 
-- [ ] **T0.7 — Entity configurations and indexes** (§6.2, §6.4, §6.7, §6.8)
+- [x] **T0.7 — Entity configurations and indexes** (§6.2, §6.4, §6.7, §6.8)
   - `Post`: globally unique `Slug`; unique `(PublishedDateLocal, Slug)` filtered on `Status = Published`; index `(Status, PublishedOn DESC)`.
   - `Tag`: unique `NormalizedName`, unique `Slug`. `PostTag`: composite PK.
   - `Comment`: self-reference via `ParentCommentId`. `Redirect`: unique `FromPath`. `MediaItem`: unique `PublicId`, index on `ContentHash`.
   - Global query filter hiding soft-deleted `Post`/`Page` rows; cascade deletes from `Post` to `PostTag`, `Comment`, `PostRevision`, `PostMedia`, `PreviewToken`.
   - **Done when:** configurations compile and the model validates (no EF warnings about keys or relationships).
 
-- [ ] **T0.8 — `SiteSettings` single row + `ISettingsService`** (§13)
+- [x] **T0.8 — `SiteSettings` single row + `ISettingsService`** (§13)
   - All settings groups from §13 as columns with defaults (posts per page = 10, feeds = full content, comments enabled, require approval = true, auto-approve returning = false, close after 0 days, max links = 2, avatars off, max upload 20 MB, rendition widths 320/640/960/1280/1920, `TimeZoneId`, `AllowRegistration = false`, discourage search engines = false).
   - Seed the single row in a migration. `ISettingsService` in Shared; server implementation cached with `HybridCache` and evicted on save.
   - **Done when:** settings can be read anywhere via DI and a unit/integration test proves the cache is evicted on update.
 
-- [ ] **T0.9 — Initial blog migration**
+- [x] **T0.9 — Initial blog migration**
   - Create the migration for T0.6–T0.8 and verify the Aspire EF migrations resource applies it.
   - **Done when:** `aspire run` starts with an up-to-date database containing all new tables.
 
