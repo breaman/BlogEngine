@@ -36,6 +36,17 @@ This project is configured with aspire and should use the aspire cli, so the rec
 aspire run
 ```
 
+### Admin account
+On first run there are no accounts. Browse to `/setup` to create the admin (display name, email and password); the page returns 404 once any account exists. Public registration is closed by default (`AllowRegistration` in site settings).
+
+To skip `/setup`, seed the admin from Aspire parameters in the AppHost's user secrets. They are only used while no account exists:
+
+```
+cd aspire/BlogEngine.AppHost
+dotnet user-secrets set "Parameters:admin-email" "you@example.com"
+dotnet user-secrets set "Parameters:admin-password" "<password>"
+```
+
 ## Tests
 The tests use [TUnit](https://tunit.dev) on Microsoft.Testing.Platform (enabled for `dotnet test` in `global.json`):
 

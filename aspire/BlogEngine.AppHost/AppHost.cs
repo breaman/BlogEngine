@@ -27,6 +27,20 @@ var server = builder.AddProject<Projects.BlogEngine_Server>("server", "https")
     .WithHttpHealthCheck(Constants.HealthEndpointPath)
     .WithReference(db);
 
+// Optional admin seeding (design 12.1). Only wired up when admin-email is configured, e.g.
+//   dotnet user-secrets set "Parameters:admin-email" "you@example.com"
+//   dotnet user-secrets set "Parameters:admin-password" "..."
+// so a fresh clone isn't prompted for them and can use /setup instead. The server ignores them once any
+// account exists.
+if (!string.IsNullOrWhiteSpace(builder.Configuration["Parameters:admin-email"]))
+{
+    var adminEmail = builder.AddParameter("admin-email");
+    var adminPassword = builder.AddParameter("admin-password", secret: true);
+
+    server.WithEnvironment("AdminSeed__Email", adminEmail)
+        .WithEnvironment("AdminSeed__Password", adminPassword);
+}
+
 var migrations = server.AddEFMigrations("ef-migrations")
     .WithMigrationsProject<Projects.BlogEngine_Data>()
     .RunDatabaseUpdateOnStart()

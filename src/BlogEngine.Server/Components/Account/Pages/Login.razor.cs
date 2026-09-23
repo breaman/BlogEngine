@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 
 using BlogEngine.Data.Models;
+using BlogEngine.Shared.Services;
 
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Components;
@@ -16,8 +17,10 @@ public partial class Login : ComponentBase
     [Inject] ILogger<Login> Logger { get; set; } = default!;
     [Inject] NavigationManager NavigationManager { get; set; } = default!;
     [Inject] IdentityRedirectManager RedirectManager { get; set; } = default!;
+    [Inject] ISettingsService SettingsService { get; set; } = default!;
 
     private string? _errorMessage;
+    private bool _registrationAllowed;
     private EditContext _editContext = default!;
 
     [CascadingParameter]
@@ -34,6 +37,7 @@ public partial class Login : ComponentBase
         Input ??= new();
 
         _editContext = new EditContext(Input);
+        _registrationAllowed = (await SettingsService.GetAsync()).AllowRegistration;
 
         if (HttpMethods.IsGet(HttpContext.Request.Method))
         {

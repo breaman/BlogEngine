@@ -15,10 +15,21 @@ namespace BlogEngine.Server.Services;
 /// through <see cref="HybridCache"/> and evicts the cached copy whenever the settings are saved.
 /// </summary>
 /// <remarks>
+/// <para>
 /// <see cref="SiteSettingsDto"/> is mutable, so <see cref="HybridCache"/> hands every caller its own
 /// deserialized copy; a caller editing its copy cannot corrupt the cached value.
+/// </para>
+/// <para>
+/// Cache misses load through their own scope rather than the request's <see cref="ApplicationDbContext"/>:
+/// during static SSR the layout and the page initialize concurrently, so a settings read in the layout would
+/// otherwise collide with the page's own queries on the shared context. It also keeps a load that
+/// <see cref="HybridCache"/> shares between concurrent requests independent of any one request's lifetime.
+/// </para>
 /// </remarks>
-public sealed class ServerSettingsService(ApplicationDbContext dbContext, HybridCache cache) : ISettingsService
+public sealed class ServerSettingsService(
+    ApplicationDbContext dbContext,
+    HybridCache cache,
+    IServiceScopeFactory scopeFactory) : ISettingsService
 {
     /// <summary>Cache key of the settings entry.</summary>
     public const string CacheKey = "site-settings";
@@ -62,7 +73,10 @@ public sealed class ServerSettingsService(ApplicationDbContext dbContext, Hybrid
     /// </summary>
     private async ValueTask<SiteSettingsDto> LoadAsync(CancellationToken cancellationToken)
     {
-        var entity = await dbContext.SiteSettings
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var loadContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        var entity = await loadContext.SiteSettings
             .AsNoTracking()
             .SingleOrDefaultAsync(s => s.Id == SiteSettings.SingletonId, cancellationToken);
 

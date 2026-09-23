@@ -2,6 +2,7 @@ using System.Text;
 
 using BlogEngine.Data.Models;
 using BlogEngine.Server.Components.Email;
+using BlogEngine.Shared.Services;
 
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Identity;
@@ -15,6 +16,7 @@ public partial class RegisterConfirmation : ComponentBase
     [Inject] private IEmailSender<User> EmailSender { get; set; } = default!;
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
     [Inject] private IdentityRedirectManager RedirectManager { get; set; } = default!;
+    [Inject] private ISettingsService SettingsService { get; set; } = default!;
 
     private string? _emailConfirmationLink;
     private string? _statusMessage;
@@ -30,6 +32,14 @@ public partial class RegisterConfirmation : ComponentBase
 
     protected override async Task OnInitializedAsync()
     {
+        // Only reachable after registering, and it reveals a confirmation link while the no-op email sender
+        // is in use, so it's closed along with registration (design 12.1).
+        if (!(await SettingsService.GetAsync()).AllowRegistration)
+        {
+            NavigationManager.NotFound();
+            return;
+        }
+
         if (Email is null)
         {
             RedirectManager.RedirectTo("");

@@ -1,5 +1,11 @@
 @page "/Account/Register"
 
+@* Registration is closed: NotFound() already set a 404, so render nothing of the form. *@
+@if (!_registrationAllowed)
+{
+    return;
+}
+
 <PageTitle>Register</PageTitle>
 
 <h1>Register</h1>

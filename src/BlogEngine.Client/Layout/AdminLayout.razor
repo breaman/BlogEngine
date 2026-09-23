@@ -1,0 +1,91 @@
+@inherits LayoutComponentBase
+
+@* Static layout for /admin pages (design 5.1). It lives in the Client project because Client pages
+   can't reference Server components; the pages inside it are InteractiveWebAssembly. *@
+
+<nav class="navbar navbar-expand-md navbar-dark bg-dark border-bottom">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="admin">
+            <span class="bi bi-journal-richtext" aria-hidden="true"></span> BlogEngine Admin
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#adminNav" aria-controls="adminNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="adminNav">
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="admin" Match="NavLinkMatch.All">
+                        <span class="bi bi-speedometer2" aria-hidden="true"></span> Dashboard
+                    </NavLink>
+                </li>
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="admin/posts">
+                        <span class="bi bi-file-earmark-text" aria-hidden="true"></span> Posts
+                    </NavLink>
+                </li>
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="admin/media">
+                        <span class="bi bi-images" aria-hidden="true"></span> Media
+                    </NavLink>
+                </li>
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="admin/comments">
+                        <span class="bi bi-chat-left-text" aria-hidden="true"></span> Comments
+                    </NavLink>
+                </li>
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="admin/tags">
+                        <span class="bi bi-tags" aria-hidden="true"></span> Tags
+                    </NavLink>
+                </li>
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="admin/settings">
+                        <span class="bi bi-gear" aria-hidden="true"></span> Settings
+                    </NavLink>
+                </li>
+            </ul>
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a class="nav-link" href="/">
+                        <span class="bi bi-box-arrow-up-right" aria-hidden="true"></span> View site
+                    </a>
+                </li>
+                <AuthorizeView>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="adminUserDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <span class="bi bi-person-circle" aria-hidden="true"></span> @context.User.Identity?.Name
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="adminUserDropdown">
+                            <li>
+                                <a class="dropdown-item" href="Account/Manage">
+                                    <span class="bi bi-shield-lock" aria-hidden="true"></span> Manage account
+                                </a>
+                            </li>
+                            <li><hr class="dropdown-divider" /></li>
+                            <li>
+                                <form action="Account/Logout" method="post" class="m-0">
+                                    <AntiforgeryToken />
+                                    <input type="hidden" name="returnUrl" value="" />
+                                    <button type="submit" class="dropdown-item">
+                                        <span class="bi bi-box-arrow-right" aria-hidden="true"></span> Log out
+                                    </button>
+                                </form>
+                            </li>
+                        </ul>
+                    </li>
+                </AuthorizeView>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<main class="container-fluid py-4 px-md-4">
+    @Body
+    <ToastContainer @rendermode="InteractiveWebAssembly" />
+</main>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">X</span>
+</div>

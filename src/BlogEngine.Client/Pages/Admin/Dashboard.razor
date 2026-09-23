@@ -1,0 +1,35 @@
+@page "/admin"
+@layout AdminLayout
+@attribute [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
+@rendermode InteractiveWebAssembly
+
+<PageTitle>Dashboard · BlogEngine Admin</PageTitle>
+
+<h1 class="h3 mb-4">Dashboard</h1>
+
+@* Placeholder cards; the counts and activity feed arrive with posts and comments (T3.10, T4.26). *@
+<div class="row row-cols-1 row-cols-sm-2 row-cols-xl-4 g-3 mb-4">
+    @foreach (var card in Cards)
+    {
+        <div class="col">
+            <div class="card h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center text-body-secondary mb-2">
+                        <span class="bi @card.Icon me-2" aria-hidden="true"></span>
+                        <span>@card.Title</span>
+                    </div>
+                    <p class="display-6 mb-0">&mdash;</p>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <span class="bi bi-clock-history me-1" aria-hidden="true"></span> Recent activity
+    </div>
+    <div class="card-body text-body-secondary">
+        Nothing yet. New posts and comments will show up here.
+    </div>
+</div>

@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Encodings.Web;
 
 using BlogEngine.Data.Models;
+using BlogEngine.Shared.Services;
 
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
@@ -20,8 +21,10 @@ public partial class Register : ComponentBase
     [Inject] private ILogger<Register> Logger { get; set; } = default!;
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
     [Inject] private IdentityRedirectManager RedirectManager { get; set; } = default!;
+    [Inject] private ISettingsService SettingsService { get; set; } = default!;
 
     private IEnumerable<IdentityError>? _identityErrors;
+    private bool _registrationAllowed;
 
     [SupplyParameterFromForm]
     private InputModel Input { get; set; } = default!;
@@ -31,13 +34,26 @@ public partial class Register : ComponentBase
 
     private string? Message => _identityErrors is null ? null : $"Error: {string.Join(", ", _identityErrors.Select(error => error.Description))}";
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         Input ??= new();
+
+        // Public registration is closed unless the admin opens it (design 12.1); the page doesn't exist until then.
+        _registrationAllowed = (await SettingsService.GetAsync()).AllowRegistration;
+        if (!_registrationAllowed)
+        {
+            NavigationManager.NotFound();
+        }
     }
 
     public async Task RegisterUser(EditContext editContext)
     {
+        // NotFound() only changes the response; make sure a post can't create an account either.
+        if (!_registrationAllowed)
+        {
+            return;
+        }
+
         var user = CreateUser();
         user.FirstName = Input.FirstName.Trim();
         user.LastName = Input.LastName.Trim();

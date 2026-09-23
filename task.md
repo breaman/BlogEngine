@@ -12,7 +12,7 @@
 
 | Phase | Goal | Tasks | Done |
 |---|---|---|---|
-| [0: Foundation](#phase-0--foundation) | Admin can log in to an empty dashboard | 16 | 13 |
+| [0: Foundation](#phase-0--foundation) | Admin can log in to an empty dashboard | 16 | 16 |
 | [1: Posts MVP](#phase-1--posts-mvp) | Can write and publish posts end to end | 25 | 0 |
 | [2: Media MVP](#phase-2--media-mvp) | Can add, edit and insert photos | 13 | 0 |
 | [3: Comments MVP](#phase-3--comments-mvp) | Readers can comment; the author moderates | 11 | 0 |
@@ -138,14 +138,14 @@ These apply to all tasks and are not repeated below:
 
 ### Security and admin shell
 
-- [ ] **T0.15 — Admin account, `/setup` and registration lockdown** (§12.1, O5)
+- [x] **T0.15 — Admin account, `/setup` and registration lockdown** (§12.1, O5)
   - `AdminOnly` authorization policy (requires `Admin` role).
   - `/setup` (static SSR): only when no users exist; creates the admin with email, password and display name and assigns `Admin`; returns 404 afterwards.
   - Optional seeding from Aspire parameters `admin-email` / `admin-password`.
   - `/Account/Register` returns 404 and its nav link is hidden when `AllowRegistration = false`.
   - **Done when:** integration tests prove `/setup` works once then 404s, and registration 404s by default.
 
-- [ ] **T0.16 — Admin layout, dashboard shell and admin API plumbing** (§5.1, §7.3, §7.4)
+- [x] **T0.16 — Admin layout, dashboard shell and admin API plumbing** (§5.1, §7.3, §7.4)
   - `AdminLayout.razor` in `BlogEngine.Client` with nav (Dashboard, Posts, Media, Comments, Tags, Settings) and a link back to the public site.
   - `/admin` dashboard page (empty cards for now), protected by `AdminOnly`.
   - `/api/admin` route group requiring `AdminOnly` + antiforgery validation on mutating verbs.
@@ -232,7 +232,7 @@ These apply to all tasks and are not repeated below:
 
 - [ ] **T1.15 — Settings page** (`/admin/settings`; O4)
   - Edit the §13 settings that matter for MVP: identity (title, tagline, description, author name/bio, social links), reading (posts per page, feed mode, home mode), time zone (IANA picker), comments policy, SEO "discourage search engines".
-  - `GET/PUT /api/admin/settings` endpoints.
+  - `GET/PUT /api/admin/settings` endpoints. *(Already added with T0.16 as the first admin API endpoints; this task adds the client service and page.)*
   - **Done when:** settings save, cache is evicted, and public pages reflect changes.
 
 - [ ] **T1.16 — Time zone change maintenance** (§7.1)

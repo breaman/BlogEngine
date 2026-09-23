@@ -7,8 +7,10 @@ using BlogEngine.Data.Models;
 using BlogEngine.Server.Components;
 using BlogEngine.Server.Components.Account;
 using BlogEngine.Server.Components.Email;
+using BlogEngine.Server.Endpoints;
 using BlogEngine.Server.Services;
 using BlogEngine.ServiceDefaults;
+using BlogEngine.Shared.Security;
 using BlogEngine.Shared.Services;
 
 using Microsoft.AspNetCore.Identity;
@@ -51,7 +53,11 @@ try
             options.DefaultSignInScheme = IdentityConstants.ExternalScheme;
         })
         .AddIdentityCookies();
-    builder.Services.AddAuthorization();
+    // All admin pages and admin API endpoints share the AdminOnly policy (design 12.1).
+    builder.Services.AddAuthorization(options => options.AddBlogPolicies());
+
+    // The WebAssembly admin sends the antiforgery token for /api/admin calls in this header (design 7.4).
+    builder.Services.AddAntiforgery(options => options.HeaderName = AntiforgeryHeaders.RequestToken);
 
     builder.Services.AddDataInterceptors();
     builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =>
@@ -88,6 +94,11 @@ try
     builder.Services.AddScoped<IUserService, HttpUserService>();
     builder.Services.AddScoped<IToastService, ToastService>();
     builder.Services.AddScoped<ISettingsService, ServerSettingsService>();
+
+    // First-run admin account: the /setup page, or seeding from the AdminSeed section (design 12.1).
+    builder.Services.AddScoped<AdminAccountService>();
+    builder.Services.Configure<AdminSeedOptions>(builder.Configuration.GetSection(AdminSeedOptions.SectionName));
+    builder.Services.AddHostedService<AdminSeeder>();
 
     // The clock behind the public visibility rule and scheduling; tests replace it with a fake (design 6.3).
     builder.Services.AddSingleton(TimeProvider.System);
@@ -131,6 +142,8 @@ try
         .AddAdditionalAssemblies(typeof(BlogEngine.Client._Imports).Assembly);
 
     app.MapAdditionalIdentityEndpoints();
+
+    app.MapAdminApi();
 
     app.Run();
 }

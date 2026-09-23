@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Encodings.Web;
 
 using BlogEngine.Data.Models;
+using BlogEngine.Shared.Services;
 
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Identity;
@@ -20,6 +21,7 @@ public partial class ExternalLogin : ComponentBase
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
     [Inject] private IdentityRedirectManager RedirectManager { get; set; } = default!;
     [Inject] private ILogger<ExternalLogin> Logger { get; set; } = default!;
+    [Inject] private ISettingsService SettingsService { get; set; } = default!;
 
     public const string LoginCallbackAction = "LoginCallback";
 
@@ -118,6 +120,14 @@ public partial class ExternalLogin : ComponentBase
         if (_externalLoginInfo is null)
         {
             RedirectManager.RedirectToWithStatus("Account/Login", "Error loading external login information during confirmation.", HttpContext);
+            return;
+        }
+
+        // Linking an external login to a new account is registration, which is closed by default (design 12.1).
+        if (!(await SettingsService.GetAsync()).AllowRegistration)
+        {
+            RedirectManager.RedirectToWithStatus("Account/Login",
+                "Error: Registration is closed, so this external login can't create a new account.", HttpContext);
             return;
         }
 

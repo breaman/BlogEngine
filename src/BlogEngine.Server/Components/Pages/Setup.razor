@@ -1,0 +1,46 @@
+@page "/setup"
+
+<PageTitle>Set up your blog</PageTitle>
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <h1><span class="bi bi-rocket-takeoff" aria-hidden="true"></span> Set up your blog</h1>
+        <p class="lead">Create the admin account you'll use to write posts and manage the site.</p>
+
+        @if (_errorMessage is not null)
+        {
+            <div class="alert alert-danger" role="alert">@_errorMessage</div>
+        }
+
+        <EditForm Model="Input" method="post" OnValidSubmit="CreateAdminAsync" FormName="setup">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" role="alert" />
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.DisplayName" id="Input.DisplayName" class="form-control" autocomplete="name" aria-required="true" placeholder="Display name" />
+                <label for="Input.DisplayName">Display name</label>
+                <ValidationMessage For="() => Input.DisplayName" class="text-danger" />
+            </div>
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.Email" id="Input.Email" class="form-control" autocomplete="username" aria-required="true" placeholder="name@example.com" />
+                <label for="Input.Email">Email</label>
+                <ValidationMessage For="() => Input.Email" class="text-danger" />
+            </div>
+            <div class="form-floating mb-3">
+                <InputText type="password" @bind-Value="Input.Password" id="Input.Password" class="form-control" autocomplete="new-password" aria-required="true" placeholder="password" />
+                <label for="Input.Password">Password</label>
+                <ValidationMessage For="() => Input.Password" class="text-danger" />
+            </div>
+            <div class="form-floating mb-3">
+                <InputText type="password" @bind-Value="Input.ConfirmPassword" id="Input.ConfirmPassword" class="form-control" autocomplete="new-password" aria-required="true" placeholder="password" />
+                <label for="Input.ConfirmPassword">Confirm password</label>
+                <ValidationMessage For="() => Input.ConfirmPassword" class="text-danger" />
+            </div>
+            <button type="submit" class="w-100 btn btn-lg btn-primary">Create admin account</button>
+        </EditForm>
+
+        <p class="text-body-secondary small mt-3">
+            This page is only available until the first account exists. Afterwards, add a passkey or
+            two-factor authentication from <strong>Manage account</strong>.
+        </p>
+    </div>
+</div>
