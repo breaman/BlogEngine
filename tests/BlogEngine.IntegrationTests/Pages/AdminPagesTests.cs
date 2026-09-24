@@ -30,6 +30,8 @@ public class AdminPagesTests(BlogEngineWebApplicationFactory factory)
     [Arguments("/admin/posts/new")]
     [Arguments("/admin/posts/1")]
     [Arguments("/admin/settings")]
+    [Arguments("/admin/media")]
+    [Arguments("/admin/media/1")]
     public async Task Page_Anonymous_RedirectsToLogin(string path)
     {
         using var client = IdentityTestHelper.CreateClient(factory);
@@ -56,6 +58,60 @@ public class AdminPagesTests(BlogEngineWebApplicationFactory factory)
         await Assert.That(all).Contains($"Hidden {token}");
         await Assert.That(tagged).Contains($"Listed {token}");
         await Assert.That(tagged).DoesNotContain($"Hidden {token}");
+    }
+
+    /// <summary>The media library prerenders its grid, and the Unused filter narrows it (T2.6, T2.8).</summary>
+    [Test]
+    public async Task MediaLibrary_PrerendersFilteredGrid()
+    {
+        var token = Guid.NewGuid().ToString("N")[..8];
+        var used = await MediaTestFiles.AddAsync(factory, $"grid-used-{token}.png");
+        var spare = await MediaTestFiles.AddAsync(factory, $"grid-spare-{token}.png");
+        await CreatePostAsync($"Grid {token}", [], $"![x]({used.Path})");
+        using var client = await CreateAdminClientAsync();
+
+        var all = await GetHtmlAsync(client, $"/admin/media?search={token}");
+        var unused = await GetHtmlAsync(client, $"/admin/media?search={token}&unused=true");
+
+        await Assert.That(all).Contains(used.FileName);
+        await Assert.That(all).Contains(spare.FileName);
+        await Assert.That(all).Contains("Used in 1 post");
+        await Assert.That(unused).DoesNotContain(used.FileName);
+        await Assert.That(unused).Contains(spare.FileName);
+    }
+
+    /// <summary>The media editor prerenders the item's details and the posts that use it (T2.10).</summary>
+    [Test]
+    public async Task MediaEditor_PrerendersDetails()
+    {
+        var token = Guid.NewGuid().ToString("N")[..8];
+        var item = await MediaTestFiles.AddAsync(factory, $"editor-{token}.png", MediaTestFiles.Png(64, 48));
+        await CreatePostAsync($"Uses editor image {token}", [], $"![x]({item.Path})");
+        using var client = await CreateAdminClientAsync();
+
+        var html = await GetHtmlAsync(client, $"/admin/media/{item.Id}");
+        var missing = await GetHtmlAsync(client, $"/admin/media/{int.MaxValue}");
+
+        await Assert.That(html).Contains(item.FileName);
+        await Assert.That(html).Contains("64 × 48");
+        await Assert.That(html).Contains($"Uses editor image {token}");
+        await Assert.That(html).Contains($"value=\"{item.Path}\"");
+        await Assert.That(missing).Contains("This image doesn't exist.");
+    }
+
+    /// <summary>The post editor's preview resolves library images while prerendering, like the published page.</summary>
+    [Test]
+    public async Task PostEditor_PrerendersLibraryImages()
+    {
+        var token = Guid.NewGuid().ToString("N")[..8];
+        var item = await MediaTestFiles.AddAsync(factory, $"preview-{token}.png", MediaTestFiles.Png(64, 48));
+        var post = await CreatePostAsync($"Preview {token}", [], $"![Squares]({item.Path} \"Caption {token}\")");
+        using var client = await CreateAdminClientAsync();
+
+        var html = await GetHtmlAsync(client, $"/admin/posts/{post.Id}");
+
+        await Assert.That(html).Contains($"src=\"/media/{item.PublicId}/{item.FileName}?v=1\"");
+        await Assert.That(html).Contains($"<figcaption>Caption {token}</figcaption>");
     }
 
     /// <summary>The editor prerenders the stored post, including its Markdown and preview.</summary>

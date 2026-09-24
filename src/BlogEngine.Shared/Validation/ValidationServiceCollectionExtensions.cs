@@ -27,6 +27,8 @@ public static class ValidationServiceCollectionExtensions
         services.AddSingleton<IValidator<PostEditDto>, PostEditValidator>();
         services.AddSingleton<IValidator<SiteSettingsDto>, SiteSettingsValidator>();
         services.AddSingleton<IValidator<SocialLinkDto>, SocialLinkValidator>();
+        services.AddSingleton<IValidator<MediaUpdateRequest>, MediaUpdateValidator>();
+        services.AddSingleton<IValidator<MediaEditOperations>, MediaEditOperationsValidator>();
 
         return services;
     }

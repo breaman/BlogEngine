@@ -44,6 +44,8 @@ public sealed class BlogMarkdownPipeline
     /// <summary>Name of the attribute holding a preview block's 0-based source line.</summary>
     public const string SourceLineAttribute = "data-line";
 
+    private readonly MediaLinkRewriter mediaLinkRewriter;
+
     /// <summary>Builds both pipelines.</summary>
     /// <param name="options">Host-specific settings; defaults are used when <see langword="null"/>.</param>
     public BlogMarkdownPipeline(BlogMarkdownOptions? options = null)
@@ -51,6 +53,7 @@ public sealed class BlogMarkdownPipeline
         options ??= new BlogMarkdownOptions();
         PostPipeline = BuildPostPipeline(options);
         CommentPipeline = BuildCommentPipeline(options);
+        mediaLinkRewriter = new MediaLinkRewriter(options.InternalHosts);
     }
 
     /// <summary>The post and page pipeline. Raw HTML is allowed because the author is trusted.</summary>
@@ -72,9 +75,15 @@ public sealed class BlogMarkdownPipeline
     }
 
     /// <summary>Renders post or page Markdown to HTML.</summary>
-    public MarkdownRenderResult RenderPost(string? markdown)
+    /// <param name="markdown">The Markdown source.</param>
+    /// <param name="media">
+    /// Metadata of the library images the post uses, for <see cref="MediaLinkRewriter"/> (design 9.4); images of
+    /// deleted items are left out. <see langword="null"/> leaves library images as plain <c>&lt;img&gt;</c> tags.
+    /// </param>
+    public MarkdownRenderResult RenderPost(string? markdown, IMediaLookup? media = null)
     {
-        return Render(markdown, PostPipeline);
+        return Render(markdown, PostPipeline,
+            media is null ? null : document => mediaLinkRewriter.Rewrite(document, media, preview: false));
     }
 
     /// <summary>
@@ -92,9 +101,23 @@ public sealed class BlogMarkdownPipeline
     /// // &lt;h1 id="title" data-line="0"&gt;Title&lt;/h1&gt;\n&lt;p data-line="2"&gt;Text&lt;/p&gt;
     /// </code>
     /// </example>
-    public MarkdownRenderResult RenderPostPreview(string? markdown)
+    /// <param name="markdown">The Markdown source.</param>
+    /// <param name="media">
+    /// Metadata of the library images the post uses; images of deleted items render as a visible placeholder.
+    /// <see langword="null"/> leaves library images as plain <c>&lt;img&gt;</c> tags.
+    /// </param>
+    public MarkdownRenderResult RenderPostPreview(string? markdown, IMediaLookup? media = null)
     {
-        return Render(markdown, PostPipeline, AddSourceLines);
+        return Render(markdown, PostPipeline, document =>
+        {
+            if (media is not null)
+            {
+                // Figures replace their paragraphs as HTML blocks, which carry their own data-line.
+                mediaLinkRewriter.Rewrite(document, media, preview: true);
+            }
+
+            AddSourceLines(document);
+        });
     }
 
     /// <summary>Renders comment Markdown to HTML with the restricted comment pipeline.</summary>

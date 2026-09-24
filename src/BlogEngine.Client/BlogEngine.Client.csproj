@@ -19,7 +19,8 @@
 
   <!--
     Admin JavaScript (design 5.3, T1.9): the sources in scripts/ are bundled by esbuild into wwwroot/js
-    (editor.js with CodeMirror and highlight.js, admin.js with small helpers). The npm packages are installed
+    (editor.js with CodeMirror and highlight.js, admin.js with small helpers, media.js with the upload queue,
+    cropper.js with Cropper.js for the image editor). The npm packages are installed
     in BlogEngine.Server, next to the Sass build, so this runs that project's build-js.mjs for the "admin"
     bundles (BlogEngine.Server builds the "public" ones itself). The bundles are build output and are not
     committed (wwwroot/ is git-ignored).
@@ -39,7 +40,7 @@
           BeforeTargets="BeforeBuild"
           Condition="'$(DesignTimeBuild)' != 'true'"
           Inputs="@(AdminScriptSource)"
-          Outputs="wwwroot\js\editor.js;wwwroot\js\admin.js">
+          Outputs="wwwroot\js\editor.js;wwwroot\js\admin.js;wwwroot\js\media.js;wwwroot\js\cropper.js">
     <Error Condition="!Exists('$(AdminScriptsNpmDir)\node_modules\esbuild')"
            Text="esbuild was not found. Run 'npm install' in $(AdminScriptsNpmDir)." />
     <Exec Command="node ./scripts/build-js.mjs admin" WorkingDirectory="$(AdminScriptsNpmDir)" />
@@ -49,7 +50,7 @@
        for the static web assets pipeline to serve them. -->
   <Target Name="IncludeAdminScripts" AfterTargets="BuildAdminScripts" Condition="'$(DesignTimeBuild)' != 'true'">
     <ItemGroup>
-      <_AdminScriptOutput Include="wwwroot\js\editor.*;wwwroot\js\admin.*" />
+      <_AdminScriptOutput Include="wwwroot\js\editor.*;wwwroot\js\admin.*;wwwroot\js\media.*;wwwroot\js\cropper.*" />
       <Content Remove="@(_AdminScriptOutput)" />
       <Content Include="@(_AdminScriptOutput)" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
     </ItemGroup>

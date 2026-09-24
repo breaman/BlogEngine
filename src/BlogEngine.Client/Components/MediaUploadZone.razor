@@ -1,0 +1,67 @@
+@* Drop zone and file chooser with one progress row per file (design 9.1, T2.8). media.js owns the files and the
+   uploads; this component decides what to send and renders the progress. *@
+<div class="media-upload-zone card @(Compact ? "compact" : null)" @ref="_dropZone">
+    <div class="card-body text-center">
+        <span class="bi bi-cloud-arrow-up media-upload-zone-icon text-body-secondary" aria-hidden="true"></span>
+        <p class="mb-2">Drag and drop images here, or</p>
+        <button type="button" class="btn btn-outline-primary btn-sm" disabled="@(!_ready)" @onclick="ChooseFilesAsync">
+            <span class="bi bi-folder2-open me-1" aria-hidden="true"></span> Choose files
+        </button>
+        <p class="small text-body-secondary mt-2 mb-0">
+            JPEG, PNG, GIF or WebP@(MaxUploadMegabytes is { } max ? $", up to {max} MB each" : null). Location data is removed from photos.
+        </p>
+        @* Hidden: the button above opens it, and media.js reads the chosen files. *@
+        <input type="file" class="d-none" multiple accept="@AcceptedTypes" @ref="_fileInput" aria-label="Choose images to upload" tabindex="-1" />
+    </div>
+
+    @if (_uploads.Count > 0)
+    {
+        <ul class="list-group list-group-flush" aria-live="polite">
+            @foreach (var upload in _uploads)
+            {
+                <li class="list-group-item" @key="upload.Id">
+                    <div class="d-flex align-items-center gap-2">
+                        @switch (upload.State)
+                        {
+                            case UploadState.Uploading:
+                                <span class="spinner-border spinner-border-sm text-primary" aria-hidden="true"></span>
+                                break;
+                            case UploadState.Done:
+                                <span class="bi bi-check-circle-fill text-success" aria-hidden="true"></span>
+                                break;
+                            default:
+                                <span class="bi bi-exclamation-triangle-fill text-danger" aria-hidden="true"></span>
+                                break;
+                        }
+                        <span class="text-truncate flex-grow-1" title="@upload.Name">@upload.Name</span>
+                        <span class="small text-body-secondary text-nowrap">@UploadStatusText(upload)</span>
+                    </div>
+                    @if (upload.State == UploadState.Uploading)
+                    {
+                        <div class="progress mt-2" role="progressbar" aria-label="Uploading @upload.Name"
+                             aria-valuenow="@upload.Percent" aria-valuemin="0" aria-valuemax="100" style="height: 0.4rem;">
+                            <div class="progress-bar" style="width: @(upload.Percent)%"></div>
+                        </div>
+                    }
+                    @if (upload.Error is { } error)
+                    {
+                        <div class="small text-danger mt-1">@error</div>
+                    }
+                    @if (upload.DuplicateOf is { } duplicate)
+                    {
+                        <div class="small text-warning-emphasis mt-1">
+                            <span class="bi bi-files me-1" aria-hidden="true"></span>
+                            The library already has this image as <a href="@($"admin/media/{duplicate.Id}")">@duplicate.FileName</a>.
+                        </div>
+                    }
+                </li>
+            }
+        </ul>
+        @if (!IsUploading)
+        {
+            <div class="card-footer text-end py-1">
+                <button type="button" class="btn btn-link btn-sm" @onclick="ClearFinished">Clear list</button>
+            </div>
+        }
+    }
+</div>

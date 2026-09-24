@@ -1,0 +1,22 @@
+/* A dashed target that lights up while files are dragged over it (design 9.1). */
+.media-upload-zone {
+    border-style: dashed;
+    border-width: 2px;
+    transition: border-color 0.15s ease-in-out, background-color 0.15s ease-in-out;
+}
+
+.media-upload-zone.is-dragover {
+    border-color: var(--bs-primary);
+    background-color: var(--bs-primary-bg-subtle);
+}
+
+.media-upload-zone-icon {
+    display: block;
+    font-size: 2.25rem;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+}
+
+.media-upload-zone.compact .media-upload-zone-icon {
+    font-size: 1.5rem;
+}

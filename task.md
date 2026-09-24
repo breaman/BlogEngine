@@ -14,7 +14,7 @@
 |---|---|---|---|
 | [0: Foundation](#phase-0--foundation) | Admin can log in to an empty dashboard | 16 | 16 |
 | [1: Posts MVP](#phase-1--posts-mvp) | Can write and publish posts end to end | 25 | 25 |
-| [2: Media MVP](#phase-2--media-mvp) | Can add, edit and insert photos | 13 | 0 |
+| [2: Media MVP](#phase-2--media-mvp) | Can add, edit and insert photos | 13 | 13 |
 | [3: Comments MVP](#phase-3--comments-mvp) | Readers can comment; the author moderates | 11 | 0 |
 | [4: V1 Polish](#phase-4--v1-polish) | Ready for public launch | 35 | 0 |
 | [5: Later](#phase-5--later) | As desired | 10 | 0 |
@@ -295,65 +295,71 @@ These apply to all tasks and are not repeated below:
 
 **Exit criteria:** you can upload, crop/rotate/resize, and insert photos into posts; EXIF GPS data never survives upload.
 
-- [ ] **T2.1 — `IMediaStorage` + `FileSystemMediaStorage`** (§9.3, Q5)
+- [x] **T2.1 — `IMediaStorage` + `FileSystemMediaStorage`** (§9.3, Q5)
   - Interface from §9.3; file system implementation rooted at a configurable path (default `App_Data/media`); key layout `{publicId}/original.{ext}`, `{publicId}/v{version}/current.{ext}`.
   - Aspire: bind mount/volume so media survives restarts. Health check for storage writability (§18).
   - **Done when:** unit/integration tests cover save, read, delete and prefix delete; `/health` reports storage status.
+  - *Status:* `IMediaStorage`/`FileSystemMediaStorage` in `Server/Storage`, rooted at `MediaStorage:RootPath` (default `App_Data/media`, git-ignored). The server is an Aspire project resource on the host, so the folder already survives restarts; the AppHost passes an optional `MediaStorage:RootPath` through, and a container should mount a volume there. `/health` includes the `media-storage` check.
 
-- [ ] **T2.2 — Add ImageSharp and `MediaProcessor`** (§5.3, §9.1)
+- [x] **T2.2 — Add ImageSharp and `MediaProcessor`** (§5.3, §9.1)
   - Add `SixLabors.ImageSharp` (note the Six Labors Split License in `README.md`).
   - `MediaProcessor`: decode, auto-orient, strip EXIF/IPTC/XMP, optional downscale above N px, SHA-256 hash, apply edit operations (rotate/flip → crop → resize), encode.
   - **Done when:** unit tests with fixture images prove orientation is baked in, GPS metadata is gone, and edit operations produce the expected dimensions.
+  - *Status:* pinned to ImageSharp **3.1.12**: ImageSharp 4 enforces a Six Labors license key at build time (noted in `README.md`). ICC profiles are kept so colors don't shift; EXIF/IPTC/XMP and PNG/GIF text are removed. Images over 100 megapixels are refused from the header (decompression bombs).
 
-- [ ] **T2.3 — Upload pipeline and endpoint** (§9.1, M1, M5, Q6)
+- [x] **T2.3 — Upload pipeline and endpoint** (§9.1, M1, M5, Q6)
   - `POST /api/admin/media` (multipart, multiple files, per-file size limit from settings).
   - Content type from decoding, not extension; allow JPEG/PNG/GIF/WebP; reject SVG and HEIC with a clear message.
   - Generate `PublicId` (12 chars, random) and slugified `FileName`; save original; current = original; warn on duplicate hash. Per-file results so one failure doesn't block others.
   - **Done when:** integration tests cover a valid upload, a renamed non-image, an oversized file, and GPS removal.
 
-- [ ] **T2.4 — Public media endpoint** (`/media/{publicId}/{fileName}`; §9.4)
+- [x] **T2.4 — Public media endpoint** (`/media/{publicId}/{fileName}`; §9.4)
   - Stream the current version from storage with `Content-Type`, `ETag`, `X-Content-Type-Options: nosniff`; `Cache-Control: public, max-age=31536000, immutable` when `?v=` matches the current version, otherwise short max-age + ETag. (`?w=` renditions come in T4.19.)
   - **Done when:** integration tests verify headers and 304 on matching ETag.
+  - *Status:* no server-side cache: one indexed row read per request, and versioned URLs are cached by browsers for a year.
 
-- [ ] **T2.5 — Media metadata, listing and delete endpoints** (§7.4, M4)
+- [x] **T2.5 — Media metadata, listing and delete endpoints** (§7.4, M4)
   - `GET /media?search=&page=&unused=`, `PUT /media/{id}` (alt text, caption), `DELETE /media/{id}?force=`.
   - Delete of a used item without `force` returns the list of posts using it; with `force`, removes the row and all storage keys.
   - **Done when:** integration tests cover both delete paths and the unused filter.
 
-- [ ] **T2.6 — `IMediaService` contract and client/server implementations**
+- [x] **T2.6 — `IMediaService` contract and client/server implementations**
   - **Done when:** media admin pages work prerendered and after hydration.
 
-- [ ] **T2.7 — `MediaLinkRewriter`** (§9.4, §9.5)
+- [x] **T2.7 — `MediaLinkRewriter`** (§9.4, §9.5)
   - In the shared pipeline: turn library image links into `<figure><img …><figcaption>` with explicit `width`/`height`, `loading="lazy"`, `decoding="async"`, the `?v=` cache-buster and size classes (`{.img-medium}`). Missing media renders a placeholder in admin preview and is omitted publicly.
   - Media metadata lookup is injected so it works on server and in WASM.
   - **Done when:** snapshot tests cover a normal image, captioned image, size hint and missing image.
 
-- [ ] **T2.8 — Media library page** (`/admin/media`; M1)
+- [x] **T2.8 — Media library page** (`/admin/media`; M1)
   - Grid with search, "Unused" filter, multi-file drag-and-drop upload with per-file progress bars, alt text/caption editing, delete with confirmation and "Used in N posts: …" warning.
   - Reusable `ConfirmDialog` component.
   - **Done when:** upload, edit metadata and both delete paths work from the UI.
 
-- [ ] **T2.9 — Cropper.js interop** (§9.2, M2, Q8)
+- [x] **T2.9 — Cropper.js interop** (§9.2, M2, Q8)
   - Add `cropperjs` v2 to npm and bundle `cropper.js` interop via esbuild.
   - `ImageCropper` component wrapping `cropper-canvas`/`-image`/`-selection`/`-shade`/`-handle`; exposes crop rect in **natural pixel coordinates**, rotate 90° left/right, flip H/V, aspect presets (Free, Original, 1:1, 4:3, 3:2, 16:9), live pixel dimensions, and a preview thumbnail.
   - **Done when:** the crop rectangle reported to .NET matches natural image coordinates after rotation.
+  - *Status:* rotation and flips are drawn onto a canvas and shown unrotated, so the selection is always axis-aligned; `MediaGeometry.ToNatural` (unit-tested) maps it to natural pixels of the rotated original, and locked aspect ratios snap to whole-pixel exactness. Verified in a browser: rotate right + 1:1 on a 1600 × 1000 image reports 1000 × 1000 at (0, 302), and the saved file matches the preview thumbnail.
 
-- [ ] **T2.10 — Media editor page and edit endpoint** (`/admin/media/{id}`; §9.2, M2)
+- [x] **T2.10 — Media editor page and edit endpoint** (`/admin/media/{id}`; §9.2, M2)
   - Rotate, flip, crop, resize (width/height with aspect lock, no upscaling beyond the cropped size).
   - `POST /media/{id}/edit` applies operations server-side to the **original**, stores `EditOperationsJson`, increments `Version`, writes `v{version}/current.{ext}`, and re-renders `ContentHtml` for every post in `PostMedia`.
   - Save and Cancel (Save as copy and Revert come in T4.18).
   - **Done when:** an edited image shows the new version in existing posts with a new `?v=`.
+  - *Status:* re-rendering uses `ExecuteUpdate` so a post's modified stamp (and any pending autosave) is untouched, but its `RowVersion` changes: an editor open on that post will offer to reload on its next save.
 
-- [ ] **T2.11 — `MediaPicker` in the Markdown editor** (§9.5, A5, M3, M4)
+- [x] **T2.11 — `MediaPicker` in the Markdown editor** (§9.5, A5, M3, M4)
   - Toolbar button and `Ctrl+Shift+I` open a modal: searchable grid, Upload tab, "Recently used" row.
   - After selection: alt text (pre-filled; prompt if empty), size (full/medium/small), alignment (none/center); inserts standard Markdown `![alt](/media/…/file.jpg "caption"){.img-medium}` at the cursor.
   - **Done when:** an image inserted from the picker renders identically in the preview and on the published post.
+  - *Status:* verified in a browser: `Cmd/Ctrl+Shift+I` opens the picker, empty alt text is refused unless "Decorative" is checked, and the inserted figure's HTML in the preview equals the published post's (apart from the scroll-sync `data-line`).
 
-- [ ] **T2.12 — `PostMedia` usage tracking**
+- [x] **T2.12 — `PostMedia` usage tracking**
   - Verify T1.2's `PostMedia` rebuild parses library URLs correctly and powers "Used in N posts" and the Unused filter.
   - **Done when:** adding/removing an image from a post updates usage counts.
 
-- [ ] **T2.13 — Media log events** (§18)
+- [x] **T2.13 — Media log events** (§18)
   - Structured Serilog events `MediaUploaded`, `MediaEdited`.
   - **Done when:** events appear in logs with media ID and size.
 

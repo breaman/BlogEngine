@@ -16,7 +16,7 @@ npm run sass-dev (or sass-prod depending on which one you want)
 ## JavaScript
 The site's JavaScript is bundled with esbuild (`src/BlogEngine.Server/scripts/build-js.mjs`) into two groups. The bundles are build output and are not committed.
 
-- **admin**: the editor (CodeMirror 6 and highlight.js) and small admin helpers. Sources in `src/BlogEngine.Client/scripts`, written to `src/BlogEngine.Client/wwwroot/js` (`editor.js`, `editor.css`, `admin.js`).
+- **admin**: the editor (CodeMirror 6 and highlight.js), the media upload queue, the image editor (Cropper.js v2) and small admin helpers. Sources in `src/BlogEngine.Client/scripts`, written to `src/BlogEngine.Client/wwwroot/js` (`editor.js`, `editor.css`, `media.js`, `cropper.js`, `admin.js`).
 - **public**: `public.js`, a tiny loader on every public page, and `code-blocks.js`/`code-blocks.css` (highlight.js and copy buttons), which it imports only for posts with code blocks. Sources in `src/BlogEngine.Server/scripts`, written to `src/BlogEngine.Server/wwwroot/js`.
 
 You don't normally run anything by hand: building `BlogEngine.Client` builds the admin group and building `BlogEngine.Server` (or `aspire run`) builds the public group, whenever a script or the npm packages changed. They use the same `node_modules` as the Sass build, so `npm install` in `src/BlogEngine.Server` is the only setup. To build or watch the bundles yourself:
@@ -28,6 +28,11 @@ npm run js-build   (or js-watch to rebuild on every change; add "admin" or "publ
 ```
 
 The Sass output (`wwwroot/css/site.css`) is not rebuilt automatically; run `npm run sass-dev` or `sass-prod` after changing `styles/site.scss`.
+
+## Media library
+Uploaded images are stored on the file system under `MediaStorage:RootPath` (default `App_Data/media`, relative to the server's content root; git-ignored). Each item keeps its original upload (`{publicId}/original.{ext}`) and the current edited version (`{publicId}/v{version}/current.{ext}`). When running with Aspire the server is a project on your machine, so the folder survives restarts; to keep uploads elsewhere, set `MediaStorage:RootPath` in the AppHost's user secrets. In a container, mount a persistent volume at that folder. `/health` includes a `media-storage` check that the folder is writable.
+
+Images are processed with [ImageSharp](https://github.com/SixLabors/ImageSharp), licensed under the [Six Labors Split License](https://github.com/SixLabors/ImageSharp/blob/main/LICENSE): free for open source software and for companies with less than $1M annual gross revenue; others need a commercial license. The package is pinned to 3.x because ImageSharp 4 requires a Six Labors license key at build time.
 
 ## EF Migrations
 This project adds EF as a dotnet tool, so before running any EF commands, one needs to run the following command from the project folder (there is also a command in the Aspire dashboard to run this restore command if the app is started before the restore command is run manually):

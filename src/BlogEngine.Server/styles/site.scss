@@ -147,6 +147,62 @@ $bootstrap-icons-font-dir: "../fonts";
     @extend .figure-caption;
   }
 
+  // Library images (MediaLinkRewriter, design 9.4, 9.5): the media picker's size hints and centering. Explicit
+  // width/height attributes reserve the space; these rules only scale the image down.
+  figure.media-figure {
+    margin-block: 1.5rem;
+
+    img {
+      display: block;
+    }
+
+    > figcaption {
+      margin-top: 0.5rem;
+    }
+  }
+
+  .img-medium {
+    max-width: 66.667%;
+  }
+
+  .img-small {
+    max-width: 33.333%;
+  }
+
+  figure.img-center,
+  img.img-center {
+    margin-inline: auto;
+  }
+
+  figure.img-center {
+    text-align: center;
+
+    img {
+      margin-inline: auto;
+    }
+  }
+
+  // Medium images would be cramped on a phone; small ones stay a thumbnail.
+  @include media-breakpoint-down(sm) {
+    .img-medium {
+      max-width: 100%;
+    }
+
+    .img-small {
+      max-width: 50%;
+    }
+  }
+
+  // Shown only in the editor preview, for an image deleted from the library (design 9.6).
+  .media-missing-placeholder {
+    display: inline-block;
+    padding: 1rem 1.25rem;
+    border: 2px dashed var(--bs-warning-border-subtle);
+    border-radius: var(--bs-border-radius);
+    background-color: var(--bs-warning-bg-subtle);
+    color: var(--bs-warning-text-emphasis);
+  }
+
   .contains-task-list {
     padding-left: 1.25rem;
     list-style: none;

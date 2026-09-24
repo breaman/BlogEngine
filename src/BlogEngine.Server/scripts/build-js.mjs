@@ -43,7 +43,11 @@ const groups = {
             // CodeMirror editor and preview highlighting for MarkdownEditor/MarkdownPreview.
             editor: `${clientDir}scripts/editor.js`,
             // Small helpers for other admin components (TagInput keys, the editor's unsaved-changes link guard).
-            admin: `${clientDir}scripts/admin.js`
+            admin: `${clientDir}scripts/admin.js`,
+            // Upload queue with per-file progress for MediaUploadZone (media library and picker).
+            media: `${clientDir}scripts/media.js`,
+            // Cropper.js v2 web components for the ImageCropper component (media editor).
+            cropper: `${clientDir}scripts/cropper.js`
         },
         outdir: `${clientDir}wwwroot/js`,
         bundle: true

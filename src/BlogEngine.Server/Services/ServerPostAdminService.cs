@@ -4,7 +4,6 @@ using BlogEngine.Server.Services.Public;
 using BlogEngine.Shared.Common;
 using BlogEngine.Shared.Contracts;
 using BlogEngine.Shared.Enums;
-using BlogEngine.Shared.Markdown;
 using BlogEngine.Shared.Services;
 using BlogEngine.Shared.Text;
 using BlogEngine.Shared.Validation;
@@ -46,7 +45,7 @@ namespace BlogEngine.Server.Services;
 public sealed class ServerPostAdminService(
     ApplicationDbContext dbContext,
     ISettingsService settingsService,
-    PostHtmlSanitizer sanitizer,
+    PostContentRenderer contentRenderer,
     TimeProvider timeProvider,
     IValidator<PostEditDto> postValidator,
     CacheInvalidator cacheInvalidator,
@@ -431,8 +430,8 @@ public sealed class ServerPostAdminService(
 
         post.Title = title;
         post.ContentMarkdown = markdown;
-        var rendered = BlogMarkdownPipeline.Default.RenderPost(markdown);
-        post.ContentHtml = sanitizer.Sanitize(rendered.Html);
+        var rendered = await contentRenderer.RenderAsync(markdown, cancellationToken);
+        post.ContentHtml = rendered.Html;
         post.HasCodeBlocks = rendered.ContainsCodeBlocks;
 
         var stats = ReadingTime.Calculate(markdown);
@@ -451,7 +450,7 @@ public sealed class ServerPostAdminService(
         }
 
         await SyncTagsAsync(post, dto.Tags ?? [], cancellationToken);
-        await SyncMediaAsync(post, markdown, cancellationToken);
+        SyncMedia(post, rendered.MediaItemIds);
     }
 
     /// <summary>
@@ -525,17 +524,12 @@ public sealed class ServerPostAdminService(
         }
     }
 
-    /// <summary>Rebuilds the post's <see cref="PostMedia"/> rows from the library URLs in its Markdown.</summary>
-    private async Task SyncMediaAsync(Post post, string markdown, CancellationToken cancellationToken)
+    /// <summary>
+    /// Rebuilds the post's <see cref="PostMedia"/> rows (T2.12) from the library items its Markdown references, as
+    /// found by the renderer, so "Used in N posts" and the unused filter follow every save.
+    /// </summary>
+    private static void SyncMedia(Post post, IReadOnlyList<int> mediaIds)
     {
-        var publicIds = MediaReferenceScanner.FindPublicIds(markdown);
-        var mediaIds = publicIds.Count == 0
-            ? []
-            : await dbContext.MediaItems
-                .Where(m => publicIds.Contains(m.PublicId))
-                .Select(m => m.Id)
-                .ToListAsync(cancellationToken);
-
         post.PostMedia.RemoveAll(pm => !mediaIds.Contains(pm.MediaItemId));
         foreach (var mediaId in mediaIds.Where(id => !post.PostMedia.Any(pm => pm.MediaItemId == id)))
         {

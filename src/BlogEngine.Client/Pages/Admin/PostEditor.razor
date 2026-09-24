@@ -76,7 +76,7 @@ else
                 <MarkdownEditor @ref="_markdownEditor"
                                 @bind-Value="Post.ContentMarkdown" @bind-Value:after="OnContentEditedAsync"
                                 Placeholder="Write your post in Markdown…"
-                                OnSave="SaveShortcutAsync" OnBlur="AutosaveAsync" />
+                                OnSave="SaveShortcutAsync" OnBlur="AutosaveAsync" OnInsertImage="InsertImageAsync" />
             </div>
 
             <aside class="col-12 col-xl-3" aria-label="Post settings">
@@ -232,3 +232,4 @@ else
 }
 
 <ConfirmDialog @ref="_confirm" />
+<MediaPicker @ref="_mediaPicker" />

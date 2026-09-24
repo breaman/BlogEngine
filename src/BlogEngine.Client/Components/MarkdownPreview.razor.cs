@@ -1,3 +1,4 @@
+using BlogEngine.Client.Services;
 using BlogEngine.Shared.Markdown;
 
 using Microsoft.AspNetCore.Components;
@@ -17,6 +18,11 @@ namespace BlogEngine.Client.Components;
 /// which <see cref="MarkdownEditor"/> uses to keep the preview scrolled to the part being edited.
 /// </para>
 /// <para>
+/// Library images are rendered by <see cref="MediaLinkRewriter"/> with their real size and version, looked up through
+/// <see cref="MediaLookupCache"/> before rendering, so they look exactly as they will once published; a deleted image
+/// shows a "missing image" placeholder (design 9.4–9.6).
+/// </para>
+/// <para>
 /// The preview isn't sanitized, because HtmlSanitizer is server-only. That only matters for raw HTML the
 /// author typed themselves, and published HTML is always sanitized on save, so a difference can appear only
 /// for markup the sanitizer would strip (scripts, event handlers, iframes from other sites).
@@ -26,6 +32,7 @@ public sealed partial class MarkdownPreview : ComponentBase, IAsyncDisposable
 {
     [Inject] private IJSRuntime JS { get; set; } = default!;
     [Inject] private ILogger<MarkdownPreview> Logger { get; set; } = default!;
+    [Inject] private MediaLookupCache MediaLookup { get; set; } = default!;
 
     /// <summary>The Markdown to render.</summary>
     [Parameter] public string? Markdown { get; set; }
@@ -42,16 +49,26 @@ public sealed partial class MarkdownPreview : ComponentBase, IAsyncDisposable
     private string _html = string.Empty;
     private bool _htmlChanged;
 
-    /// <summary>Re-renders the HTML only when the Markdown changed, so unrelated parent renders stay cheap.</summary>
-    protected override void OnParametersSet()
+    /// <summary>
+    /// Re-renders the HTML only when the Markdown changed, so unrelated parent renders stay cheap. Library images not
+    /// seen before are looked up first, so the preview never flashes a "missing image" while they load.
+    /// </summary>
+    protected override async Task OnParametersSetAsync()
     {
         if (Markdown == _renderedMarkdown)
         {
             return;
         }
 
+        var publicIds = MediaReferenceScanner.FindPublicIds(Markdown);
+        if (!MediaLookup.HasAll(publicIds))
+        {
+            await MediaLookup.LoadAsync(publicIds);
+        }
+
+        // The parameter may have changed again while the lookup ran; always render the latest text.
         _renderedMarkdown = Markdown;
-        _html = BlogMarkdownPipeline.Default.RenderPostPreview(Markdown).Html;
+        _html = BlogMarkdownPipeline.Default.RenderPostPreview(Markdown, MediaLookup).Html;
         _htmlChanged = true;
     }
 

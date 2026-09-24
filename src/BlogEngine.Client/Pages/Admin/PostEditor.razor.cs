@@ -73,6 +73,7 @@ public partial class PostEditor : ComponentBase, IAsyncDisposable
 
     private MarkdownEditor? _markdownEditor;
     private ConfirmDialog _confirm = default!;
+    private MediaPicker _mediaPicker = default!;
     private EditContext? _editContext;
     private ValidationMessageStore? _serverErrors;
 
@@ -369,6 +370,18 @@ public partial class PostEditor : ComponentBase, IAsyncDisposable
         if (_status == SaveStatus.Saved)
         {
             Toasts.ShowInfo("Changes saved. They go live when you click Update.");
+        }
+    }
+
+    /// <summary>
+    /// The editor's image button and <c>Ctrl/Cmd+Shift+I</c>: opens the media picker and inserts the chosen image as a
+    /// paragraph of its own at the cursor (design 9.5, T2.11).
+    /// </summary>
+    private async Task InsertImageAsync()
+    {
+        if (await _mediaPicker.ShowAsync() is { } markdown && _markdownEditor is not null)
+        {
+            await _markdownEditor.InsertBlockAsync(markdown);
         }
     }
 

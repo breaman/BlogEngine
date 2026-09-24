@@ -1,4 +1,5 @@
 using BlogEngine.Data.Models;
+using BlogEngine.Server.Storage;
 using BlogEngine.ServiceDefaults;
 
 using Microsoft.AspNetCore.Hosting;
@@ -21,6 +22,9 @@ public sealed class BlogEngineWebApplicationFactory : TestWebApplicationFactory<
     [ClassDataSource<SqlServerContainer>(Shared = SharedType.PerTestSession)]
     public required SqlServerContainer SqlServer { get; init; }
 
+    /// <summary>A throwaway media folder for this test session, so uploads never touch the real App_Data.</summary>
+    public string MediaRoot { get; } = Path.Combine(Path.GetTempPath(), "blogengine-integration-media", Guid.NewGuid().ToString("N"));
+
     /// <summary>Starts the host and migrates the database so tests see the production schema.</summary>
     public async Task InitializeAsync()
     {
@@ -29,9 +33,20 @@ public sealed class BlogEngineWebApplicationFactory : TestWebApplicationFactory<
         await dbContext.Database.MigrateAsync();
     }
 
-    /// <summary>Points the application's connection string at the test container.</summary>
+    /// <summary>Points the application's connection string at the test container and media storage at <see cref="MediaRoot"/>.</summary>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting($"ConnectionStrings:{Constants.DatabaseConnectionString}", SqlServer.ConnectionString);
+        builder.UseSetting($"{MediaStorageOptions.SectionName}:{nameof(MediaStorageOptions.RootPath)}", MediaRoot);
+    }
+
+    /// <summary>Stops the host and removes the session's media folder.</summary>
+    public override async ValueTask DisposeAsync()
+    {
+        await base.DisposeAsync();
+        if (Directory.Exists(MediaRoot))
+        {
+            Directory.Delete(MediaRoot, recursive: true);
+        }
     }
 }

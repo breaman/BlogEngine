@@ -1,0 +1,164 @@
+@page "/admin/media/{Id:int}"
+@layout AdminLayout
+@attribute [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
+@rendermode InteractiveWebAssembly
+
+<PageTitle>@(Item is not null ? $"{Item.FileName} · " : null)Media · BlogEngine Admin</PageTitle>
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb mb-2">
+        <li class="breadcrumb-item"><a href="admin/media">Media</a></li>
+        <li class="breadcrumb-item active text-truncate" aria-current="page">@(Item?.FileName ?? "Image")</li>
+    </ol>
+</nav>
+
+@if (_loadError is not null)
+{
+    <div class="alert alert-danger" role="alert">@_loadError</div>
+}
+else if (ItemMissing)
+{
+    <div class="alert alert-warning" role="alert">
+        This image doesn't exist. <a href="admin/media" class="alert-link">Back to the media library</a>
+    </div>
+}
+else if (Item is null)
+{
+    <p class="text-body-secondary"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Loading image…</p>
+}
+else
+{
+    <div class="row g-4">
+        <div class="col-12 col-xl-9">
+            <section class="card" aria-labelledby="media-edit-heading">
+                <div class="card-header d-flex flex-wrap align-items-center gap-2">
+                    <h1 class="h6 mb-0" id="media-edit-heading">Crop, rotate and resize</h1>
+                    <span class="small text-body-secondary ms-auto">Edits are applied to the original upload, so nothing is lost by editing again.</span>
+                </div>
+                <div class="card-body">
+                    @* Recreated after every save, so it starts from the stored edits of the new version. *@
+                    <ImageCropper @key="Item.Version" Src="@OriginalUrl" Alt="@Item.AltText"
+                                  InitialOperations="Item.EditOperations" OnChanged="OnCropChanged" />
+
+                    <div class="row g-2 align-items-center mt-3">
+                        <div class="col-6 col-md-3">
+                            <div class="form-floating">
+                                <input type="number" id="media-resize-width" class="form-control" placeholder="Width" min="1" max="@CropSize.Width"
+                                       disabled="@(_crop is null)" value="@_resize.Width" @onchange="OnResizeWidthChanged" />
+                                <label for="media-resize-width">Width (px)</label>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="form-floating">
+                                <input type="number" id="media-resize-height" class="form-control" placeholder="Height" min="1" max="@CropSize.Height"
+                                       disabled="@(_crop is null)" value="@_resize.Height" @onchange="OnResizeHeightChanged" />
+                                <label for="media-resize-height">Height (px)</label>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-auto">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="media-resize-lock" @bind="_lockAspect" />
+                                <label class="form-check-label" for="media-resize-lock">Keep aspect ratio</label>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md">
+                            <div class="form-text m-0">The image can be made smaller but not larger than the selection (@CropSize.Width × @CropSize.Height).</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer d-flex flex-wrap gap-2 align-items-center">
+                    <span class="small text-body-secondary">Result: <strong>@_resize.Width × @_resize.Height</strong> px</span>
+                    <div class="ms-auto d-flex gap-2">
+                        <button type="button" class="btn btn-outline-secondary" disabled="@_saving" @onclick="Cancel">Cancel</button>
+                        <button type="button" class="btn btn-primary" disabled="@(!CanSave)" @onclick="SaveEditsAsync">
+                            @if (_saving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                            }
+                            else
+                            {
+                                <span class="bi bi-floppy me-1" aria-hidden="true"></span>
+                            }
+                            Save
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <aside class="col-12 col-xl-3" aria-label="Image details">
+            <section class="card mb-3" aria-labelledby="media-details-heading">
+                <div class="card-header"><h2 class="h6 mb-0" id="media-details-heading">Details</h2></div>
+                <div class="card-body">
+                    <EditForm Model="_metadata" OnValidSubmit="SaveMetadataAsync">
+                        <FluentValidator />
+                        <div class="form-floating mb-1">
+                            <InputText id="media-alt-text" class="form-control" placeholder="Alt text" maxlength="@FieldLengths.AltText"
+                                       @bind-Value="_metadata.AltText" />
+                            <label for="media-alt-text">Alt text</label>
+                        </div>
+                        <ValidationMessage For="() => _metadata.AltText" class="text-danger small" />
+                        <div class="form-text mb-3">Describe the image for people who can't see it.</div>
+                        <div class="form-floating mb-1">
+                            <InputTextArea id="media-caption" class="form-control media-caption-input" placeholder="Caption" maxlength="@FieldLengths.Caption"
+                                           @bind-Value="_metadata.Caption" />
+                            <label for="media-caption">Caption (optional)</label>
+                        </div>
+                        <ValidationMessage For="() => _metadata.Caption" class="text-danger small" />
+                        <button type="submit" class="btn btn-outline-primary btn-sm mt-2" disabled="@(_savingMetadata || !_interactive)">Save details</button>
+                    </EditForm>
+                </div>
+            </section>
+
+            <section class="card mb-3" aria-labelledby="media-file-heading">
+                <div class="card-header"><h2 class="h6 mb-0" id="media-file-heading">File</h2></div>
+                <div class="card-body small">
+                    <dl class="row mb-2">
+                        <dt class="col-5 fw-normal text-body-secondary">Size</dt>
+                        <dd class="col-7 mb-1">@Item.Width × @Item.Height</dd>
+                        <dt class="col-5 fw-normal text-body-secondary">File size</dt>
+                        <dd class="col-7 mb-1">@MediaFormat.Size(Item.SizeBytes)</dd>
+                        <dt class="col-5 fw-normal text-body-secondary">Type</dt>
+                        <dd class="col-7 mb-1">@Item.ContentType</dd>
+                        <dt class="col-5 fw-normal text-body-secondary">Version</dt>
+                        <dd class="col-7 mb-0">@Item.Version@(Item.EditOperations is not null ? " (edited)" : null)</dd>
+                    </dl>
+                    <label for="media-url" class="form-label mb-1 text-body-secondary">Markdown path</label>
+                    <input id="media-url" class="form-control form-control-sm font-monospace" readonly value="@Item.Path" />
+                    <a class="btn btn-link btn-sm px-0" href="@Item.Url" target="_blank" rel="noopener">
+                        <span class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></span> Open current version
+                    </a>
+                </div>
+            </section>
+
+            <section class="card mb-3" aria-labelledby="media-usage-heading">
+                <div class="card-header"><h2 class="h6 mb-0" id="media-usage-heading">Used in</h2></div>
+                @if (Item.UsedIn.Count == 0)
+                {
+                    <div class="card-body small text-body-secondary">No posts use this image.</div>
+                }
+                else
+                {
+                    <ul class="list-group list-group-flush small">
+                        @foreach (var post in Item.UsedIn)
+                        {
+                            <li class="list-group-item">
+                                <a href="@($"admin/posts/{post.PostId}")">@post.Title</a>
+                                @if (post.IsInTrash)
+                                {
+                                    <span class="badge text-bg-secondary ms-1">In trash</span>
+                                }
+                            </li>
+                        }
+                    </ul>
+                }
+            </section>
+
+            <button type="button" class="btn btn-outline-danger w-100" disabled="@(!_interactive)" @onclick="DeleteAsync">
+                <span class="bi bi-trash me-1" aria-hidden="true"></span> Delete image
+            </button>
+        </aside>
+    </div>
+}
+
+<ConfirmDialog @ref="_confirm" />

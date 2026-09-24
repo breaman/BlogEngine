@@ -79,8 +79,8 @@ public sealed partial class MarkdownEditor : ComponentBase, IAsyncDisposable
     [Parameter] public EventCallback OnBlur { get; set; }
 
     /// <summary>
-    /// Raised by the image button and <c>Ctrl/Cmd+Shift+I</c> so the page can open a media picker (Phase 2),
-    /// which then calls <see cref="InsertTextAsync"/>. Without a handler, an image template is inserted.
+    /// Raised by the image button and <c>Ctrl/Cmd+Shift+I</c> so the page can open the media picker, which then
+    /// calls <see cref="InsertBlockAsync"/>. Without a handler, an image template is inserted.
     /// </summary>
     [Parameter] public EventCallback OnInsertImage { get; set; }
 
@@ -134,12 +134,25 @@ public sealed partial class MarkdownEditor : ComponentBase, IAsyncDisposable
         }
     }
 
-    /// <summary>Inserts text at the cursor, replacing the selection (for example Markdown from the media picker).</summary>
+    /// <summary>Inserts text at the cursor, replacing the selection.</summary>
     public async Task InsertTextAsync(string text)
     {
         if (_editor is not null && !_disposed)
         {
             await _editor.InvokeVoidAsync("insertText", text);
+        }
+    }
+
+    /// <summary>
+    /// Inserts text as a paragraph of its own at the cursor (for example an image from the media picker), with blank
+    /// lines around it as needed, and reports the new content right away.
+    /// </summary>
+    public async Task InsertBlockAsync(string text)
+    {
+        if (_editor is not null && !_disposed)
+        {
+            await _editor.InvokeVoidAsync("insertBlock", text);
+            await FlushAsync();
         }
     }
 

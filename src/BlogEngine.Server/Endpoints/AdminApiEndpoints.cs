@@ -28,6 +28,7 @@ public static class AdminApiEndpoints
         group.MapAdminSettingsEndpoints();
         group.MapAdminPostsEndpoints();
         group.MapAdminTagsEndpoints();
+        group.MapAdminMediaEndpoints();
 
         return group;
     }

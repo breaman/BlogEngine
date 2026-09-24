@@ -108,9 +108,31 @@ class MarkdownEditorHandle {
         });
     }
 
-    /** Inserts text at the cursor, replacing the selection (used by the media picker in Phase 2). */
+    /** Inserts text at the cursor, replacing the selection. */
     insertText(text) {
         this.view.dispatch(this.view.state.replaceSelection(text ?? ''));
+        this.view.focus();
+    }
+
+    /**
+     * Inserts `text` as a paragraph of its own at the cursor, adding blank lines around it as needed, so an image
+     * from the media picker renders as a figure rather than inside the surrounding text (design 9.5).
+     */
+    insertBlock(text) {
+        const { state } = this.view;
+        const range = state.selection.main;
+        const before = state.sliceDoc(Math.max(0, range.from - 2), range.from);
+        const after = state.sliceDoc(range.to, Math.min(state.doc.length, range.to + 2));
+
+        const prefix = range.from === 0 || before === '\n\n' ? '' : before.endsWith('\n') ? '\n' : '\n\n';
+        const suffix = range.to === state.doc.length ? '\n' : after === '\n\n' ? '' : after.startsWith('\n') ? '\n' : '\n\n';
+        const insert = prefix + (text ?? '') + suffix;
+
+        this.view.dispatch({
+            changes: { from: range.from, to: range.to, insert },
+            selection: EditorSelection.cursor(range.from + insert.length),
+            scrollIntoView: true
+        });
         this.view.focus();
     }
 
@@ -261,7 +283,7 @@ function createCommands(handle) {
         link: view => insertLink(view, false),
         image: view => {
             if (handle.imageHandler) {
-                // The media picker (Phase 2) inserts the image through insertText.
+                // The media picker inserts the image through insertBlock.
                 handle.invoke('OnImageRequested');
                 return true;
             }

@@ -21,6 +21,8 @@
     <PackageReference Include="Serilog.AspNetCore" />
     <PackageReference Include="Serilog.Sinks.MSSqlServer" />
     <PackageReference Include="Serilog.Sinks.OpenTelemetry" />
+    <!-- Decodes, auto-orients, strips metadata from, edits and re-encodes uploaded images (design 5.3, 9.1). -->
+    <PackageReference Include="SixLabors.ImageSharp" />
     <!-- RSS 2.0 and Atom feeds (design 16). -->
     <PackageReference Include="System.ServiceModel.Syndication" />
   </ItemGroup>

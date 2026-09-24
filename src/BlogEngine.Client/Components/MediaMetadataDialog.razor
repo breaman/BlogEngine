@@ -1,0 +1,49 @@
+@* Alt text and caption editor in a Blazor-rendered Bootstrap modal (design 9.6, M4, T2.8). *@
+@if (_item is not null && _model is not null)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="@_titleId"
+         @onkeydown="OnKeyDown">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <EditForm Model="_model" OnValidSubmit="SaveAsync">
+                    <FluentValidator />
+                    <div class="modal-header">
+                        <h2 class="modal-title fs-5 text-truncate" id="@_titleId">@_item.FileName</h2>
+                        <button type="button" class="btn-close" aria-label="Close" @onclick="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <img src="@_item.Url" alt="" class="media-metadata-preview mb-3" />
+                        @if (_error is not null)
+                        {
+                            <div class="alert alert-danger py-2" role="alert">@_error</div>
+                        }
+                        <div class="form-floating mb-1">
+                            <InputText id="media-alt-text" class="form-control" placeholder="Alt text" maxlength="@FieldLengths.AltText"
+                                       @bind-Value="_model.AltText" />
+                            <label for="media-alt-text">Alt text</label>
+                        </div>
+                        <ValidationMessage For="() => _model.AltText" class="text-danger small" />
+                        <div class="form-text mb-3">Describe the image for people who can't see it. Leave empty only for decorative images.</div>
+                        <div class="form-floating">
+                            <InputTextArea id="media-caption" class="form-control media-caption-input" placeholder="Caption" maxlength="@FieldLengths.Caption"
+                                           @bind-Value="_model.Caption" />
+                            <label for="media-caption">Caption (optional)</label>
+                        </div>
+                        <ValidationMessage For="() => _model.Caption" class="text-danger small" />
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" @onclick="Close">Cancel</button>
+                        <button type="submit" class="btn btn-primary" disabled="@_saving">
+                            @if (_saving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                            }
+                            Save
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}

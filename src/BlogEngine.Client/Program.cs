@@ -36,8 +36,11 @@ builder.Services.AddBlogValidators();
 builder.Services.AddScoped<IPostAdminService, ClientPostAdminService>();
 builder.Services.AddScoped<ITagService, ClientTagService>();
 builder.Services.AddScoped<ISettingsService, ClientSettingsService>();
+builder.Services.AddScoped<IMediaService, ClientMediaService>();
 
 // Browser-side helpers for the post editor; the server registers them too, for prerendering.
 builder.Services.AddScoped<DraftBackupStore>();
+builder.Services.AddScoped<RecentMediaStore>();
+builder.Services.AddScoped<MediaLookupCache>();
 
 await builder.Build().RunAsync();

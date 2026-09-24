@@ -9,7 +9,9 @@ using BlogEngine.Server.Components.Account;
 using BlogEngine.Server.Components.Email;
 using BlogEngine.Server.Endpoints;
 using BlogEngine.Server.Services;
+using BlogEngine.Server.Services.Media;
 using BlogEngine.Server.Services.Public;
+using BlogEngine.Server.Storage;
 using BlogEngine.ServiceDefaults;
 using BlogEngine.Shared.Security;
 using BlogEngine.Shared.Services;
@@ -103,6 +105,16 @@ try
     builder.Services.AddScoped<IPostAdminService, ServerPostAdminService>();
     builder.Services.AddScoped<ITagService, ServerTagService>();
     builder.Services.AddSingleton<PostHtmlSanitizer>();
+    builder.Services.AddScoped<PostContentRenderer>();
+
+    // Media library (design 9): files on disk under MediaStorage:RootPath (Q5), ImageSharp processing, and the
+    // server side of the dual-service pattern. The storage health check shows up in /health (design 18).
+    builder.Services.Configure<MediaStorageOptions>(builder.Configuration.GetSection(MediaStorageOptions.SectionName));
+    builder.Services.AddSingleton<IMediaStorage, FileSystemMediaStorage>();
+    builder.Services.AddSingleton<MediaProcessor>();
+    builder.Services.AddScoped<ServerMediaService>();
+    builder.Services.AddScoped<IMediaService>(sp => sp.GetRequiredService<ServerMediaService>());
+    builder.Services.AddHealthChecks().AddCheck<MediaStorageHealthCheck>(MediaStorageHealthCheck.Name);
 
     // Public site (static SSR, design 5.1, 11): cached read queries, cache eviction on writes, redirects and feeds.
     builder.Services.AddSingleton<PublicPostQueries>();
@@ -112,6 +124,8 @@ try
 
     // Client services injected by admin pages; they only touch the browser after prerendering (T1.13).
     builder.Services.AddScoped<DraftBackupStore>();
+    builder.Services.AddScoped<RecentMediaStore>();
+    builder.Services.AddScoped<MediaLookupCache>();
 
     // FluentValidation validators, resolved by services and by Blazilla's <FluentValidator /> in forms: the shared
     // DTO validators, plus the validators nested next to the input models of the Identity and setup pages.
@@ -175,6 +189,7 @@ try
 
     app.MapAdminApi();
 
+    app.MapMediaEndpoints();
     app.MapFeedEndpoints();
     app.MapSitemapEndpoints();
 

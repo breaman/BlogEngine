@@ -1,0 +1,148 @@
+@page "/admin/media"
+@layout AdminLayout
+@attribute [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
+@rendermode InteractiveWebAssembly
+
+<PageTitle>Media · BlogEngine Admin</PageTitle>
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <h1 class="h3 mb-0">Media</h1>
+</div>
+
+<div class="mb-4">
+    <MediaUploadZone OnBatchCompleted="OnUploadsCompletedAsync" />
+</div>
+
+<form class="row g-2 align-items-center mb-3" role="search" @onsubmit="ApplyFilters" @onsubmit:preventDefault>
+    <div class="col-12 col-md-6">
+        <div class="form-floating">
+            <input type="search" id="media-search" class="form-control" placeholder="Search" @bind="_searchFilter" />
+            <label for="media-search">Search file names, alt text and captions</label>
+        </div>
+    </div>
+    <div class="col-auto">
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch" id="media-unused" checked="@Unused" @onchange="ToggleUnused" />
+            <label class="form-check-label" for="media-unused">Unused only</label>
+        </div>
+    </div>
+    <div class="col-auto d-flex gap-2">
+        <button type="submit" class="btn btn-outline-primary">
+            <span class="bi bi-search" aria-hidden="true"></span> Search
+        </button>
+        @if (HasFilters)
+        {
+            <button type="button" class="btn btn-outline-secondary" @onclick="ClearFilters">
+                <span class="bi bi-x-lg" aria-hidden="true"></span> Clear
+            </button>
+        }
+    </div>
+</form>
+
+@if (_loadError is not null)
+{
+    <div class="alert alert-danger d-flex align-items-center gap-2" role="alert">
+        <span>@_loadError</span>
+        <button type="button" class="btn btn-sm btn-outline-danger ms-auto" @onclick="ReloadAsync">Retry</button>
+    </div>
+}
+else if (Result is null)
+{
+    <p class="text-body-secondary"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Loading media…</p>
+}
+else if (Result.Items.Count == 0)
+{
+    <div class="card">
+        <div class="card-body text-center text-body-secondary py-5">
+            @if (HasFilters)
+            {
+                <p class="mb-0">No images match these filters.</p>
+            }
+            else
+            {
+                <p class="mb-0">No images yet. Drop some above to get started.</p>
+            }
+        </div>
+    </div>
+}
+else
+{
+    <div class="row row-cols-2 row-cols-sm-3 row-cols-lg-4 row-cols-xxl-6 g-3 @(_loading ? "opacity-50" : null)">
+        @foreach (var item in Result.Items)
+        {
+            var busy = _busyItemId == item.Id;
+            <div class="col" @key="item.Id">
+                <div class="card h-100 media-card">
+                    <a href="@($"admin/media/{item.Id}")" class="media-card-thumb" title="Edit @item.FileName">
+                        <img src="@item.Url" alt="@item.AltText" loading="lazy" decoding="async" width="@item.Width" height="@item.Height" />
+                    </a>
+                    <div class="card-body p-2">
+                        <div class="small fw-semibold text-truncate" title="@item.FileName">@item.FileName</div>
+                        <div class="small text-body-secondary">
+                            @item.Width × @item.Height · @MediaFormat.Size(item.SizeBytes)
+                        </div>
+                        <div class="d-flex flex-wrap gap-1 mt-1">
+                            @if (item.UsageCount > 0)
+                            {
+                                <span class="badge text-bg-primary">Used in @item.UsageCount @(item.UsageCount == 1 ? "post" : "posts")</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-secondary">Unused</span>
+                            }
+                            @if (string.IsNullOrWhiteSpace(item.AltText))
+                            {
+                                <span class="badge text-bg-warning" title="Add alt text so people who can't see the image know what it shows">No alt text</span>
+                            }
+                            @if (item.EditOperations is not null)
+                            {
+                                <span class="badge text-bg-info">Edited</span>
+                            }
+                        </div>
+                    </div>
+                    <div class="card-footer p-1 d-flex justify-content-end gap-1">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" title="Alt text and caption" aria-label="Edit alt text and caption of @item.FileName"
+                                disabled="@busy" @onclick="() => EditMetadataAsync(item)">
+                            <span class="bi bi-card-text" aria-hidden="true"></span>
+                        </button>
+                        <a class="btn btn-sm btn-outline-primary" href="@($"admin/media/{item.Id}")" title="Crop, rotate and resize" aria-label="Edit image @item.FileName">
+                            <span class="bi bi-crop" aria-hidden="true"></span>
+                        </a>
+                        <a class="btn btn-sm btn-outline-secondary" href="@item.Url" target="_blank" rel="noopener" title="Open" aria-label="Open @item.FileName">
+                            <span class="bi bi-box-arrow-up-right" aria-hidden="true"></span>
+                        </a>
+                        <button type="button" class="btn btn-sm btn-outline-danger" title="Delete" aria-label="Delete @item.FileName"
+                                disabled="@busy" @onclick="() => DeleteAsync(item)">
+                            <span class="bi bi-trash" aria-hidden="true"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <nav aria-label="Media pages" class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3">
+        <span class="text-body-secondary small">@Result.TotalCount.ToString("N0") @(Result.TotalCount == 1 ? "image" : "images")</span>
+        @if (Result.TotalPages > 1)
+        {
+            <ul class="pagination mb-0">
+                <li class="page-item @(Result.Page <= 1 ? "disabled" : null)">
+                    <a class="page-link" href="@ListUri(page: Result.Page - 1)" aria-label="Previous page">
+                        <span class="bi bi-chevron-left" aria-hidden="true"></span> Previous
+                    </a>
+                </li>
+                <li class="page-item disabled">
+                    <span class="page-link">Page @Result.Page of @Result.TotalPages</span>
+                </li>
+                <li class="page-item @(Result.Page >= Result.TotalPages ? "disabled" : null)">
+                    <a class="page-link" href="@ListUri(page: Result.Page + 1)" aria-label="Next page">
+                        Next <span class="bi bi-chevron-right" aria-hidden="true"></span>
+                    </a>
+                </li>
+            </ul>
+        }
+    </nav>
+}
+
+<MediaMetadataDialog @ref="_metadataDialog" />
+<ConfirmDialog @ref="_confirm" />

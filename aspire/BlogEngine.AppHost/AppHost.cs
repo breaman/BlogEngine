@@ -41,6 +41,16 @@ if (!string.IsNullOrWhiteSpace(builder.Configuration["Parameters:admin-email"]))
         .WithEnvironment("AdminSeed__Password", adminPassword);
 }
 
+// Media library files (design 9.3, Q5). The server runs as a project on this machine, so its default folder
+// (src/BlogEngine.Server/App_Data/media) already survives restarts. To keep uploads somewhere else, such as a folder
+// that is backed up, set it for the AppHost:
+//   dotnet user-secrets set "MediaStorage:RootPath" "/path/to/media"
+// A containerized deployment should mount a volume at the folder MediaStorage__RootPath points to.
+if (builder.Configuration["MediaStorage:RootPath"] is { Length: > 0 } mediaRoot)
+{
+    server.WithEnvironment("MediaStorage__RootPath", Path.GetFullPath(mediaRoot, builder.AppHostDirectory));
+}
+
 var migrations = server.AddEFMigrations("ef-migrations")
     .WithMigrationsProject<Projects.BlogEngine_Data>()
     .RunDatabaseUpdateOnStart()

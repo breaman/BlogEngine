@@ -1,0 +1,38 @@
+/* The canvas needs an explicit height; Cropper.js fits the image inside it. */
+.image-cropper-stage {
+    position: relative;
+    height: clamp(20rem, 65vh, 48rem);
+    border-radius: var(--bs-border-radius);
+    overflow: hidden;
+    background-color: var(--bs-tertiary-bg);
+}
+
+.image-cropper-host,
+.image-cropper-host ::deep cropper-canvas {
+    width: 100%;
+    height: 100%;
+}
+
+.image-cropper-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.image-cropper-preview {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 8rem;
+    padding: 0.5rem;
+    border: var(--bs-border-width) solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+    background-color: var(--bs-tertiary-bg);
+}
+
+.image-cropper-preview ::deep canvas {
+    max-width: 100%;
+    height: auto;
+}

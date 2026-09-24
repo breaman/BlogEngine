@@ -1,0 +1,12 @@
+.media-metadata-preview {
+    display: block;
+    max-width: 100%;
+    max-height: 12rem;
+    margin-inline: auto;
+    border-radius: var(--bs-border-radius);
+}
+
+/* Room for a two-line caption inside the floating label layout. */
+.media-caption-input {
+    height: 6rem;
+}
