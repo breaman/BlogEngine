@@ -41,4 +41,33 @@
             </p>
         </footer>
     </article>
+
+    @if (_comments.Count > 0 || _commentsOpen || _commentsClosed)
+    {
+        @* Approved comments, then the form or a closed notice (design 14.2, 8.5). Not rendered at all when comments are
+           turned off site-wide and the post has none. *@
+        <section id="comments" class="post mx-auto mt-5" aria-labelledby="comments-heading">
+            <h2 id="comments-heading" class="h4 mb-3">
+                @(_comments.Count switch { 0 => "Comments", 1 => "1 comment", var n => $"{n} comments" })
+            </h2>
+
+            @if (_comments.Count > 0)
+            {
+                <CommentList Comments="_comments" ShowAvatars="_showAvatars" Now="_now" />
+            }
+            else if (_commentsOpen)
+            {
+                <p class="text-body-secondary">No comments yet.</p>
+            }
+
+            @if (_commentsOpen)
+            {
+                <CommentForm PostId="post.Id" PostPath="@post.Path" />
+            }
+            else if (_commentsClosed)
+            {
+                <p class="text-body-secondary mt-3 mb-0"><span class="bi bi-lock" aria-hidden="true"></span> Comments are closed.</p>
+            }
+        </section>
+    }
 }

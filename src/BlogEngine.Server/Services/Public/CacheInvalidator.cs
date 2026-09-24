@@ -29,9 +29,13 @@ namespace BlogEngine.Server.Services.Public;
 public sealed class CacheInvalidator(HybridCache cache, IOutputCacheStore outputCache, ILogger<CacheInvalidator> logger)
 {
     private long postsGeneration;
+    private long commentsGeneration;
 
     /// <summary>Changes after every eviction of post-derived content; part of the public cache keys.</summary>
     public long PostsGeneration => Interlocked.Read(ref postsGeneration);
+
+    /// <summary>Changes after every eviction of comments; part of the cache keys of <see cref="PublicCommentQueries"/>.</summary>
+    public long CommentsGeneration => Interlocked.Read(ref commentsGeneration);
 
     /// <summary>
     /// Evicts everything that could show the post: its own entries and every list, archive, tag page, feed
@@ -45,6 +49,27 @@ public sealed class CacheInvalidator(HybridCache cache, IOutputCacheStore output
         await outputCache.EvictByTagAsync(PublicCacheTags.Posts, CancellationToken.None);
 
         logger.LogDebug("Evicted the public caches after post {PostId} changed.", postId);
+    }
+
+    /// <summary>
+    /// Evicts the approved comments of the posts, after a comment was approved, or one that was approved was
+    /// rejected, flagged or deleted (design 11).
+    /// </summary>
+    /// <param name="postIds">The posts whose comments changed.</param>
+    public async Task CommentsChangedAsync(IEnumerable<int> postIds)
+    {
+        ArgumentNullException.ThrowIfNull(postIds);
+
+        var tags = postIds.Distinct().Select(PublicCacheTags.Comments).ToList();
+        if (tags.Count == 0)
+        {
+            return;
+        }
+
+        Interlocked.Increment(ref commentsGeneration);
+        await cache.RemoveByTagAsync(tags, CancellationToken.None);
+
+        logger.LogDebug("Evicted the cached comments of {PostCount} posts.", tags.Count);
     }
 
     /// <summary>

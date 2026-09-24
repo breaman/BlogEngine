@@ -31,6 +31,9 @@
                 <li class="nav-item">
                     <NavLink class="nav-link" href="admin/comments">
                         <span class="bi bi-chat-left-text" aria-hidden="true"></span> Comments
+                        <AuthorizeView Policy="@AuthorizationPolicies.AdminOnly">
+                            <PendingCommentsBadge @rendermode="InteractiveWebAssembly" />
+                        </AuthorizeView>
                     </NavLink>
                 </li>
                 <li class="nav-item">

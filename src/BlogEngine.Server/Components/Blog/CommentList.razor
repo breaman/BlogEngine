@@ -1,0 +1,18 @@
+@* Approved comments on the post page, oldest first, replies indented one level (design 14.2, T3.6). *@
+<ol class="comment-list list-unstyled mb-0">
+    @foreach (var thread in _threads)
+    {
+        <li class="comment-thread" @key="thread.Comment.Id">
+            <CommentItem Comment="thread.Comment" ShowAvatars="ShowAvatars" Now="Now" />
+            @if (thread.Replies.Count > 0)
+            {
+                <ol class="comment-replies list-unstyled mb-0">
+                    @foreach (var reply in thread.Replies)
+                    {
+                        <li @key="reply.Id"><CommentItem Comment="reply" ShowAvatars="ShowAvatars" Now="Now" /></li>
+                    }
+                </ol>
+            }
+        </li>
+    }
+</ol>

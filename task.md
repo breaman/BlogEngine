@@ -15,7 +15,7 @@
 | [0: Foundation](#phase-0--foundation) | Admin can log in to an empty dashboard | 16 | 16 |
 | [1: Posts MVP](#phase-1--posts-mvp) | Can write and publish posts end to end | 25 | 25 |
 | [2: Media MVP](#phase-2--media-mvp) | Can add, edit and insert photos | 13 | 13 |
-| [3: Comments MVP](#phase-3--comments-mvp) | Readers can comment; the author moderates | 11 | 0 |
+| [3: Comments MVP](#phase-3--comments-mvp) | Readers can comment; the author moderates | 11 | 11 |
 | [4: V1 Polish](#phase-4--v1-polish) | Ready for public launch | 35 | 0 |
 | [5: Later](#phase-5--later) | As desired | 10 | 0 |
 
@@ -369,56 +369,67 @@ These apply to all tasks and are not repeated below:
 
 **Exit criteria:** readers can comment on posts; nothing appears publicly until you approve it; spam is filtered and commenters can be blocked.
 
-- [ ] **T3.1 — Comment DTOs and `ICommentModerationService`**
+- [x] **T3.1 — Comment DTOs and `ICommentModerationService`**
   - `CommentDto`, `CommentSubmission`, moderation query/actions contracts in Shared.
   - **Done when:** contracts compile; validators (name, email, URL, body length) have unit tests.
+  - *Status:* also `CommentBlockRequest` (values normalized by `CommentBlockValues`), `CommentBulkRequest`, `CommentStatusCounts` and `IDashboardService`/`DashboardSummaryDto` for T3.10. `CommentValidatorsTests` covers the three validators.
 
-- [ ] **T3.2 — Comment rendering and sanitization** (§8.2)
+- [x] **T3.2 — Comment rendering and sanitization** (§8.2)
   - Render with the restricted comment pipeline, sanitize with `HtmlSanitizer`, force `rel="nofollow ugc noopener"` on all links (including `AuthorUrl`).
   - **Done when:** unit tests prove script, images, headings and raw HTML are removed.
+  - *Status:* `CommentRenderer` + `CommentHtmlSanitizer` (strict allowlist, only the external-link classes, `rel` overwritten on every link). Rendered once at submit time into `BodyHtml`.
 
-- [ ] **T3.3 — Public comment form (static SSR)** (§5.1, §8.1, C1, Q1)
+- [x] **T3.3 — Public comment form (static SSR)** (§5.1, §8.1, C1, Q1)
   - `CommentForm` with `EditForm` + `FormName` + `[SupplyParameterFromForm]` (enhanced form post): name, email, website (optional), comment.
   - Hidden honeypot field (`website2`) and a Data-Protection-signed render timestamp.
   - After submit: "Your comment is awaiting moderation." (pending comments are not shown back).
   - "Remember me" via a tiny `localStorage` script.
   - Respect `CommentsEnabled`, `AllowComments`, and show "Comments are closed." when closed.
   - **Done when:** a reader can submit a comment with JavaScript disabled.
+  - *Status:* `CommentForm` posts back to the post page. The honeypot and signed timestamp are separate `[SupplyParameterFromForm]` fields, and the timestamp is bound to the post id. "Remember me" lives in `js/public.js`; its checkbox stays hidden without JavaScript. `CommentFormTests` submits a plain form post with no JavaScript. The per-post closing date (`CommentsCloseOn`) is honored already; T4.17 sets it.
 
-- [ ] **T3.4 — `SpamGuard`** (§8.3, C4, Q2)
+- [x] **T3.4 — `SpamGuard`** (§8.3, C4, Q2)
   - Ordered checks: honeypot (discard), time trap <3 s or >24 h (discard), block list match (Spam), keyword blocklist (+50), >2 links (+30 each extra), body <3 chars or URL-only (+40). Score ≥ 50 → Spam, else Pending (auto-approve path exists but setting is off).
   - Store `SpamScore`, `SpamReasons`, `IpHash` (SHA-256 of IP + secret salt), `UserAgent`. Bots get a generic "thanks".
   - **Done when:** unit tests cover every check and the score threshold.
+  - *Status:* blocklist matches also record a score of 100, and domain blocks match subdomains in the email, website and body links. Approval is skipped only with a clean score of 0: when "require approval" is off, or for a returning commenter when auto-approve is on (off by default; T4.20 adds its tests and UI). The IP hash is HMAC-SHA256 keyed with `Comments:IpHashSalt`, which the AppHost generates and keeps in user secrets.
 
-- [ ] **T3.5 — Comment rate limiting** (§8.3)
+- [x] **T3.5 — Comment rate limiting** (§8.3)
   - ASP.NET Core rate limiter: fixed window, 3 comments / 5 minutes per IP hash; friendly 429 message.
   - **Done when:** an integration test's 4th comment in the window is rejected.
+  - *Status:* `[EnableRateLimiting]` on `PostDetail`; the policy limits only POSTs, partitioned by IP hash. A rejected post gets a small HTML page with `Retry-After`. Behind a reverse proxy, forwarded headers must be configured so the real client address is used.
 
-- [ ] **T3.6 — Approved comments on the post page** (§14.2)
+- [x] **T3.6 — Approved comments on the post page** (§14.2)
   - `CommentList`: approved comments oldest first; author name (linked to website if given), relative date, colored-initial avatar (Gravatar optional via setting). Emails never displayed.
   - Cache tagged `comments:{postId}`, evicted on moderation.
   - **Done when:** approving a comment makes it appear; pending/spam/rejected never appear.
+  - *Status:* `PublicCommentQueries` caches per post, with a generation number in the key like the post caches. Replies are already grouped one level deep for T4.15/T4.16.
 
-- [ ] **T3.7 — Moderation API** (§7.4, C2, C3)
+- [x] **T3.7 — Moderation API** (§7.4, C2, C3)
   - `GET /comments?status=`, `POST /comments/{id}/approve|reject|spam`, `DELETE /comments/{id}` (hard delete), `POST /comments/bulk`, `POST /comment-blocks`, `DELETE /comment-blocks/{id}`.
   - "Block commenter": adds email + IP-hash blocks and marks all of that commenter's comments as Spam. "Empty spam": deletes spam older than 30 days.
   - **Done when:** integration tests cover each action and blocking.
+  - *Status:* besides the listed routes, `GET /comments/counts`, `POST /comments/{id}/block`, `POST /comments/empty-spam` and `GET /comment-blocks`. Deleting a comment also deletes its replies (the self-reference can't cascade).
 
-- [ ] **T3.8 — Moderation queue page** (`/admin/comments`; §8.4)
+- [x] **T3.8 — Moderation queue page** (`/admin/comments`; §8.4)
   - Tabs: Pending (default), Approved, Spam, Rejected. Rows show post title, author name/email, relative time, body preview, spam score and reasons, actions (Approve, Reject, Spam, Delete, Block commenter). Multi-select bulk actions. "Empty spam" button.
   - **Done when:** all actions work from the UI with confirmation for destructive ones.
+  - *Status:* delete, bulk delete, block commenter and empty spam ask for confirmation. `AdminCommentPagesTests` covers prerendering. Checked in a browser against the Aspire app: submit a comment ("remember me" filled from `localStorage`), approve it (the nav badge clears without a reload and the comment shows on the post), block the commenter, and add and remove blocklist entries.
 
-- [ ] **T3.9 — Keyword/domain blocklist management**
+- [x] **T3.9 — Keyword/domain blocklist management**
   - UI on the Settings page (or comments page) to add/remove `Keyword` and `Domain` blocks and view email/IP blocks.
   - **Done when:** a blocked keyword pushes a comment to Spam.
+  - *Status:* a Blocklist tab on `/admin/comments` (`CommentBlocklist`): add keywords, domains and emails; view and remove every block, including the email/IP blocks from "Block commenter".
 
-- [ ] **T3.10 — Dashboard counts** (O1)
+- [x] **T3.10 — Dashboard counts** (O1)
   - Dashboard cards: drafts, published count, pending comments (badge), recent activity (latest posts and comments). Pending count badge in the admin nav.
   - **Done when:** counts are accurate and update after moderation.
+  - *Status:* `GET /api/admin/dashboard` also returns the scheduled count (for T4.26). The nav badge (`PendingCommentsBadge`) is a WebAssembly island in the layout, kept current through `CommentCountNotifier`. It only renders for admins, and its count query uses its own `DbContext` because the layout prerenders alongside the page.
 
-- [ ] **T3.11 — Comment log events** (§18)
+- [x] **T3.11 — Comment log events** (§18)
   - `CommentSubmitted` (with spam score), `CommentModerated`; failed spam checks logged.
   - **Done when:** events appear in logs.
+  - *Status:* `CommentLog` (event ids 3001–3007): `CommentSubmitted`, `CommentDiscarded` (warning; failed honeypot/time trap), `CommentModerated`, `CommentDeleted`, `CommenterBlocked`, `SpamEmptied` and `CommentRateLimited`. Emails and IPs are never logged. `CommentLogTests` checks the structured properties.
 
 ---
 

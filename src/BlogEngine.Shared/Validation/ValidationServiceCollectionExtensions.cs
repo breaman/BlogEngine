@@ -29,6 +29,9 @@ public static class ValidationServiceCollectionExtensions
         services.AddSingleton<IValidator<SocialLinkDto>, SocialLinkValidator>();
         services.AddSingleton<IValidator<MediaUpdateRequest>, MediaUpdateValidator>();
         services.AddSingleton<IValidator<MediaEditOperations>, MediaEditOperationsValidator>();
+        services.AddSingleton<IValidator<CommentSubmission>, CommentSubmissionValidator>();
+        services.AddSingleton<IValidator<CommentBlockRequest>, CommentBlockRequestValidator>();
+        services.AddSingleton<IValidator<CommentBulkRequest>, CommentBulkRequestValidator>();
 
         return services;
     }

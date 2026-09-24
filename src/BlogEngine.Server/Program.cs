@@ -9,6 +9,7 @@ using BlogEngine.Server.Components.Account;
 using BlogEngine.Server.Components.Email;
 using BlogEngine.Server.Endpoints;
 using BlogEngine.Server.Services;
+using BlogEngine.Server.Services.Comments;
 using BlogEngine.Server.Services.Media;
 using BlogEngine.Server.Services.Public;
 using BlogEngine.Server.Storage;
@@ -116,8 +117,22 @@ try
     builder.Services.AddScoped<IMediaService>(sp => sp.GetRequiredService<ServerMediaService>());
     builder.Services.AddHealthChecks().AddCheck<MediaStorageHealthCheck>(MediaStorageHealthCheck.Name);
 
+    // Comments (design 8): the public submission pipeline with its spam guard and rate limit, and the server side of
+    // the moderation and dashboard services. The IP hash salt comes from Comments:IpHashSalt (the AppHost provides it).
+    builder.Services.Configure<CommentOptions>(builder.Configuration.GetSection(CommentOptions.SectionName));
+    builder.Services.AddSingleton<CommentIpHasher>();
+    builder.Services.AddSingleton<CommentFormTimestamp>();
+    builder.Services.AddSingleton<CommentHtmlSanitizer>();
+    builder.Services.AddSingleton<CommentRenderer>();
+    builder.Services.AddSingleton<SpamGuard>();
+    builder.Services.AddScoped<CommentSubmissionService>();
+    builder.Services.AddScoped<ICommentModerationService, ServerCommentModerationService>();
+    builder.Services.AddScoped<IDashboardService, ServerDashboardService>();
+    builder.Services.AddCommentRateLimiting();
+
     // Public site (static SSR, design 5.1, 11): cached read queries, cache eviction on writes, redirects and feeds.
     builder.Services.AddSingleton<PublicPostQueries>();
+    builder.Services.AddSingleton<PublicCommentQueries>();
     builder.Services.AddSingleton<CacheInvalidator>();
     builder.Services.AddSingleton<RedirectLookup>();
     builder.Services.AddSingleton<SyndicationFeedWriter>();
@@ -126,6 +141,7 @@ try
     builder.Services.AddScoped<DraftBackupStore>();
     builder.Services.AddScoped<RecentMediaStore>();
     builder.Services.AddScoped<MediaLookupCache>();
+    builder.Services.AddScoped<CommentCountNotifier>();
 
     // FluentValidation validators, resolved by services and by Blazilla's <FluentValidator /> in forms: the shared
     // DTO validators, plus the validators nested next to the input models of the Identity and setup pages.
@@ -178,6 +194,8 @@ try
     app.UseAuthentication();
     app.UseAuthorization();
     app.UseAntiforgery();
+    // After routing, so the comment policy on the post page's endpoint applies; only comment POSTs are limited.
+    app.UseRateLimiter();
     app.UseOutputCache();
     app.MapStaticAssets();
 

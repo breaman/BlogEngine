@@ -41,6 +41,13 @@ if (!string.IsNullOrWhiteSpace(builder.Configuration["Parameters:admin-email"]))
         .WithEnvironment("AdminSeed__Password", adminPassword);
 }
 
+// Secret salt for commenter IP hashes (design 6.5, 12.3). Generated on the first run and kept in the AppHost's user
+// secrets, so IP blocks keep matching across restarts. Set Parameters:comment-ip-salt to use your own.
+var commentIpSalt = builder.AddParameter("comment-ip-salt", new GenerateParameterDefault { MinLength = 32, Special = false },
+        secret: true, persist: true)
+    .InitiallyHidden();
+server.WithEnvironment("Comments__IpHashSalt", commentIpSalt);
+
 // Media library files (design 9.3, Q5). The server runs as a project on this machine, so its default folder
 // (src/BlogEngine.Server/App_Data/media) already survives restarts. To keep uploads somewhere else, such as a folder
 // that is backed up, set it for the AppHost:

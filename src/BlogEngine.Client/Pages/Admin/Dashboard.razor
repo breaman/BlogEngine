@@ -5,31 +5,103 @@
 
 <PageTitle>Dashboard · BlogEngine Admin</PageTitle>
 
-<h1 class="h3 mb-4">Dashboard</h1>
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+    <h1 class="h3 mb-0">Dashboard</h1>
+    <a class="btn btn-primary" href="admin/posts/new">
+        <span class="bi bi-plus-lg" aria-hidden="true"></span> New post
+    </a>
+</div>
 
-@* Placeholder cards; the counts and activity feed arrive with posts and comments (T3.10, T4.26). *@
+@if (_loadError is not null)
+{
+    <div class="alert alert-danger d-flex align-items-center gap-2" role="alert">
+        <span>@_loadError</span>
+        <button type="button" class="btn btn-sm btn-outline-danger ms-auto" @onclick="LoadAsync">Retry</button>
+    </div>
+}
+
 <div class="row row-cols-1 row-cols-sm-2 row-cols-xl-4 g-3 mb-4">
     @foreach (var card in Cards)
     {
+        var count = Summary is null ? (int?)null : card.Count(Summary);
         <div class="col">
-            <div class="card h-100">
+            <a class="card h-100 text-decoration-none" href="@card.Href">
                 <div class="card-body">
                     <div class="d-flex align-items-center text-body-secondary mb-2">
                         <span class="bi @card.Icon me-2" aria-hidden="true"></span>
                         <span>@card.Title</span>
+                        @if (card.Highlight && count > 0)
+                        {
+                            <span class="badge rounded-pill text-bg-danger ms-auto">Needs review</span>
+                        }
                     </div>
-                    <p class="display-6 mb-0">&mdash;</p>
+                    <p class="display-6 mb-0 text-body">@(count?.ToString("N0") ?? "—")</p>
                 </div>
-            </div>
+            </a>
         </div>
     }
 </div>
 
-<div class="card">
-    <div class="card-header">
-        <span class="bi bi-clock-history me-1" aria-hidden="true"></span> Recent activity
+<div class="row g-3">
+    <div class="col-12 col-xl-6">
+        <div class="card h-100">
+            <div class="card-header d-flex align-items-center">
+                <span class="bi bi-file-earmark-text me-1" aria-hidden="true"></span> Recent posts
+                <a class="ms-auto small" href="admin/posts">All posts</a>
+            </div>
+            @if (Summary is { RecentPosts.Count: > 0 })
+            {
+                <ul class="list-group list-group-flush">
+                    @foreach (var post in Summary.RecentPosts)
+                    {
+                        <li class="list-group-item d-flex align-items-center gap-2" @key="post.Id">
+                            <a class="text-truncate" href="@($"admin/posts/{post.Id}")">@post.Title</a>
+                            @if (post.Status == PostStatus.Published)
+                            {
+                                <span class="badge text-bg-success">Published</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-secondary">Draft</span>
+                            }
+                            <span class="ms-auto small text-body-secondary text-nowrap">@Relative(post.ModifiedOn)</span>
+                        </li>
+                    }
+                </ul>
+            }
+            else
+            {
+                <div class="card-body text-body-secondary">@(Summary is null ? "Loading…" : "No posts yet.")</div>
+            }
+        </div>
     </div>
-    <div class="card-body text-body-secondary">
-        Nothing yet. New posts and comments will show up here.
+    <div class="col-12 col-xl-6">
+        <div class="card h-100">
+            <div class="card-header d-flex align-items-center">
+                <span class="bi bi-chat-left-text me-1" aria-hidden="true"></span> Recent comments
+                <a class="ms-auto small" href="admin/comments">Moderation queue</a>
+            </div>
+            @if (Summary is { RecentComments.Count: > 0 })
+            {
+                <ul class="list-group list-group-flush">
+                    @foreach (var comment in Summary.RecentComments)
+                    {
+                        <li class="list-group-item" @key="comment.Id">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="fw-semibold text-truncate">@comment.AuthorName</span>
+                                <span class="small text-body-secondary text-truncate">on @comment.PostTitle</span>
+                                <span class="badge @StatusBadge(comment.Status) ms-auto">@comment.Status</span>
+                                <span class="small text-body-secondary text-nowrap">@Relative(comment.CreatedOn)</span>
+                            </div>
+                            <div class="small text-body-secondary text-truncate">@Excerpt(comment.BodyHtml)</div>
+                        </li>
+                    }
+                </ul>
+            }
+            else
+            {
+                <div class="card-body text-body-secondary">@(Summary is null ? "Loading…" : "No comments yet.")</div>
+            }
+        </div>
     </div>
 </div>

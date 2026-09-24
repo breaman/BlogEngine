@@ -1,0 +1,107 @@
+@* The blocklist tab of the comments page (design 8.3, T3.9): add keyword, domain and email blocks, and review or
+   remove every block, including the email and IP blocks that "Block commenter" adds. *@
+<div class="row g-4">
+    <div class="col-12 col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <span class="bi bi-plus-circle me-1" aria-hidden="true"></span> Add a block
+            </div>
+            <div class="card-body">
+                <EditForm Model="Model" OnValidSubmit="AddAsync">
+                    <FluentValidator />
+                    <ValidationSummary class="text-danger" role="alert" />
+                    <div class="form-floating mb-3">
+                        <InputSelect @bind-Value="Model.Kind" id="block-kind" class="form-select">
+                            @foreach (var kind in AddableKinds)
+                            {
+                                <option value="@kind.Kind">@kind.Label</option>
+                            }
+                        </InputSelect>
+                        <label for="block-kind">Block by</label>
+                        <ValidationMessage For="() => Model.Kind" class="text-danger" />
+                    </div>
+                    <div class="form-floating mb-1">
+                        <InputText @bind-Value="Model.Value" id="block-value" class="form-control" placeholder="Value" maxlength="@FieldLengths.CommentBlockValue" />
+                        <label for="block-value">@ValueLabel</label>
+                        <ValidationMessage For="() => Model.Value" class="text-danger" />
+                    </div>
+                    <p class="form-text mt-0 mb-3">@ValueHelp</p>
+                    <div class="form-floating mb-3">
+                        <InputText @bind-Value="Model.Note" id="block-note" class="form-control" placeholder="Note" maxlength="@FieldLengths.CommentBlockNote" />
+                        <label for="block-note">Note (optional)</label>
+                        <ValidationMessage For="() => Model.Note" class="text-danger" />
+                    </div>
+                    <button type="submit" class="btn btn-primary" disabled="@_saving">
+                        <span class="bi bi-slash-circle" aria-hidden="true"></span> Add block
+                    </button>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-lg-8">
+        @if (_loadError is not null)
+        {
+            <div class="alert alert-danger d-flex align-items-center gap-2" role="alert">
+                <span>@_loadError</span>
+                <button type="button" class="btn btn-sm btn-outline-danger ms-auto" @onclick="LoadAsync">Retry</button>
+            </div>
+        }
+        else if (Blocks is null)
+        {
+            <p class="text-body-secondary"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Loading the blocklist…</p>
+        }
+        else if (Blocks.Count == 0)
+        {
+            <div class="card">
+                <div class="card-body text-center text-body-secondary py-5">
+                    <p class="mb-0">Nothing is blocked. Add keywords or domains here, or use "Block commenter" in the queue.</p>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th scope="col">Type</th>
+                            <th scope="col">Value</th>
+                            <th scope="col">Note</th>
+                            <th scope="col">Added</th>
+                            <th scope="col" class="text-end"><span class="visually-hidden">Actions</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var block in Blocks)
+                        {
+                            <tr @key="block.Id">
+                                <td><span class="badge text-bg-secondary">@KindLabel(block.Kind)</span></td>
+                                <td class="text-break">
+                                    @if (block.Kind == CommentBlockKind.IpHash)
+                                    {
+                                        <span class="font-monospace small" title="@block.Value">@block.Value[..12]…</span>
+                                    }
+                                    else
+                                    {
+                                        @block.Value
+                                    }
+                                </td>
+                                <td class="small text-body-secondary">@block.Note</td>
+                                <td class="small text-nowrap">@block.CreatedOn?.ToLocalTime().ToString("d")</td>
+                                <td class="text-end">
+                                    <button type="button" class="btn btn-sm btn-outline-danger" title="Remove" aria-label="Remove the block on @block.Value"
+                                            disabled="@(_busyId == block.Id)" @onclick="() => DeleteAsync(block)">
+                                        <span class="bi bi-trash" aria-hidden="true"></span>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+<ConfirmDialog @ref="_confirm" />

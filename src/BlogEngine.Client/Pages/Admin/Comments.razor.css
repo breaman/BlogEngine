@@ -1,0 +1,15 @@
+.comment-row {
+    min-width: 0;
+}
+
+/* Long comments stay scannable in the queue; the full text is on the post page. */
+.comment-preview {
+    max-height: 12rem;
+    overflow: auto;
+    overflow-wrap: break-word;
+    background-color: var(--bs-tertiary-bg);
+}
+
+.comment-preview ::deep p:last-child {
+    margin-bottom: 0;
+}

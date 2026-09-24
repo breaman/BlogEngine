@@ -55,25 +55,4 @@ public class MediaLogTests(BlogEngineWebApplicationFactory factory)
         await Assert.That(rejected.Level).IsEqualTo(LogLevel.Warning);
         await Assert.That(rejected.Properties["FileName"]).IsEqualTo("fake.jpg");
     }
-
-    /// <summary>Records every log entry with its structured properties.</summary>
-    private sealed class CapturingLogger<T> : ILogger<T>
-    {
-        public List<(LogLevel Level, EventId EventId, IReadOnlyDictionary<string, object?> Properties)> Entries { get; } = [];
-
-        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
-
-        public bool IsEnabled(LogLevel logLevel) => true;
-
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
-        {
-            var properties = state is IEnumerable<KeyValuePair<string, object?>> pairs
-                ? pairs.ToDictionary(p => p.Key, p => p.Value)
-                : [];
-            lock (Entries)
-            {
-                Entries.Add((logLevel, eventId, properties));
-            }
-        }
-    }
 }

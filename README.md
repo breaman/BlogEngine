@@ -34,6 +34,9 @@ Uploaded images are stored on the file system under `MediaStorage:RootPath` (def
 
 Images are processed with [ImageSharp](https://github.com/SixLabors/ImageSharp), licensed under the [Six Labors Split License](https://github.com/SixLabors/ImageSharp/blob/main/LICENSE): free for open source software and for companies with less than $1M annual gross revenue; others need a commercial license. The package is pinned to 3.x because ImageSharp 4 requires a Six Labors license key at build time.
 
+## Comments
+Readers comment without accounts through a static form on each post page; nothing appears until it's approved at `/admin/comments`. Commenter IP addresses are stored only as HMAC-SHA256 hashes keyed with `Comments:IpHashSalt`, so IP blocks and the rate limit (3 comments per 5 minutes per address) keep working without keeping raw addresses. The Aspire AppHost generates the salt on first run and keeps it in its user secrets as the `comment-ip-salt` parameter. Outside Aspire, set `Comments:IpHashSalt` to a long random value and keep it stable: if it's missing, the server uses a random salt and logs a warning, and IP blocks stop matching after a restart. Behind a reverse proxy, configure forwarded headers so the rate limit sees the real client address.
+
 ## EF Migrations
 This project adds EF as a dotnet tool, so before running any EF commands, one needs to run the following command from the project folder (there is also a command in the Aspire dashboard to run this restore command if the app is started before the restore command is run manually):
 

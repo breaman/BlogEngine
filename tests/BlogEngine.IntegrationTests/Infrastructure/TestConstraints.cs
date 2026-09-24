@@ -10,4 +10,7 @@ public static class TestConstraints
 
     /// <summary>Tests that change the single site settings row.</summary>
     public const string SiteSettings = nameof(SiteSettings);
+
+    /// <summary>Tests that add or moderate comments, whose counts and moderation queue the whole session shares.</summary>
+    public const string Comments = nameof(Comments);
 }

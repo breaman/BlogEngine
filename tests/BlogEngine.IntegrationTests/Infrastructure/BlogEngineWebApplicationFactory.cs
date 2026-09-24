@@ -1,4 +1,5 @@
 using BlogEngine.Data.Models;
+using BlogEngine.Server.Services.Comments;
 using BlogEngine.Server.Storage;
 using BlogEngine.ServiceDefaults;
 
@@ -38,6 +39,10 @@ public sealed class BlogEngineWebApplicationFactory : TestWebApplicationFactory<
     {
         builder.UseSetting($"ConnectionStrings:{Constants.DatabaseConnectionString}", SqlServer.ConnectionString);
         builder.UseSetting($"{MediaStorageOptions.SectionName}:{nameof(MediaStorageOptions.RootPath)}", MediaRoot);
+        builder.UseSetting($"{CommentOptions.SectionName}:{nameof(CommentOptions.IpHashSalt)}", "integration-test-salt");
+
+        // The in-memory server has no client address; let tests choose one, so rate limits are per test (T3.5).
+        builder.ConfigureServices(services => services.AddSingleton<IStartupFilter, TestClientIpStartupFilter>());
     }
 
     /// <summary>Stops the host and removes the session's media folder.</summary>

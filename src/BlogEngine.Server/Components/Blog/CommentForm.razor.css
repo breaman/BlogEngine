@@ -1,0 +1,12 @@
+/* The honeypot is moved off-screen rather than display:none, which some bots detect and skip. */
+.comment-hp {
+    position: absolute;
+    left: -10000px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+}
+
+.comment-form ::deep .comment-body-input {
+    min-height: 8rem;
+}

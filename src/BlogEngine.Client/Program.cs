@@ -37,10 +37,15 @@ builder.Services.AddScoped<IPostAdminService, ClientPostAdminService>();
 builder.Services.AddScoped<ITagService, ClientTagService>();
 builder.Services.AddScoped<ISettingsService, ClientSettingsService>();
 builder.Services.AddScoped<IMediaService, ClientMediaService>();
+builder.Services.AddScoped<ICommentModerationService, ClientCommentModerationService>();
+builder.Services.AddScoped<IDashboardService, ClientDashboardService>();
 
 // Browser-side helpers for the post editor; the server registers them too, for prerendering.
 builder.Services.AddScoped<DraftBackupStore>();
 builder.Services.AddScoped<RecentMediaStore>();
 builder.Services.AddScoped<MediaLookupCache>();
+
+// Keeps the pending-comments badge in the admin nav in step with the moderation page and dashboard.
+builder.Services.AddScoped<CommentCountNotifier>();
 
 await builder.Build().RunAsync();

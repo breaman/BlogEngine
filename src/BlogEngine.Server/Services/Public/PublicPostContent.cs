@@ -11,10 +11,24 @@ namespace BlogEngine.Server.Services.Public;
 /// <param name="HasCodeBlocks">Whether the page needs the code highlighting script (design 10.3).</param>
 /// <param name="MetaTitle">Optional SEO title override.</param>
 /// <param name="MetaDescription">Optional SEO description override.</param>
+/// <param name="AllowComments">Whether the post takes comments at all (design 8.5).</param>
+/// <param name="CommentsCloseOn">When comments close, if they do.</param>
 [ImmutableObject(true)]
 public sealed record PublicPostContent(
     PublicPostSummary Post,
     string Html,
     bool HasCodeBlocks,
     string? MetaTitle,
-    string? MetaDescription);
+    string? MetaDescription,
+    bool AllowComments = true,
+    DateTimeOffset? CommentsCloseOn = null)
+{
+    /// <summary>
+    /// Whether readers may comment at <paramref name="now"/> (design 8.5): the post allows comments and its closing time,
+    /// if any, hasn't passed. The site-wide switch is checked separately.
+    /// </summary>
+    public bool CommentsOpenAt(DateTimeOffset now)
+    {
+        return AllowComments && (CommentsCloseOn is not { } closeOn || closeOn > now);
+    }
+}

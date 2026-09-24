@@ -66,7 +66,7 @@ public class AdminAccessTests(BlogEngineWebApplicationFactory factory)
         var html = await response.Content.ReadAsStringAsync();
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
-        await Assert.That(html).Contains("<h1 class=\"h3 mb-4\">Dashboard</h1>");
+        await Assert.That(html).Contains("<h1 class=\"h3 mb-0\">Dashboard</h1>");
         foreach (var section in new[] { "admin/posts", "admin/media", "admin/comments", "admin/tags", "admin/settings" })
         {
             await Assert.That(html).Contains($"href=\"{section}\"");

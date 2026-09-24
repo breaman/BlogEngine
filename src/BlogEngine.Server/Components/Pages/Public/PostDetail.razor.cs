@@ -1,9 +1,11 @@
 using BlogEngine.Server.Services;
+using BlogEngine.Server.Services.Comments;
 using BlogEngine.Server.Services.Public;
 using BlogEngine.Shared.Common;
 using BlogEngine.Shared.Services;
 
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace BlogEngine.Server.Components.Pages.Public;
 
@@ -22,13 +24,21 @@ namespace BlogEngine.Server.Components.Pages.Public;
 /// </list>
 /// The redirect table is checked here rather than left to <see cref="RedirectFallbackMiddleware"/>, because
 /// <c>NavigationManager.NotFound()</c> renders the not-found page straight away in static SSR.
+/// <para>
+/// Below the post come its approved comments and the comment form (design 14.2, T3.3, T3.6). The page's only POST is
+/// that form, so the comment rate limit applies to this endpoint (<see cref="CommentRateLimiting"/>; GETs are never
+/// limited). The page is never output-cached, because the form carries a per-visitor antiforgery token (design 11).
+/// </para>
 /// </remarks>
+[EnableRateLimiting(CommentRateLimiting.PolicyName)]
 public partial class PostDetail : ComponentBase
 {
     [Inject] private PublicPostQueries Queries { get; set; } = default!;
     [Inject] private RedirectLookup Redirects { get; set; } = default!;
     [Inject] private ISettingsService SettingsService { get; set; } = default!;
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
+    [Inject] private PublicCommentQueries CommentQueries { get; set; } = default!;
+    [Inject] private TimeProvider TimeProvider { get; set; } = default!;
 
     /// <summary>The request, for issuing permanent redirects (always present in static SSR).</summary>
     [CascadingParameter]
@@ -53,6 +63,11 @@ public partial class PostDetail : ComponentBase
     private PublicPostContent? _post;
     private IReadOnlyList<ShareLinks.Link> _shareLinks = [];
     private string _dateFormat = SiteSettingsDefaults.DateFormat;
+    private IReadOnlyList<PublicComment> _comments = [];
+    private bool _commentsOpen;
+    private bool _commentsClosed;
+    private bool _showAvatars;
+    private DateTimeOffset _now;
 
     /// <summary>Resolves the URL to a post, a redirect or a 404 (see the class remarks).</summary>
     protected override async Task OnParametersSetAsync()
@@ -69,8 +84,16 @@ public partial class PostDetail : ComponentBase
                 return;
             }
 
-            _dateFormat = (await SettingsService.GetAsync()).DateFormat;
+            var settings = await SettingsService.GetAsync();
+            _dateFormat = settings.DateFormat;
             _shareLinks = ShareLinks.For(post.Post.Title, NavigationManager.ToAbsoluteUri(post.Post.Path).AbsoluteUri);
+
+            // Comments (design 8.5): the site-wide switch hides the form everywhere; a post can also close its own.
+            _now = TimeProvider.GetUtcNow();
+            _comments = (await CommentQueries.GetApprovedAsync(post.Post.Id)).Comments;
+            _commentsOpen = settings.CommentsEnabled && post.CommentsOpenAt(_now);
+            _commentsClosed = settings.CommentsEnabled && !_commentsOpen;
+            _showAvatars = settings.ShowCommentAvatars;
             _post = post;
             return;
         }

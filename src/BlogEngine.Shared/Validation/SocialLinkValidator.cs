@@ -20,14 +20,6 @@ public sealed class SocialLinkValidator : AbstractValidator<SocialLinkDto>
         RuleFor(l => l.Url)
             .NotEmpty()
             .MaximumLength(FieldLengths.Url)
-            .Must(BeAbsoluteHttpUrl).WithMessage("'{PropertyName}' must be an absolute http or https URL.");
-    }
-
-    /// <summary>Whether the value is an absolute URL a browser can open from the footer.</summary>
-    private static bool BeAbsoluteHttpUrl(string? url)
-    {
-        // Blank values are reported by NotEmpty; don't add a second message for them.
-        return string.IsNullOrEmpty(url)
-            || (Uri.TryCreate(url, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps));
+            .Must(HttpUrls.IsBlankOrAbsoluteHttp).WithMessage("'{PropertyName}' must be an absolute http or https URL.");
     }
 }

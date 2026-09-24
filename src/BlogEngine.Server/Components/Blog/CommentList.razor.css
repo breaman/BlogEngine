@@ -1,0 +1,15 @@
+.comment-list > .comment-thread + .comment-thread {
+    border-top: var(--bs-border-width) solid var(--bs-border-color-translucent);
+}
+
+.comment-replies {
+    margin-left: 3.5rem;
+    border-left: 0.2rem solid var(--bs-border-color-translucent);
+    padding-left: 1rem;
+}
+
+@media (max-width: 575.98px) {
+    .comment-replies {
+        margin-left: 1rem;
+    }
+}

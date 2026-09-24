@@ -1,0 +1,172 @@
+@page "/admin/comments"
+@layout AdminLayout
+@attribute [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
+@rendermode InteractiveWebAssembly
+
+<PageTitle>Comments · BlogEngine Admin</PageTitle>
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <h1 class="h3 mb-0">Comments</h1>
+    @if (Tab == CommentsTab.Spam && Counts?.Spam > 0)
+    {
+        <button type="button" class="btn btn-outline-danger" disabled="@_busy" @onclick="EmptySpamAsync">
+            <span class="bi bi-trash3" aria-hidden="true"></span> Empty spam
+        </button>
+    }
+</div>
+
+<ul class="nav nav-tabs mb-3">
+    @foreach (var tab in Tabs)
+    {
+        <li class="nav-item">
+            <a class="nav-link @(tab.Tab == Tab ? "active" : null)" aria-current="@(tab.Tab == Tab ? "page" : null)" href="@TabUri(tab.Tab)">
+                @tab.Label
+                @if (CountOf(tab.Tab) is { } count)
+                {
+                    <span class="badge rounded-pill @(tab.Tab == CommentsTab.Pending && count > 0 ? "text-bg-danger" : "text-bg-secondary") ms-1">@count</span>
+                }
+            </a>
+        </li>
+    }
+</ul>
+
+@if (Tab == CommentsTab.Blocklist)
+{
+    <CommentBlocklist />
+}
+else if (_loadError is not null)
+{
+    <div class="alert alert-danger d-flex align-items-center gap-2" role="alert">
+        <span>@_loadError</span>
+        <button type="button" class="btn btn-sm btn-outline-danger ms-auto" @onclick="ReloadAsync">Retry</button>
+    </div>
+}
+else if (Result is null)
+{
+    <p class="text-body-secondary"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Loading comments…</p>
+}
+else if (Result.Items.Count == 0)
+{
+    <div class="card">
+        <div class="card-body text-center text-body-secondary py-5">
+            <p class="mb-0">@EmptyMessage</p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        <div class="form-check mb-0 me-2">
+            <input class="form-check-input" type="checkbox" id="comments-select-all" checked="@AllSelected" @onchange="ToggleAll" />
+            <label class="form-check-label" for="comments-select-all">
+                @(_selected.Count > 0 ? $"{_selected.Count} selected" : "Select all")
+            </label>
+        </div>
+        @foreach (var action in BulkActions)
+        {
+            <button type="button" class="btn btn-sm @action.ButtonClass" disabled="@(_selected.Count == 0 || _busy)"
+                    @onclick="() => BulkAsync(action.Action)">
+                <span class="bi @action.Icon" aria-hidden="true"></span> @action.Label
+            </button>
+        }
+    </div>
+
+    <ul class="list-group mb-3 @(_busy ? "opacity-50" : null)">
+        @foreach (var comment in Result.Items)
+        {
+            var selected = _selected.Contains(comment.Id);
+            <li class="list-group-item py-3 @(selected ? "list-group-item-primary" : null)" @key="comment.Id">
+                <div class="d-flex gap-3">
+                    <div class="pt-1">
+                        <input class="form-check-input" type="checkbox" id="comment-select-@comment.Id" checked="@selected"
+                               aria-label="Select the comment by @comment.AuthorName" @onchange="e => ToggleSelected(comment.Id, e)" />
+                    </div>
+                    <div class="flex-grow-1 comment-row">
+                        <div class="d-flex flex-wrap align-items-baseline column-gap-2 row-gap-1 small">
+                            <span class="fw-semibold fs-6">@comment.AuthorName</span>
+                            <a class="link-secondary" href="@($"mailto:{comment.AuthorEmail}")">@comment.AuthorEmail</a>
+                            @if (comment.AuthorUrl is { } url)
+                            {
+                                <a class="link-secondary text-break" href="@url" target="_blank" rel="nofollow ugc noopener noreferrer">
+                                    <span class="bi bi-globe" aria-hidden="true"></span> @url
+                                </a>
+                            }
+                            <span class="text-body-secondary" title="@comment.CreatedOn?.ToLocalTime().ToString("f")">@Relative(comment.CreatedOn)</span>
+                        </div>
+                        <div class="small text-body-secondary mb-2">
+                            on <a href="@($"admin/posts/{comment.PostId}")">@comment.PostTitle</a>
+                            @if (comment.PostPath is { } path)
+                            {
+                                <a class="ms-1 link-secondary" href="@($"{path}#comment-{comment.Id}")" target="_blank" rel="noopener"
+                                   title="View on the site" aria-label="View @comment.PostTitle on the site">
+                                    <span class="bi bi-box-arrow-up-right" aria-hidden="true"></span>
+                                </a>
+                            }
+                        </div>
+                        <div class="comment-preview border rounded p-2 mb-2">@((MarkupString)comment.BodyHtml)</div>
+                        @if (comment.SpamScore > 0 || !string.IsNullOrEmpty(comment.SpamReasons))
+                        {
+                            <div class="small mb-2">
+                                <span class="badge @(comment.SpamScore >= SpamThreshold ? "text-bg-danger" : "text-bg-warning")">Spam score @comment.SpamScore</span>
+                                <span class="text-body-secondary ms-1">@comment.SpamReasons</span>
+                            </div>
+                        }
+                        <div class="d-flex flex-wrap gap-1">
+                            @if (comment.Status != CommentStatus.Approved)
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-success" disabled="@_busy" @onclick="() => ModerateAsync(comment, CommentModerationAction.Approve)">
+                                    <span class="bi bi-check-lg" aria-hidden="true"></span> Approve
+                                </button>
+                            }
+                            @if (comment.Status != CommentStatus.Rejected)
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_busy" @onclick="() => ModerateAsync(comment, CommentModerationAction.Reject)">
+                                    <span class="bi bi-x-lg" aria-hidden="true"></span> Reject
+                                </button>
+                            }
+                            @if (comment.Status != CommentStatus.Spam)
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-warning" disabled="@_busy" @onclick="() => ModerateAsync(comment, CommentModerationAction.Spam)">
+                                    <span class="bi bi-exclamation-octagon" aria-hidden="true"></span> Spam
+                                </button>
+                            }
+                            <button type="button" class="btn btn-sm btn-outline-danger" disabled="@_busy" @onclick="() => ModerateAsync(comment, CommentModerationAction.Delete)">
+                                <span class="bi bi-trash" aria-hidden="true"></span> Delete
+                            </button>
+                            @if (!comment.IsAuthorReply)
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-danger" disabled="@_busy" @onclick="() => BlockAsync(comment)">
+                                    <span class="bi bi-slash-circle" aria-hidden="true"></span> Block commenter
+                                </button>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </li>
+        }
+    </ul>
+
+    <nav aria-label="Comment pages" class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <span class="text-body-secondary small">@Result.TotalCount.ToString("N0") @(Result.TotalCount == 1 ? "comment" : "comments")</span>
+        @if (Result.TotalPages > 1)
+        {
+            <ul class="pagination mb-0">
+                <li class="page-item @(Result.Page <= 1 ? "disabled" : null)">
+                    <a class="page-link" href="@TabUri(Tab, Result.Page - 1)" aria-label="Previous page">
+                        <span class="bi bi-chevron-left" aria-hidden="true"></span> Previous
+                    </a>
+                </li>
+                <li class="page-item disabled">
+                    <span class="page-link">Page @Result.Page of @Result.TotalPages</span>
+                </li>
+                <li class="page-item @(Result.Page >= Result.TotalPages ? "disabled" : null)">
+                    <a class="page-link" href="@TabUri(Tab, Result.Page + 1)" aria-label="Next page">
+                        Next <span class="bi bi-chevron-right" aria-hidden="true"></span>
+                    </a>
+                </li>
+            </ul>
+        }
+    </nav>
+}
+
+<ConfirmDialog @ref="_confirm" />

@@ -25,4 +25,10 @@ public static class PublicCacheTags
     {
         return string.Create(CultureInfo.InvariantCulture, $"tag:{tagId}");
     }
+
+    /// <summary>The approved comments of one post (design 11), evicted on submission and moderation.</summary>
+    public static string Comments(int postId)
+    {
+        return string.Create(CultureInfo.InvariantCulture, $"comments:{postId}");
+    }
 }

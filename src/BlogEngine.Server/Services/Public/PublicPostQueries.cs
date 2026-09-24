@@ -250,7 +250,9 @@ public sealed class PublicPostQueries(HybridCache cache, CacheInvalidator invali
                 p.ContentHtml,
                 p.HasCodeBlocks,
                 p.MetaTitle,
-                p.MetaDescription
+                p.MetaDescription,
+                p.AllowComments,
+                p.CommentsCloseOn
             })
             .ToListAsync(cancellationToken);
 
@@ -262,7 +264,7 @@ public sealed class PublicPostQueries(HybridCache cache, CacheInvalidator invali
                     new PublicPostSummary(r.Id, r.Title, r.Slug, r.Summary, r.PublishedOn, r.PublishedDateLocal!.Value,
                         r.LastUpdatedOn, r.ReadingMinutes, r.IsFeatured,
                         [.. r.Tags.Select(t => new PublicTagLink(t.Id, t.Name, t.Slug))]),
-                    r.ContentHtml, r.HasCodeBlocks, r.MetaTitle, r.MetaDescription))
+                    r.ContentHtml, r.HasCodeBlocks, r.MetaTitle, r.MetaDescription, r.AllowComments, r.CommentsCloseOn))
         ];
     }
 }

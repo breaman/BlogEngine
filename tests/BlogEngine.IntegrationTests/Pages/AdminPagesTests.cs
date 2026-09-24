@@ -32,6 +32,7 @@ public class AdminPagesTests(BlogEngineWebApplicationFactory factory)
     [Arguments("/admin/settings")]
     [Arguments("/admin/media")]
     [Arguments("/admin/media/1")]
+    [Arguments("/admin/comments")]
     public async Task Page_Anonymous_RedirectsToLogin(string path)
     {
         using var client = IdentityTestHelper.CreateClient(factory);
