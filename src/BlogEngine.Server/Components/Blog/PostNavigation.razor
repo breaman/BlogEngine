@@ -1,0 +1,42 @@
+@* Below a post (design 14.2, P10): the older and newer posts, then up to three posts sharing its tags. *@
+@if (Neighbors.Older is not null || Neighbors.Newer is not null)
+{
+    <nav class="post-navigation row g-3 mt-4" aria-label="Older and newer posts">
+        <div class="col-12 col-sm-6">
+            @if (Neighbors.Older is { } older)
+            {
+                <a class="d-block text-decoration-none h-100 p-3 border rounded" href="@older.Path" rel="prev">
+                    <span class="d-block small text-body-secondary"><span class="bi bi-arrow-left" aria-hidden="true"></span> Older post</span>
+                    <span class="d-block fw-semibold">@older.Title</span>
+                </a>
+            }
+        </div>
+        <div class="col-12 col-sm-6 text-sm-end">
+            @if (Neighbors.Newer is { } newer)
+            {
+                <a class="d-block text-decoration-none h-100 p-3 border rounded" href="@newer.Path" rel="next">
+                    <span class="d-block small text-body-secondary">Newer post <span class="bi bi-arrow-right" aria-hidden="true"></span></span>
+                    <span class="d-block fw-semibold">@newer.Title</span>
+                </a>
+            }
+        </div>
+    </nav>
+}
+
+@if (Related.Count > 0)
+{
+    <section class="related-posts mt-4" aria-labelledby="related-posts-heading">
+        <h2 id="related-posts-heading" class="h5 mb-3">Related posts</h2>
+        <ul class="list-unstyled mb-0">
+            @foreach (var post in Related)
+            {
+                <li class="mb-2">
+                    <a class="fw-semibold" href="@post.Path">@post.Title</a>
+                    <span class="small text-body-secondary ms-1">
+                        <time datetime="@PublicDates.Iso(post.PublishedDateLocal)">@PublicDates.Format(post.PublishedDateLocal, DateFormat)</time>
+                    </span>
+                </li>
+            }
+        </ul>
+    </section>
+}

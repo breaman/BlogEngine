@@ -38,7 +38,7 @@
                     <span aria-hidden="true">&middot;</span>
                     @foreach (var tag in _post.Tags)
                     {
-                        <span class="tag-badge badge rounded-pill text-bg-light border fw-normal">#@tag.Name</span>
+                        <span class="tag-badge badge rounded-pill bg-body-tertiary text-body border fw-normal">#@tag.Name</span>
                     }
                 }
             </p>
@@ -51,8 +51,10 @@
             </figure>
         }
 
+        <TableOfContents Entries="_outline" PagePath="@SitePaths.Preview(Token)" />
+
         <div class="post-content" data-code-blocks="@(_post.HasCodeBlocks ? "true" : null)">
-            @((MarkupString)_post.Html)
+            @((MarkupString)_html)
         </div>
     </article>
 }

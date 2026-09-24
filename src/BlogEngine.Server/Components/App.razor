@@ -5,6 +5,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
+    @* Light/dark theme (P14): a tiny blocking script, so the theme is applied before the first paint (no flash). *@
+    <script src="@Assets["js/theme.js"]"></script>
     @if (_discourageSearchEngines)
     {
         @* "Discourage search engines" (design 13, 16): noindex on every page, alongside Disallow: / in robots.txt. *@

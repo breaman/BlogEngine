@@ -39,8 +39,9 @@ public class PostImagesAndSeoTests(BlogEngineWebApplicationFactory factory)
         await Assert.That(html).Contains("<meta name=\"twitter:card\" content=\"summary_large_image\"");
     }
 
-    /// <summary>A post without a cover or social image has no social image tags.</summary>
+    /// <summary>A post without a cover or social image has no social image tags (while no default image is set).</summary>
     [Test]
+    [NotInParallel(TestConstraints.SiteSettings)]
     public async Task NoImages_NoSocialImageTags()
     {
         var post = await PublicTestPosts.PublishAsync(factory, new PostEditDto { Title = $"Plain {MediaTestFiles.Token()}", ContentMarkdown = "Body." });

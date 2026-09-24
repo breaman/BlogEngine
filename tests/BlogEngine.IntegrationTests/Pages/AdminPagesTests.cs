@@ -34,6 +34,9 @@ public class AdminPagesTests(BlogEngineWebApplicationFactory factory)
     [Arguments("/admin/media")]
     [Arguments("/admin/media/1")]
     [Arguments("/admin/comments")]
+    [Arguments("/admin/pages")]
+    [Arguments("/admin/pages/new")]
+    [Arguments("/admin/pages/1")]
     public async Task Page_Anonymous_RedirectsToLogin(string path)
     {
         using var client = IdentityTestHelper.CreateClient(factory);
@@ -190,6 +193,39 @@ public class AdminPagesTests(BlogEngineWebApplicationFactory factory)
         await Assert.That(html).Contains("id=\"settings-site-title\"");
         await Assert.That(html).Contains("<option value=\"America/Chicago\"");
         await Assert.That(html).Contains("Save settings");
+    }
+
+    /// <summary>The standalone pages list and editor prerender with their data (T4.10), and the nav links to them.</summary>
+    [Test]
+    public async Task StandalonePages_PrerenderListAndEditor()
+    {
+        var token = Guid.NewGuid().ToString("N")[..8];
+        PageEditDto page;
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var pages = scope.ServiceProvider.GetRequiredService<IPageAdminService>();
+            page = ((PageSaved)await pages.CreateAsync(new PageEditDto
+            {
+                Title = $"Colophon {token}",
+                ContentMarkdown = $"Built with Blazor {token}",
+                ShowInNav = true,
+                NavOrder = 3
+            })).Page;
+        }
+
+        using var client = await CreateAdminClientAsync();
+        var list = await GetHtmlAsync(client, "/admin/pages");
+        var editor = await GetHtmlAsync(client, $"/admin/pages/{page.Id}");
+        var fromTemplate = await GetHtmlAsync(client, "/admin/pages/new?template=privacy");
+
+        await Assert.That(list).Contains($"Colophon {token}");
+        await Assert.That(list).Contains($"href=\"admin/pages/{page.Id}\"");
+        await Assert.That(list).Contains("href=\"admin/pages/new?template=privacy\"");
+        await Assert.That(list).Contains("href=\"admin/pages\"");
+        await Assert.That(editor).Contains($"value=\"Colophon {token}\"");
+        await Assert.That(editor).Contains($"value=\"{page.Slug}\"");
+        await Assert.That(fromTemplate).Contains("value=\"Privacy\"");
+        await Assert.That(fromTemplate).Contains("value=\"privacy\"");
     }
 
     private async Task<HttpClient> CreateAdminClientAsync()

@@ -10,12 +10,14 @@
 //         src/BlogEngine.Client/wwwroot/js.
 // public: sources in src/BlogEngine.Server/scripts, written to src/BlogEngine.Server/wwwroot/js. public.js is
 //         loaded on every public page and only minified, never bundled, so its dynamic import of
-//         code-blocks.js (highlight.js and copy buttons) stays a separate, lazily loaded file.
+//         code-blocks.js (highlight.js and copy buttons) stays a separate, lazily loaded file. theme.js is a
+//         classic script for <head> that applies the light/dark theme before the page paints.
 //
 // The npm packages are installed once, in this project, so every build resolves imports from this
 // node_modules folder. Blazor serves the output folders as static web assets.
 
 import * as esbuild from 'esbuild';
+import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 const serverDir = fileURLToPath(new URL('..', import.meta.url));
@@ -23,15 +25,35 @@ const clientDir = fileURLToPath(new URL('../../BlogEngine.Client/', import.meta.
 const watch = process.argv.includes('--watch');
 const requested = process.argv.slice(2).filter(arg => !arg.startsWith('--'));
 
+/**
+ * Serves `virtual:hljs-dark-theme.css`: highlight.js's GitHub Dark theme scoped to Bootstrap's dark color mode
+ * (P14), so code follows the page theme. Imported after the light GitHub theme, whose rules it overrides only
+ * under [data-bs-theme="dark"]. The nesting is flattened into plain selectors (see `supported` below).
+ * @type {import('esbuild').Plugin}
+ */
+const darkCodeTheme = {
+    name: 'hljs-dark-theme',
+    setup(build) {
+        build.onResolve({ filter: /^virtual:hljs-dark-theme\.css$/ }, args => ({ path: args.path, namespace: 'hljs-dark-theme' }));
+        build.onLoad({ filter: /.*/, namespace: 'hljs-dark-theme' }, async () => ({
+            contents: `[data-bs-theme="dark"] {\n${await readFile(`${serverDir}node_modules/highlight.js/styles/github-dark.css`, 'utf8')}\n}\n`,
+            loader: 'css'
+        }));
+    }
+};
+
 /** Options shared by every bundle. @type {import('esbuild').BuildOptions} */
 const common = {
     // Loaded as ES modules (import() from .NET, or <script type="module">).
     format: 'esm',
     target: 'es2022',
+    // Write nested CSS (the scoped dark theme) as flat selectors, which every browser understands.
+    supported: { nesting: false },
     minify: true,
     sourcemap: 'linked',
     // Some sources are outside this folder, so tell esbuild where the packages are.
     nodePaths: [`${serverDir}node_modules`],
+    plugins: [darkCodeTheme],
     logLevel: 'info'
 };
 
@@ -65,6 +87,14 @@ const groups = {
             // The loader on every public page: minified only, so the import() above stays lazy.
             entryPoints: { public: `${serverDir}scripts/public.js` },
             outdir: `${serverDir}wwwroot/js`,
+            bundle: false
+        },
+        {
+            ...common,
+            // Applies the light/dark theme from <head> as a classic, render-blocking script (P14), so not a module.
+            entryPoints: { theme: `${serverDir}scripts/theme.js` },
+            outdir: `${serverDir}wwwroot/js`,
+            format: 'iife',
             bundle: false
         }
     ]

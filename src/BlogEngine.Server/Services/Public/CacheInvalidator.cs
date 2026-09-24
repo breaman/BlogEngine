@@ -9,9 +9,10 @@ namespace BlogEngine.Server.Services.Public;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Two caches are involved: <see cref="HybridCache"/> holds the query results of <see cref="PublicPostQueries"/>
-/// (and the settings), and the output cache holds whole responses for feeds, the sitemap and
-/// <c>robots.txt</c>. Both are evicted by the tags in <see cref="PublicCacheTags"/>.
+/// Two caches are involved: <see cref="HybridCache"/> holds the query results of <see cref="PublicPostQueries"/>,
+/// <see cref="PublicCommentQueries"/> and <see cref="PublicPageQueries"/> (and the settings), and the output cache holds
+/// whole responses for feeds, the sitemap and <c>robots.txt</c>. Both are evicted by the tags in
+/// <see cref="PublicCacheTags"/>.
 /// </para>
 /// <para>
 /// <b>Why a generation as well as tags.</b> Tag eviction alone has a race: a cache load that read the database
@@ -30,12 +31,16 @@ public sealed class CacheInvalidator(HybridCache cache, IOutputCacheStore output
 {
     private long postsGeneration;
     private long commentsGeneration;
+    private long pagesGeneration;
 
     /// <summary>Changes after every eviction of post-derived content; part of the public cache keys.</summary>
     public long PostsGeneration => Interlocked.Read(ref postsGeneration);
 
     /// <summary>Changes after every eviction of comments; part of the cache keys of <see cref="PublicCommentQueries"/>.</summary>
     public long CommentsGeneration => Interlocked.Read(ref commentsGeneration);
+
+    /// <summary>Changes after every eviction of standalone pages; part of the cache keys of <see cref="PublicPageQueries"/>.</summary>
+    public long PagesGeneration => Interlocked.Read(ref pagesGeneration);
 
     /// <summary>
     /// Evicts everything that could show the post: its own entries and every list, archive, tag page, feed
@@ -70,6 +75,20 @@ public sealed class CacheInvalidator(HybridCache cache, IOutputCacheStore output
         await cache.RemoveByTagAsync(tags, CancellationToken.None);
 
         logger.LogDebug("Evicted the cached comments of {PostCount} posts.", tags.Count);
+    }
+
+    /// <summary>
+    /// Evicts the standalone pages (design 6.7, A17) after one was published, edited, unpublished or deleted: the page
+    /// snapshot (navigation links on every public page) and page contents, plus the sitemap, which lists the pages.
+    /// </summary>
+    /// <param name="pageId">The page that changed.</param>
+    public async Task PagesChangedAsync(int pageId)
+    {
+        Interlocked.Increment(ref pagesGeneration);
+        await cache.RemoveByTagAsync(PublicCacheTags.Pages, CancellationToken.None);
+        await outputCache.EvictByTagAsync(PublicCacheTags.Posts, CancellationToken.None);
+
+        logger.LogDebug("Evicted the cached pages after page {PageId} changed.", pageId);
     }
 
     /// <summary>

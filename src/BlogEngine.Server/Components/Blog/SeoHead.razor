@@ -1,26 +1,68 @@
-@* Title and head tags for a public page (design 14.2, 16). The only <HeadContent> on a page, since the last
-   rendered one wins. The social image tags come from a post's social or cover image (A15, A16); the rest of Open
-   Graph, Twitter cards and JSON-LD arrive with the full SeoHead in T4.7. *@
+@* Title and head tags for a public page (design 14.2, 16, P8). The only <HeadContent> on a page, since the last
+   rendered one wins. *@
 <PageTitle>@_fullTitle</PageTitle>
 <HeadContent>
     @if (!string.IsNullOrWhiteSpace(_description))
     {
         <meta name="description" content="@_description" />
     }
-    <link rel="canonical" href="@Absolute(CanonicalPath)" />
-    @if (Image is not null)
+    @if (_noIndex)
     {
-        var imageUrl = Absolute(Image.Url);
-        <meta property="og:image" content="@imageUrl" />
-        <meta property="og:image:width" content="@Image.Width" />
-        <meta property="og:image:height" content="@Image.Height" />
-        @if (!string.IsNullOrWhiteSpace(Image.AltText))
-        {
-            <meta property="og:image:alt" content="@Image.AltText" />
-        }
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:image" content="@imageUrl" />
+        <meta name="robots" content="noindex, follow" />
     }
+    <link rel="canonical" href="@_canonicalUrl" />
+
+    @* Open Graph (link previews in chat apps and social networks). *@
+    <meta property="og:site_name" content="@_siteTitle" />
+    <meta property="og:type" content="@(Article is null ? "website" : "article")" />
+    <meta property="og:title" content="@_socialTitle" />
+    @if (!string.IsNullOrWhiteSpace(_description))
+    {
+        <meta property="og:description" content="@_description" />
+    }
+    <meta property="og:url" content="@_canonicalUrl" />
+    @if (Article is not null)
+    {
+        <meta property="article:published_time" content="@Iso(Article.PublishedOn)" />
+        <meta property="article:modified_time" content="@Iso(Article.ModifiedOn)" />
+        @foreach (var tag in Article.Tags)
+        {
+            <meta property="article:tag" content="@tag" />
+        }
+    }
+    @if (_image is not null)
+    {
+        <meta property="og:image" content="@_imageUrl" />
+        <meta property="og:image:width" content="@_image.Width" />
+        <meta property="og:image:height" content="@_image.Height" />
+        @if (!string.IsNullOrWhiteSpace(_image.AltText))
+        {
+            <meta property="og:image:alt" content="@_image.AltText" />
+        }
+    }
+
+    @* Twitter/X cards fall back to Open Graph for anything not given here. *@
+    <meta name="twitter:card" content="@(_image is null ? "summary" : "summary_large_image")" />
+    <meta name="twitter:title" content="@_socialTitle" />
+    @if (!string.IsNullOrWhiteSpace(_description))
+    {
+        <meta name="twitter:description" content="@_description" />
+    }
+    @if (_image is not null)
+    {
+        <meta name="twitter:image" content="@_imageUrl" />
+        @if (!string.IsNullOrWhiteSpace(_image.AltText))
+        {
+            <meta name="twitter:image:alt" content="@_image.AltText" />
+        }
+    }
+
+    @if (_jsonLd is not null)
+    {
+        @* Serialized with HTML-sensitive characters escaped (BlogPostingSchema), so it can't close the element. *@
+        <script type="application/ld+json">@((MarkupString)_jsonLd)</script>
+    }
+
     <link rel="alternate" type="application/rss+xml" title="@($"{_siteTitle} (RSS)")" href="@Absolute(SitePaths.RssFeed)" />
     <link rel="alternate" type="application/atom+xml" title="@($"{_siteTitle} (Atom)")" href="@Absolute(SitePaths.AtomFeed)" />
     @if (TagFeed is not null)

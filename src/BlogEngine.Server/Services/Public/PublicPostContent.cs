@@ -15,6 +15,9 @@ namespace BlogEngine.Server.Services.Public;
 /// <param name="CommentsCloseOn">When comments close, if they do.</param>
 /// <param name="Cover">The cover image shown above the content (A15), if any.</param>
 /// <param name="SocialImageOverride">The image chosen for social sharing previews (A16), if any.</param>
+/// <param name="Outline">
+/// The table of contents (P13); empty for short posts, and for feed items, which never show one. See <see cref="PostOutline"/>.
+/// </param>
 [ImmutableObject(true)]
 public sealed record PublicPostContent(
     PublicPostSummary Post,
@@ -25,8 +28,12 @@ public sealed record PublicPostContent(
     bool AllowComments = true,
     DateTimeOffset? CommentsCloseOn = null,
     PublicImage? Cover = null,
-    PublicImage? SocialImageOverride = null)
+    PublicImage? SocialImageOverride = null,
+    IReadOnlyList<OutlineHeading>? Outline = null)
 {
+    /// <summary>The table of contents entries; empty when the post doesn't get one.</summary>
+    public IReadOnlyList<OutlineHeading> TableOfContents => Outline ?? [];
+
     /// <summary>The image for social sharing previews: the chosen social image, otherwise the cover (A15, A16).</summary>
     public PublicImage? SocialImage => SocialImageOverride ?? Cover;
 

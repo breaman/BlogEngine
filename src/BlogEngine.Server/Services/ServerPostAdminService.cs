@@ -206,6 +206,13 @@ public sealed class ServerPostAdminService(
             if (contentChanged)
             {
                 AddRevision(entity, RevisionKind.Manual);
+
+                // Readers see "Updated …" only for changes to a post that was already live (P15); editing a draft or a
+                // scheduled post is still part of writing it.
+                if (oldPath is not null)
+                {
+                    entity.LastUpdatedOn = timeProvider.GetUtcNow();
+                }
             }
 
             await AddRedirectIfMovedAsync(oldPath, entity, ct);
@@ -295,8 +302,16 @@ public sealed class ServerPostAdminService(
             // and ScheduledPublishWatcher evicts the public caches when the time comes. Without one, a post that was
             // live before keeps its original date across unpublishing and republishing, and anything else (a new
             // post, or a scheduled one published early) goes live now.
-            var publishOn = (request.PublishOn ?? (entity.PublishedOn is { } existing && existing <= now ? existing : now))
-                .ToUniversalTime();
+            var keepsLiveDate = request.PublishOn is null && entity.PublishedOn is { } existing && existing <= now;
+            var publishOn = (request.PublishOn ?? (keepsLiveDate ? entity.PublishedOn!.Value : now)).ToUniversalTime();
+
+            // Republishing a post that was live before, under its original date, with content edited while it was a
+            // draft, is an update of that post as far as readers are concerned (P15).
+            if (keepsLiveDate && await ContentChangedSinceLastPublishAsync(entity, ct))
+            {
+                entity.LastUpdatedOn = now;
+            }
+
             entity.Status = PostStatus.Published;
             entity.PublishedOn = publishOn;
             entity.PublishedDateLocal = BlogTimeZone.ToLocalDate(publishOn, settings.TimeZoneId);
@@ -669,6 +684,23 @@ public sealed class ServerPostAdminService(
         }
 
         AddRevision(post, RevisionKind.Publish);
+    }
+
+    /// <summary>
+    /// Whether the post's title or content differs from its most recent <see cref="RevisionKind.Publish"/> revision, that
+    /// is, from what readers last saw. A post with no publish revision counts as unchanged.
+    /// </summary>
+    private async Task<bool> ContentChangedSinceLastPublishAsync(Post post, CancellationToken cancellationToken)
+    {
+        var published = await dbContext.PostRevisions
+            .AsNoTracking()
+            .Where(r => r.PostId == post.Id && r.Kind == RevisionKind.Publish)
+            .OrderByDescending(r => r.SavedOn)
+            .ThenByDescending(r => r.Id)
+            .Select(r => new { r.Title, r.ContentMarkdown })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return published is not null && (published.Title != post.Title || published.ContentMarkdown != post.ContentMarkdown);
     }
 
     /// <summary>Adds a revision of the post's current title and content.</summary>

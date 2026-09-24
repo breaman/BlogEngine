@@ -66,7 +66,9 @@ export function guardLinkNavigation(dotNet) {
         }
 
         const link = event.target instanceof Element ? event.target.closest('a[href]') : null;
-        if (!link || link.hasAttribute('download') || (link.target && link.target !== '_self')) {
+        // Bare "#id" links (heading anchors and footnotes in the editor preview) stay on the page; editor.js scrolls.
+        if (!link || link.hasAttribute('download') || (link.target && link.target !== '_self')
+            || link.getAttribute('href').startsWith('#')) {
             return;
         }
 

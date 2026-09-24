@@ -34,6 +34,25 @@ public sealed record PublicPostSummary(
     /// <summary>The canonical post URL path, <c>/posts/{yyyy}/{mm}/{dd}/{slug}</c>.</summary>
     public string Path => PostPaths.Post(PublishedDateLocal, Slug);
 
-    /// <summary>When the post last changed: the update date if it has one, otherwise the publish date.</summary>
-    public DateTimeOffset LastModified => LastUpdatedOn ?? PublishedOn;
+    /// <summary>
+    /// When the post last changed: the update date if it has one, otherwise the publish date. An update stamped before a
+    /// later re-dated publish time doesn't count, so this never precedes <see cref="PublishedOn"/>.
+    /// </summary>
+    public DateTimeOffset LastModified => LastUpdatedOn is { } updated && updated > PublishedOn ? updated : PublishedOn;
+
+    /// <summary>
+    /// The day of the last update in the blog's time zone, when it falls after the publish date; otherwise
+    /// <see langword="null"/>. Same-day corrections aren't worth an "Updated" line (P15).
+    /// </summary>
+    /// <param name="timeZoneId">The blog's IANA time zone (<see cref="Shared.Contracts.SiteSettingsDto.TimeZoneId"/>).</param>
+    public DateOnly? UpdatedDateLocal(string timeZoneId)
+    {
+        if (LastUpdatedOn is not { } updated)
+        {
+            return null;
+        }
+
+        var local = BlogTimeZone.ToLocalDate(updated, timeZoneId);
+        return local > PublishedDateLocal ? local : null;
+    }
 }

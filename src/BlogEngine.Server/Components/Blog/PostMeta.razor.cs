@@ -22,6 +22,13 @@ public partial class PostMeta : ComponentBase
     [Parameter]
     public bool LinkDate { get; set; }
 
+    /// <summary>
+    /// The "Updated" date shown after the publish date (P15), in the blog's time zone; see
+    /// <see cref="PublicPostSummary.UpdatedDateLocal"/>. Nothing is shown when <see langword="null"/>.
+    /// </summary>
+    [Parameter]
+    public DateOnly? UpdatedDate { get; set; }
+
     /// <summary>Whether to list the tags.</summary>
     [Parameter]
     public bool ShowTags { get; set; } = true;

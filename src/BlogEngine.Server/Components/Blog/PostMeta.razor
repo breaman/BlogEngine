@@ -1,4 +1,4 @@
-@* The line under a post title: date · reading time · tags (design 14.1, 14.2). *@
+@* The line under a post title: date · updated date · reading time · tags (design 14.1, 14.2). *@
 <p class="post-meta small text-body-secondary d-flex flex-wrap align-items-center column-gap-2 row-gap-1 @Class">
     @if (LinkDate)
     {
@@ -7,6 +7,11 @@
     else
     {
         <time datetime="@PublicDates.Iso(Post.PublishedDateLocal)">@PublicDates.Format(Post.PublishedDateLocal, DateFormat)</time>
+    }
+    @if (UpdatedDate is { } updated)
+    {
+        <span aria-hidden="true">&middot;</span>
+        <span class="post-updated">Updated <time datetime="@PublicDates.Iso(updated)">@PublicDates.Format(updated, DateFormat)</time></span>
     }
     <span aria-hidden="true">&middot;</span>
     <span>@Post.ReadingMinutes min read</span>

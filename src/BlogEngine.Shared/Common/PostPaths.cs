@@ -50,19 +50,21 @@ public static class PostPaths
     }
 
     /// <summary>
-    /// <paramref name="path"/> for list page <paramref name="page"/>: page 1 has no query string, so it has
-    /// one canonical URL (design 16).
+    /// <paramref name="path"/> for list page <paramref name="page"/>: page 1 adds nothing, so it has one canonical URL
+    /// (design 16). A path that already has a query string, such as a search, gets <c>&amp;page=</c>.
     /// </summary>
     /// <example>
     /// <code>
-    /// PostPaths.WithPage("/posts", 1); // "/posts"
-    /// PostPaths.WithPage("/posts", 3); // "/posts?page=3"
+    /// PostPaths.WithPage("/posts", 1);           // "/posts"
+    /// PostPaths.WithPage("/posts", 3);           // "/posts?page=3"
+    /// PostPaths.WithPage("/search?q=blazor", 2); // "/search?q=blazor&amp;page=2"
     /// </code>
     /// </example>
     public static string WithPage(string path, int page)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
-        return page <= 1 ? path : string.Create(CultureInfo.InvariantCulture, $"{path}?page={page}");
+        var separator = path.Contains('?', StringComparison.Ordinal) ? '&' : '?';
+        return page <= 1 ? path : string.Create(CultureInfo.InvariantCulture, $"{path}{separator}page={page}");
     }
 }

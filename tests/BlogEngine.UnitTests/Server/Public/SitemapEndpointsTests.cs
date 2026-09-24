@@ -15,14 +15,18 @@ public class SitemapEndpointsTests
     private static readonly Uri SiteUrl = new("https://blog.example/");
     private static readonly XNamespace Sitemap = "http://www.sitemaps.org/schemas/sitemap/0.9";
 
-    /// <summary>The sitemap has the fixed pages, each post with its last change, and each tag page.</summary>
+    /// <summary>
+    /// The sitemap has the fixed pages, each post with its last change, each tag page, and each standalone page with its
+    /// last save.
+    /// </summary>
     [Test]
     public async Task BuildSitemap_ListsPagesPostsAndTags()
     {
         var updated = PublicTestData.Post(2, new DateOnly(2026, 9, 20)) with { LastUpdatedOn = new DateTimeOffset(2026, 9, 21, 8, 30, 0, TimeSpan.FromHours(-5)) };
         var index = new PublicPostIndex([PublicTestData.Post(1), updated], [new PublicTag(3, "C#", "csharp", null, 2)]);
+        var pages = new PublicPageIndex([new PublicPageSummary(4, "About", "about", true, 0, new DateTimeOffset(2026, 9, 1, 9, 0, 0, TimeSpan.Zero))]);
 
-        var urls = XDocument.Parse(Encoding.UTF8.GetString(SitemapEndpoints.BuildSitemap(index, SiteUrl)))
+        var urls = XDocument.Parse(Encoding.UTF8.GetString(SitemapEndpoints.BuildSitemap(index, pages, SiteUrl)))
             .Root!.Elements(Sitemap + "url")
             .ToDictionary(u => u.Element(Sitemap + "loc")!.Value, u => u.Element(Sitemap + "lastmod")?.Value);
 
@@ -30,10 +34,13 @@ public class SitemapEndpointsTests
         [
             "https://blog.example/",
             "https://blog.example/posts",
+            "https://blog.example/archive",
             "https://blog.example/posts/2026/09/22/post-1",
             "https://blog.example/posts/2026/09/20/post-2",
-            "https://blog.example/tags/csharp"
+            "https://blog.example/tags/csharp",
+            "https://blog.example/about"
         ]);
+        await Assert.That(urls["https://blog.example/about"]).IsEqualTo("2026-09-01T09:00:00Z");
         await Assert.That(urls["https://blog.example/posts/2026/09/22/post-1"]).IsEqualTo("2026-09-22T12:00:00Z");
         await Assert.That(urls["https://blog.example/posts/2026/09/20/post-2"]).IsEqualTo("2026-09-21T13:30:00Z");
         await Assert.That(urls["https://blog.example/"]).IsEqualTo("2026-09-22T12:00:00Z");

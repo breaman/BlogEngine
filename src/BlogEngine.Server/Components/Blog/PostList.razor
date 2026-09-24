@@ -1,4 +1,4 @@
-@* The list shared by /posts, the date archives and tag pages (design 7.1, 14.1). *@
+@* The list shared by /posts, the date archives, tag pages and search results (design 7.1, 14.1, 15). *@
 @if (Page.Posts.Count == 0)
 {
     <p class="text-body-secondary">@EmptyText</p>
@@ -11,5 +11,5 @@ else
             <PostCard Post="post" DateFormat="@DateFormat" />
         }
     </div>
-    <Pager Page="Page.Page" TotalPages="Page.TotalPages" BasePath="@BasePath" />
+    <Pager Page="Page.Page" TotalPages="Page.TotalPages" BasePath="@BasePath" PreviousText="@PreviousText" NextText="@NextText" />
 }

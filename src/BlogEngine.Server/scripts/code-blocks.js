@@ -7,6 +7,8 @@
 
 import hljs from '../../BlogEngine.Client/scripts/highlighter.js';
 import 'highlight.js/styles/github.css';
+// GitHub Dark under [data-bs-theme="dark"], so code follows the page's theme (P14; see build-js.mjs).
+import 'virtual:hljs-dark-theme.css';
 
 /** How long the "Copied" state is shown on a copy button. */
 const copiedResetMs = 2000;

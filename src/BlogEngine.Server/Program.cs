@@ -104,6 +104,7 @@ try
     builder.Services.AddScoped<IToastService, ToastService>();
     builder.Services.AddScoped<ISettingsService, ServerSettingsService>();
     builder.Services.AddScoped<IPostAdminService, ServerPostAdminService>();
+    builder.Services.AddScoped<IPageAdminService, ServerPageAdminService>();
     builder.Services.AddScoped<IPreviewLinkService, ServerPreviewLinkService>();
     builder.Services.AddScoped<ITagService, ServerTagService>();
     builder.Services.AddSingleton<PostHtmlSanitizer>();
@@ -130,10 +131,14 @@ try
     builder.Services.AddScoped<ICommentModerationService, ServerCommentModerationService>();
     builder.Services.AddScoped<IDashboardService, ServerDashboardService>();
     builder.Services.AddCommentRateLimiting();
+    // Site search runs an uncached LIKE scan, so it is rate limited too (design 12.4, T4.9).
+    builder.Services.AddRateLimiter(options => options.AddPolicy<string, SearchRateLimiting>(SearchRateLimiting.PolicyName));
 
     // Public site (static SSR, design 5.1, 11): cached read queries, cache eviction on writes, redirects and feeds.
     builder.Services.AddSingleton<PublicPostQueries>();
     builder.Services.AddSingleton<PublicCommentQueries>();
+    builder.Services.AddSingleton<PublicSearchQueries>();
+    builder.Services.AddSingleton<PublicPageQueries>();
     builder.Services.AddSingleton<CacheInvalidator>();
     builder.Services.AddSingleton<RedirectLookup>();
     builder.Services.AddSingleton<PreviewPostQuery>();
@@ -199,7 +204,7 @@ try
     app.UseAuthentication();
     app.UseAuthorization();
     app.UseAntiforgery();
-    // After routing, so the comment policy on the post page's endpoint applies; only comment POSTs are limited.
+    // After routing, so the endpoint policies apply: comment POSTs on the post page, and site search.
     app.UseRateLimiter();
     app.UseOutputCache();
     app.MapStaticAssets();

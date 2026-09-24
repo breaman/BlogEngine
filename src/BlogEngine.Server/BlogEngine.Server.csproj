@@ -41,9 +41,9 @@
   </Target>
 
   <!--
-    Public-site JavaScript (design 10.3, T1.23): scripts/public.js (the tiny loader on every page) and
-    scripts/code-blocks.js (highlight.js and copy buttons, loaded only for posts with code) are built by
-    esbuild into wwwroot/js. The "admin" bundles are built by BlogEngine.Client. Incremental, and skipped in
+    Public-site JavaScript (design 10.3, T1.23, T4.14): scripts/public.js (the tiny loader on every page),
+    scripts/code-blocks.js (highlight.js and copy buttons, loaded only for posts with code) and scripts/theme.js
+    (the light/dark theme, applied from <head>) are built by esbuild into wwwroot/js. The "admin" bundles are built by BlogEngine.Client. Incremental, and skipped in
     Visual Studio design-time builds, which must not start external processes. The output is not committed.
   -->
   <ItemGroup>
@@ -54,7 +54,7 @@
           BeforeTargets="BeforeBuild"
           Condition="'$(DesignTimeBuild)' != 'true'"
           Inputs="@(PublicScriptSource)"
-          Outputs="wwwroot\js\public.js;wwwroot\js\code-blocks.js">
+          Outputs="wwwroot\js\public.js;wwwroot\js\code-blocks.js;wwwroot\js\theme.js">
     <Error Condition="!Exists('$(MSBuildProjectDirectory)\node_modules\esbuild')"
            Text="esbuild was not found. Run 'npm install' in $(MSBuildProjectDirectory)." />
     <Exec Command="node ./scripts/build-js.mjs public" WorkingDirectory="$(MSBuildProjectDirectory)" />
@@ -64,7 +64,7 @@
        for the static web assets pipeline to serve (and fingerprint) them. -->
   <Target Name="IncludePublicScripts" AfterTargets="BuildPublicScripts" Condition="'$(DesignTimeBuild)' != 'true'">
     <ItemGroup>
-      <_PublicScriptOutput Include="wwwroot\js\public.*;wwwroot\js\code-blocks.*" />
+      <_PublicScriptOutput Include="wwwroot\js\public.*;wwwroot\js\code-blocks.*;wwwroot\js\theme.*" />
       <Content Remove="@(_PublicScriptOutput)" />
       <Content Include="@(_PublicScriptOutput)" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
     </ItemGroup>

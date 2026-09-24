@@ -13,6 +13,8 @@ import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { syntaxHighlighting, defaultHighlightStyle, indentOnInput, bracketMatching } from '@codemirror/language';
 import hljs from './highlighter.js';
 import 'highlight.js/styles/github.css';
+// GitHub Dark under [data-bs-theme="dark"], so the preview follows the admin's theme (P14; see build-js.mjs).
+import 'virtual:hljs-dark-theme.css';
 
 /** Delay before a change is sent to .NET, so the preview re-renders once per pause in typing. */
 const changeDebounceMs = 200;
@@ -43,6 +45,33 @@ export function highlight(element) {
     for (const block of element.querySelectorAll('pre code:not([data-highlighted])')) {
         hljs.highlightElement(block);
     }
+
+    keepFragmentLinksInPreview(element);
+}
+
+const previewsWithFragmentLinks = new WeakSet();
+
+/**
+ * Heading anchors and footnote links in the preview are bare "#id" links, which the page's <base href="/"> would send
+ * to the site's home page (the public pages resolve them on the server). In the preview they scroll to their target
+ * instead. Blazor ignores clicks whose default was prevented, and admin.js's link guard ignores "#" links.
+ */
+function keepFragmentLinksInPreview(element) {
+    if (previewsWithFragmentLinks.has(element)) {
+        return;
+    }
+
+    previewsWithFragmentLinks.add(element);
+    element.addEventListener('click', event => {
+        const link = event.target instanceof Element ? event.target.closest('a[href^="#"]') : null;
+        if (!link || !element.contains(link)) {
+            return;
+        }
+
+        event.preventDefault();
+        const id = decodeURIComponent(link.getAttribute('href').slice(1));
+        element.querySelector(`[id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'start' });
+    });
 }
 
 class MarkdownEditorHandle {

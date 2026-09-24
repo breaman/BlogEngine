@@ -1,7 +1,7 @@
-// Enhancements for the public site (design 5.1, 10.3, T1.23, T3.3). Loaded on every page, so it stays tiny: it
-// looks for a post whose render flagged code blocks (data-code-blocks on .post-content) and then imports the
-// highlight.js bundle, so text-only pages never download highlighting code; and it adds "remember me" to the
-// comment form.
+// Enhancements for the public site (design 5.1, 10.3, T1.23, T3.3, T4.14). Loaded on every page, admin included, so it
+// stays tiny: it looks for a post whose render flagged code blocks (data-code-blocks on .post-content) and then imports
+// the highlight.js bundle, so text-only pages never download highlighting code; it adds "remember me" to the comment
+// form; and it runs the light/dark theme menu (theme.js, loaded in <head>, applies the theme itself).
 //
 // Copied (minified, not bundled) by scripts/build-js.mjs into BlogEngine.Server/wwwroot/js/public.js. It must
 // stay unbundled: esbuild would otherwise inline code-blocks.js and defeat the lazy load.
@@ -72,9 +72,46 @@ function rememberCommenter() {
     });
 }
 
+const themeIcons = { light: 'bi-sun-fill', dark: 'bi-moon-stars-fill', auto: 'bi-circle-half' };
+
+/**
+ * Shows the reader's theme choice in every theme menu on the page (ThemeToggle, in the public navbar or the admin
+ * layout): the button's icon and label, and which option is pressed.
+ */
+function syncThemeMenus() {
+    const choice = window.blogEngineTheme?.get();
+    if (!choice) {
+        return;
+    }
+
+    for (const menu of document.querySelectorAll('.theme-toggle')) {
+        const icon = menu.querySelector('[data-theme-icon]');
+        if (icon) {
+            icon.className = `bi ${themeIcons[choice]}`;
+        }
+
+        menu.querySelector('.dropdown-toggle')?.setAttribute('aria-label', `Color theme: ${choice}`);
+        for (const option of menu.querySelectorAll('[data-theme-value]')) {
+            const selected = option.dataset.themeValue === choice;
+            option.classList.toggle('active', selected);
+            option.setAttribute('aria-pressed', String(selected));
+        }
+    }
+}
+
+// One delegated listener, so menus re-rendered by enhanced navigation keep working without being wired up again.
+document.addEventListener('click', event => {
+    const option = event.target instanceof Element ? event.target.closest('[data-theme-value]') : null;
+    if (option) {
+        window.blogEngineTheme?.set(option.dataset.themeValue);
+    }
+});
+window.addEventListener('blogengine:themechange', syncThemeMenus);
+
 function enhancePage() {
     enhanceCodeBlocks();
     rememberCommenter();
+    syncThemeMenus();
 }
 
 enhancePage();

@@ -34,6 +34,7 @@ builder.Services.AddBlogValidators();
 
 // Admin services over /api/admin; the server registers database-backed implementations of the same interfaces.
 builder.Services.AddScoped<IPostAdminService, ClientPostAdminService>();
+builder.Services.AddScoped<IPageAdminService, ClientPageAdminService>();
 builder.Services.AddScoped<IPreviewLinkService, ClientPreviewLinkService>();
 builder.Services.AddScoped<ITagService, ClientTagService>();
 builder.Services.AddScoped<ISettingsService, ClientSettingsService>();

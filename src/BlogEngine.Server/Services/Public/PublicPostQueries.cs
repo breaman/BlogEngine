@@ -90,6 +90,13 @@ public sealed class PublicPostQueries(HybridCache cache, CacheInvalidator invali
         return PublicPostPage.Create([.. index.Posts.Where(p => period.Contains(p.PublishedDateLocal))], page, pageSize);
     }
 
+    /// <summary>Every year and month with visible posts and their counts, newest first (<c>/archive</c>, P11).</summary>
+    public async Task<IReadOnlyList<ArchiveYear>> GetArchiveOverviewAsync(CancellationToken cancellationToken = default)
+    {
+        var index = await GetIndexAsync(cancellationToken);
+        return ArchiveOverview.From(index.Posts);
+    }
+
     /// <summary>Tags with at least one visible post, with their counts, ordered by name.</summary>
     public async Task<IReadOnlyList<PublicTag>> GetTagsAsync(CancellationToken cancellationToken = default)
     {
@@ -138,6 +145,22 @@ public sealed class PublicPostQueries(HybridCache cache, CacheInvalidator invali
             EntryOptions, tags, cancellationToken);
 
         return feed.Posts;
+    }
+
+    /// <summary>
+    /// A media library image by id, for images chosen in the settings rather than on a post, such as the default social
+    /// image (design 13, P8); <see langword="null"/> if the item no longer exists.
+    /// </summary>
+    /// <remarks>
+    /// Cached with the post-derived entries, which a settings change also evicts. An edit to the image alone doesn't
+    /// evict it, so for up to the entry's expiration its <c>?v=</c> may be one version behind; the media endpoint still
+    /// serves the current file for an old version, just without the long cache lifetime.
+    /// </remarks>
+    public async Task<PublicImage?> GetMediaImageAsync(int mediaId, CancellationToken cancellationToken = default)
+    {
+        return await cache.GetOrCreateAsync(Key("image", mediaId), (Queries: this, MediaId: mediaId),
+            static (state, ct) => state.Queries.LoadMediaImageAsync(state.MediaId, ct),
+            EntryOptions, IndexTags, cancellationToken);
     }
 
     /// <summary>
@@ -203,7 +226,7 @@ public sealed class PublicPostQueries(HybridCache cache, CacheInvalidator invali
         return new PublicPostIndex(posts, tags);
     }
 
-    /// <summary>Loads a visible post's rendered content.</summary>
+    /// <summary>Loads a visible post's rendered content, with its table of contents (P13).</summary>
     private async ValueTask<PublicPostContent?> LoadContentAsync(int postId, CancellationToken cancellationToken)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
@@ -212,7 +235,24 @@ public sealed class PublicPostQueries(HybridCache cache, CacheInvalidator invali
         var posts = await LoadContentsAsync(
             dbContext.Posts.AsNoTracking().VisibleToPublic(timeProvider).Where(p => p.Id == postId), cancellationToken);
 
-        return posts.FirstOrDefault();
+        // Done once per cache entry, and only for the post page: feeds never show a table of contents, and the feed writer
+        // resolves fragment links against each post's absolute URL itself.
+        return posts.FirstOrDefault() is { } post
+            ? post with { Html = FragmentLinks.Resolve(post.Html, post.Post.Path), Outline = PostOutline.FromHtml(post.Html) }
+            : null;
+    }
+
+    /// <summary>Loads a media library item as a <see cref="PublicImage"/>.</summary>
+    private async ValueTask<PublicImage?> LoadMediaImageAsync(int mediaId, CancellationToken cancellationToken)
+    {
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+        return await dbContext.MediaItems
+            .AsNoTracking()
+            .Where(m => m.Id == mediaId)
+            .Select(m => new PublicImage(MediaPaths.Versioned(m.PublicId, m.FileName, m.Version), m.Width, m.Height, m.AltText))
+            .SingleOrDefaultAsync(cancellationToken);
     }
 
     /// <summary>Loads the newest visible posts with content, optionally only those with a tag.</summary>

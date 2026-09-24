@@ -35,4 +35,13 @@ public class PostPathsTests
     {
         await Assert.That(PostPaths.WithPage(PostPaths.Index, page)).IsEqualTo(expected);
     }
+
+    /// <summary>A path that already has a query string, such as a search, gets the page number with an ampersand.</summary>
+    [Test]
+    [Arguments(1, "/search?q=blazor")]
+    [Arguments(3, "/search?q=blazor&page=3")]
+    public async Task WithPage_AppendsToExistingQuery(int page, string expected)
+    {
+        await Assert.That(PostPaths.WithPage("/search?q=blazor", page)).IsEqualTo(expected);
+    }
 }

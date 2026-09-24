@@ -11,6 +11,9 @@ public static class PublicCacheTags
     /// <summary>Everything derived from the visible posts: lists, archives, tags, post pages, feeds, sitemap.</summary>
     public const string Posts = "posts";
 
+    /// <summary>Standalone pages (design 6.7, A17): the page snapshot behind the navigation, and each page's content.</summary>
+    public const string Pages = "pages";
+
     /// <summary>Output cache entries that depend only on the site settings, such as <c>robots.txt</c>.</summary>
     public const string Settings = "settings";
 

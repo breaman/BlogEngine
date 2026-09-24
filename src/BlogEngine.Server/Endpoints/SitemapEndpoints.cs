@@ -16,8 +16,9 @@ namespace BlogEngine.Server.Endpoints;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The sitemap lists the home page, <c>/posts</c>, every visible post (<c>lastmod</c> is the last update, or else
-/// the publish time) and every tag page with visible posts. Standalone pages join it with T4.10.
+/// The sitemap lists the home page, <c>/posts</c>, the archive overview, every visible post (<c>lastmod</c> is the last
+/// update, or else the publish time), every tag page with visible posts, and every published standalone page
+/// (<c>lastmod</c> is its last save).
 /// </para>
 /// <para>
 /// <c>robots.txt</c> keeps crawlers out of the admin, API, preview and account areas and points them at the
@@ -52,10 +53,11 @@ public static class SitemapEndpoints
 
     /// <summary>Writes the XML sitemap.</summary>
     private static async Task<FileContentHttpResult> WriteSitemapAsync(HttpRequest request, PublicPostQueries queries,
-        CancellationToken cancellationToken)
+        PublicPageQueries pageQueries, CancellationToken cancellationToken)
     {
         var index = await queries.GetIndexAsync(cancellationToken);
-        return TypedResults.File(BuildSitemap(index, PublicSiteUrl.Root(request)), SitemapContentType);
+        var pages = await pageQueries.GetIndexAsync(cancellationToken);
+        return TypedResults.File(BuildSitemap(index, pages, PublicSiteUrl.Root(request)), SitemapContentType);
     }
 
     /// <summary>Writes <c>robots.txt</c> for the current settings.</summary>
@@ -66,10 +68,14 @@ public static class SitemapEndpoints
         return TypedResults.Text(BuildRobots(settings, PublicSiteUrl.Root(request)), RobotsContentType);
     }
 
-    /// <summary>The sitemap XML for <paramref name="index"/>, with absolute URLs under <paramref name="siteUrl"/>.</summary>
-    public static byte[] BuildSitemap(PublicPostIndex index, Uri siteUrl)
+    /// <summary>
+    /// The sitemap XML for the posts and tags in <paramref name="index"/> and the standalone <paramref name="pages"/>,
+    /// with absolute URLs under <paramref name="siteUrl"/>.
+    /// </summary>
+    public static byte[] BuildSitemap(PublicPostIndex index, PublicPageIndex pages, Uri siteUrl)
     {
         ArgumentNullException.ThrowIfNull(index);
+        ArgumentNullException.ThrowIfNull(pages);
         ArgumentNullException.ThrowIfNull(siteUrl);
 
         using var stream = new MemoryStream();
@@ -81,6 +87,7 @@ public static class SitemapEndpoints
             DateTimeOffset? newest = index.Posts.Count > 0 ? index.Posts.Max(p => p.LastModified) : null;
             WriteUrl(writer, new Uri(siteUrl, SitePaths.Home), newest);
             WriteUrl(writer, new Uri(siteUrl, PostPaths.Index), newest);
+            WriteUrl(writer, new Uri(siteUrl, SitePaths.Archive), newest);
 
             foreach (var post in index.Posts)
             {
@@ -90,6 +97,11 @@ public static class SitemapEndpoints
             foreach (var tag in index.Tags)
             {
                 WriteUrl(writer, new Uri(siteUrl, tag.Path), lastModified: null);
+            }
+
+            foreach (var page in pages.Pages)
+            {
+                WriteUrl(writer, new Uri(siteUrl, page.Path), page.ModifiedOn);
             }
 
             writer.WriteEndElement();

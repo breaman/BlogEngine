@@ -58,7 +58,7 @@ public partial class PostPreviewRenderingTests
     {
         var html = BlogMarkdownPipeline.Default.RenderPostPreview("# Title\n\nFirst\n\n\nSecond").Html;
 
-        await Assert.That(html).Contains("<h1 id=\"title\" data-line=\"0\">Title</h1>");
+        await Assert.That(html).Contains("<h1 id=\"title\" data-line=\"0\"><a href=\"#title\" class=\"heading-anchor\">Title</a></h1>");
         await Assert.That(html).Contains("<p data-line=\"2\">First</p>");
         await Assert.That(html).Contains("<p data-line=\"5\">Second</p>");
     }

@@ -1,25 +1,26 @@
-@* « Newer / Page X of Y / Older » (design 14.1). Plain links, so paging works without JavaScript. *@
+@* « Newer / Page X of Y / Older » (design 14.1), or « Previous / Next » for lists not ordered by date. Plain links,
+   so paging works without JavaScript. *@
 @if (TotalPages > 1)
 {
     <nav class="pager d-flex justify-content-between align-items-center gap-2 my-4" aria-label="Pages">
         @if (Page > 1)
         {
-            <a class="btn btn-outline-secondary btn-sm" rel="prev" href="@PageHref(Page - 1)">&laquo; Newer</a>
+            <a class="btn btn-outline-secondary btn-sm" rel="prev" href="@PageHref(Page - 1)">&laquo; @PreviousText</a>
         }
         else
         {
-            <span class="btn btn-outline-secondary btn-sm invisible" aria-hidden="true">&laquo; Newer</span>
+            <span class="btn btn-outline-secondary btn-sm invisible" aria-hidden="true">&laquo; @PreviousText</span>
         }
 
         <span class="text-body-secondary small">Page @Page of @TotalPages</span>
 
         @if (Page < TotalPages)
         {
-            <a class="btn btn-outline-secondary btn-sm" rel="next" href="@PageHref(Page + 1)">Older &raquo;</a>
+            <a class="btn btn-outline-secondary btn-sm" rel="next" href="@PageHref(Page + 1)">@NextText &raquo;</a>
         }
         else
         {
-            <span class="btn btn-outline-secondary btn-sm invisible" aria-hidden="true">Older &raquo;</span>
+            <span class="btn btn-outline-secondary btn-sm invisible" aria-hidden="true">@NextText &raquo;</span>
         }
     </nav>
 }

@@ -5,12 +5,12 @@
     var post = _post.Post;
 
     <SeoHead Title="@(_post.MetaTitle ?? post.Title)" Description="@(_post.MetaDescription ?? post.Summary)" CanonicalPath="@post.Path"
-             Image="_post.SocialImage" />
+             Image="_post.SocialImage" Article="SeoArticle.From(post)" />
 
     <article class="post mx-auto">
         <header class="mb-4">
             <h1 class="post-title mb-2">@post.Title</h1>
-            <PostMeta Post="post" DateFormat="@_dateFormat" LinkDate="true" />
+            <PostMeta Post="post" DateFormat="@_dateFormat" LinkDate="true" UpdatedDate="_updatedDate" />
         </header>
 
         @if (_post.Cover is { } cover)
@@ -21,6 +21,8 @@
                      class="img-fluid rounded" fetchpriority="high" decoding="async" />
             </figure>
         }
+
+        <TableOfContents Entries="_post.TableOfContents" PagePath="@post.Path" />
 
         @* data-code-blocks tells js/public.js to load highlighting and copy buttons (design 10.3). *@
         <div class="post-content" data-code-blocks="@(_post.HasCodeBlocks ? "true" : null)">
@@ -50,6 +52,8 @@
                 }
             </p>
         </footer>
+
+        <PostNavigation Neighbors="_neighbors" Related="_related" DateFormat="@_dateFormat" />
     </article>
 
     @if (_comments.Count > 0 || _commentsOpen || _commentsClosed)

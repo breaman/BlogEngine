@@ -1,0 +1,194 @@
+@page "/admin/pages/new"
+@page "/admin/pages/{Id:int}"
+@layout AdminLayout
+@attribute [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
+@rendermode InteractiveWebAssembly
+
+<PageTitle>@(Page is { Title.Length: > 0 } ? $"{Page.Title} · " : null)@PageHeading · BlogEngine Admin</PageTitle>
+
+<nav aria-label="breadcrumb" class="mb-2">
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="admin/pages">Pages</a></li>
+        <li class="breadcrumb-item active" aria-current="page">@PageHeading</li>
+    </ol>
+</nav>
+
+@if (_loadError is not null)
+{
+    <div class="alert alert-danger" role="alert">@_loadError</div>
+}
+else if (PageMissing)
+{
+    <div class="alert alert-warning" role="alert">
+        This page doesn't exist. <a href="admin/pages" class="alert-link">Back to pages</a>
+    </div>
+}
+else if (Page is null || _editContext is null)
+{
+    <p class="text-body-secondary"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Loading page…</p>
+}
+else
+{
+    <NavigationLock ConfirmExternalNavigation="HasUnsavedChanges" OnBeforeInternalNavigation="OnBeforeInternalNavigationAsync" />
+
+    @if (_formError is not null)
+    {
+        <div class="alert alert-danger" role="alert">@_formError</div>
+    }
+
+    <EditForm EditContext="_editContext">
+        <FluentValidator />
+
+        <div class="row g-4">
+            <div class="col-12 col-xl-9">
+                <div class="form-floating mb-3">
+                    <input id="page-title" type="text" class="form-control form-control-lg @_editContext.FieldCssClass(() => Page.Title)"
+                           placeholder="Title" maxlength="@FieldLengths.PostTitle" autocomplete="off"
+                           @bind="Page.Title" @bind:event="oninput" @bind:after="OnTitleEdited" />
+                    <label for="page-title">Title</label>
+                    <ValidationMessage For="() => Page.Title" class="text-danger" />
+                </div>
+
+                <MarkdownEditor @ref="_markdownEditor"
+                                @bind-Value="Page.ContentMarkdown" @bind-Value:after="OnEdited"
+                                Placeholder="Write the page in Markdown…"
+                                OnSave="SaveShortcutAsync" OnInsertImage="InsertImageAsync" AllowImageUpload="true" />
+            </div>
+
+            <aside class="col-12 col-xl-3" aria-label="Page settings">
+                @* Publishing. Pages have no scheduling or staged changes: saving a published page updates it at once. *@
+                <section class="card mb-3" aria-labelledby="page-publish-heading">
+                    <div class="card-header d-flex align-items-center">
+                        <h2 class="h6 mb-0" id="page-publish-heading">Publish</h2>
+                        <PostStatusBadge Status="Page.Status" Class="ms-auto" />
+                    </div>
+                    <div class="card-body">
+                        @{ var status = StatusLine; }
+                        <p class="small mb-3 @status.CssClass" role="status" aria-live="polite">
+                            <span class="bi @status.Icon me-1" aria-hidden="true"></span>@status.Text
+                        </p>
+
+                        <div class="d-grid gap-2">
+                            @if (IsPublished)
+                            {
+                                <button type="button" class="btn btn-primary" disabled="@(!CanAct)" @onclick="UpdateAsync">
+                                    <span class="bi bi-cloud-upload me-1" aria-hidden="true"></span> Update
+                                </button>
+                                <div class="d-flex gap-2">
+                                    @if (Page.PublicPath is { } path)
+                                    {
+                                        <a class="btn btn-outline-secondary flex-fill" href="@path" target="_blank" rel="noopener">
+                                            <span class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></span> View
+                                        </a>
+                                    }
+                                    <button type="button" class="btn btn-outline-warning flex-fill" disabled="@(!CanAct)" @onclick="UnpublishAsync">
+                                        <span class="bi bi-eye-slash me-1" aria-hidden="true"></span> Unpublish
+                                    </button>
+                                </div>
+                            }
+                            else
+                            {
+                                <button type="button" class="btn btn-primary" disabled="@(!CanAct)" @onclick="PublishAsync">
+                                    <span class="bi bi-send me-1" aria-hidden="true"></span> Publish
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary" disabled="@(!CanAct)" @onclick="SaveDraftAsync">
+                                    <span class="bi bi-floppy me-1" aria-hidden="true"></span> Save draft
+                                </button>
+                            }
+                        </div>
+                    </div>
+                </section>
+
+                @* URL *@
+                <section class="card mb-3" aria-labelledby="page-url-heading">
+                    <div class="card-header"><h2 class="h6 mb-0" id="page-url-heading">URL</h2></div>
+                    <div class="card-body">
+                        <div class="form-floating">
+                            <InputText id="page-slug" class="form-control font-monospace" placeholder="slug" maxlength="@FieldLengths.Slug"
+                                       autocomplete="off" spellcheck="false"
+                                       @bind-Value="Page.Slug" @bind-Value:after="OnEdited" />
+                            <label for="page-slug">Slug</label>
+                        </div>
+                        <ValidationMessage For="() => Page.Slug" class="text-danger small" />
+                        @if (SlugWillRedirect)
+                        {
+                            <div class="alert alert-warning small py-2 mt-2 mb-0" role="status">
+                                <span class="bi bi-signpost-split me-1" aria-hidden="true"></span>
+                                Changing the slug creates a redirect from <code>@_stored?.PublicPath</code> when you click Update.
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="form-text">
+                                The page's address, <code>/@(string.IsNullOrWhiteSpace(Page.Slug) ? "…" : Page.Slug)</code>. Leave blank
+                                to generate it from the title. Words the site uses, such as <code>posts</code> or <code>admin</code>,
+                                aren't allowed.
+                            </div>
+                        }
+                    </div>
+                </section>
+
+                @* Navigation (design 6.7): whether the page is linked from the site's menu, and where. *@
+                <section class="card mb-3" aria-labelledby="page-nav-heading">
+                    <div class="card-header"><h2 class="h6 mb-0" id="page-nav-heading">Navigation</h2></div>
+                    <div class="card-body">
+                        <div class="form-check form-switch mb-2">
+                            <InputCheckbox id="page-show-in-nav" class="form-check-input" role="switch"
+                                           @bind-Value="Page.ShowInNav" @bind-Value:after="OnEdited" />
+                            <label class="form-check-label" for="page-show-in-nav">Show in the site navigation</label>
+                        </div>
+                        <div class="form-floating">
+                            <InputNumber id="page-nav-order" class="form-control" placeholder="Order" min="0" max="@MaxNavOrder"
+                                         disabled="@(!Page.ShowInNav)" @bind-Value="Page.NavOrder" @bind-Value:after="OnEdited" />
+                            <label for="page-nav-order">Order</label>
+                        </div>
+                        <ValidationMessage For="() => Page.NavOrder" class="text-danger small" />
+                        <div class="form-text">Lower numbers come first, after Home, Posts, Tags and Archive.</div>
+                    </div>
+                </section>
+
+                @* Summary *@
+                <section class="card mb-3" aria-labelledby="page-summary-heading">
+                    <div class="card-header"><h2 class="h6 mb-0" id="page-summary-heading">Summary</h2></div>
+                    <div class="card-body">
+                        <div class="form-floating">
+                            <InputTextArea id="page-summary" class="form-control" placeholder="Summary" rows="3" maxlength="@FieldLengths.PostSummary"
+                                           @bind-Value="Page.Summary" @bind-Value:after="OnEdited" />
+                            <label for="page-summary">Summary</label>
+                        </div>
+                        <ValidationMessage For="() => Page.Summary" class="text-danger small" />
+                        <div class="form-text">Used as the description in search results. Leave blank to use the start of the page.</div>
+                    </div>
+                </section>
+
+                @* SEO overrides *@
+                <section class="card mb-3" aria-labelledby="page-seo-heading">
+                    <div class="card-header"><h2 class="h6 mb-0" id="page-seo-heading">SEO</h2></div>
+                    <div class="card-body">
+                        <div class="form-floating">
+                            <input id="page-meta-title" type="text" class="form-control @_editContext.FieldCssClass(() => Page.MetaTitle)"
+                                   placeholder="Meta title" maxlength="@FieldLengths.MetaTitle" autocomplete="off"
+                                   @bind="Page.MetaTitle" @bind:event="oninput" @bind:after="OnMetaTitleEdited" />
+                            <label for="page-meta-title">Meta title</label>
+                        </div>
+                        <CharacterCounter Length="@(Page.MetaTitle?.Length ?? 0)" Max="FieldLengths.MetaTitle" />
+                        <ValidationMessage For="() => Page.MetaTitle" class="text-danger small" />
+
+                        <div class="form-floating mt-2">
+                            <textarea id="page-meta-description" class="form-control @_editContext.FieldCssClass(() => Page.MetaDescription)"
+                                      placeholder="Meta description" rows="3" maxlength="@FieldLengths.MetaDescription"
+                                      @bind="Page.MetaDescription" @bind:event="oninput" @bind:after="OnMetaDescriptionEdited"></textarea>
+                            <label for="page-meta-description">Meta description</label>
+                        </div>
+                        <CharacterCounter Length="@(Page.MetaDescription?.Length ?? 0)" Max="FieldLengths.MetaDescription" />
+                        <ValidationMessage For="() => Page.MetaDescription" class="text-danger small" />
+                        <div class="form-text">Leave blank to use the title and summary.</div>
+                    </div>
+                </section>
+            </aside>
+        </div>
+    </EditForm>
+}
+
+<ConfirmDialog @ref="_confirm" />
+<MediaPicker @ref="_mediaPicker" />

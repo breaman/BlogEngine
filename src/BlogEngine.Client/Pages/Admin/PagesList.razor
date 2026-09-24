@@ -1,0 +1,104 @@
+@page "/admin/pages"
+@layout AdminLayout
+@attribute [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
+@rendermode InteractiveWebAssembly
+
+<PageTitle>Pages · BlogEngine Admin</PageTitle>
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+    <h1 class="h3 mb-0">Pages</h1>
+    <div class="d-flex flex-wrap gap-2">
+        @foreach (var template in PageTemplates.All)
+        {
+            <a class="btn btn-outline-secondary" href="@($"admin/pages/new?template={template.Key}")">
+                <span class="bi bi-file-earmark-text" aria-hidden="true"></span> New @template.Title.ToLowerInvariant() page
+            </a>
+        }
+        <a class="btn btn-primary" href="admin/pages/new">
+            <span class="bi bi-plus-lg" aria-hidden="true"></span> New page
+        </a>
+    </div>
+</div>
+
+<p class="text-body-secondary">
+    Standalone pages such as About or Privacy live at <code>/{slug}</code> and can appear in the site's navigation.
+</p>
+
+@if (_loadError is not null)
+{
+    <div class="alert alert-danger d-flex align-items-center gap-2" role="alert">
+        <span>@_loadError</span>
+        <button type="button" class="btn btn-sm btn-outline-danger ms-auto" @onclick="LoadAsync">Retry</button>
+    </div>
+}
+else if (Pages is null)
+{
+    <p class="text-body-secondary"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Loading pages…</p>
+}
+else if (Pages.Count == 0)
+{
+    <div class="card">
+        <div class="card-body text-center text-body-secondary py-5">
+            <p>No pages yet.</p>
+            <a class="btn btn-primary" href="admin/pages/new">Write your first page</a>
+        </div>
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th scope="col">Title</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Navigation</th>
+                    <th scope="col">Last saved</th>
+                    <th scope="col" class="text-end"><span class="visually-hidden">Actions</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Pages)
+                {
+                    var busy = _busyPageId == item.Id;
+                    <tr @key="item.Id">
+                        <td>
+                            <a class="fw-semibold text-decoration-none" href="@($"admin/pages/{item.Id}")">@item.Title</a>
+                            <div class="small text-body-secondary font-monospace">/@item.Slug</div>
+                        </td>
+                        <td><PostStatusBadge Status="item.Status" /></td>
+                        <td>
+                            @if (item.ShowInNav)
+                            {
+                                <span class="bi bi-check-lg text-success" aria-hidden="true"></span>
+                                <span>Position @item.NavOrder</span>
+                            }
+                            else
+                            {
+                                <span class="text-body-secondary">Hidden</span>
+                            }
+                        </td>
+                        <td class="text-nowrap">@DateText(item.ModifiedOn)</td>
+                        <td class="text-end text-nowrap">
+                            <a class="btn btn-sm btn-outline-primary" href="@($"admin/pages/{item.Id}")" title="Edit" aria-label="Edit @item.Title">
+                                <span class="bi bi-pencil" aria-hidden="true"></span>
+                            </a>
+                            @if (item.PublicPath is { } path)
+                            {
+                                <a class="btn btn-sm btn-outline-secondary" href="@path" target="_blank" rel="noopener" title="View" aria-label="View @item.Title">
+                                    <span class="bi bi-box-arrow-up-right" aria-hidden="true"></span>
+                                </a>
+                            }
+                            <button type="button" class="btn btn-sm btn-outline-danger" title="Delete" aria-label="Delete @item.Title"
+                                    disabled="@busy" @onclick="() => DeleteAsync(item)">
+                                <span class="bi bi-trash" aria-hidden="true"></span>
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<ConfirmDialog @ref="_confirm" />

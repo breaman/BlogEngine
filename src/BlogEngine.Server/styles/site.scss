@@ -69,6 +69,8 @@ $bootstrap-icons-font-dir: "../fonts";
 #blazor-error-ui {
   color-scheme: light dark;
   background: lightyellow;
+  // The background stays light in the dark theme, so the text can't inherit the dark theme's light body color.
+  color: #212529;
   bottom: 0;
   box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
   box-sizing: border-box;
@@ -207,6 +209,65 @@ $bootstrap-icons-font-dir: "../fonts";
     padding-left: 1.25rem;
     list-style: none;
   }
+
+  // Headings link to themselves (HeadingAnchorExtension, P13). They keep looking like headings; a "#" appears on hover
+  // and keyboard focus. The "/ ''" alternative text keeps screen readers from announcing it.
+  :is(h1, h2, h3, h4, h5, h6) > a.heading-anchor {
+    color: inherit;
+    text-decoration: none;
+
+    &::after {
+      content: "#" / "";
+      margin-left: 0.35em;
+      color: var(--bs-secondary-color);
+      opacity: 0;
+      transition: opacity 0.15s ease-in-out;
+    }
+
+    &:hover::after,
+    &:focus-visible::after {
+      opacity: 1;
+    }
+  }
+
+  // Leave a little room above a heading reached through its anchor or the table of contents.
+  :is(h1, h2, h3, h4, h5, h6)[id] {
+    scroll-margin-top: 1rem;
+  }
+}
+
+// Table of contents above long posts (P13).
+.post-toc {
+  ol {
+    margin-bottom: 0;
+    padding-left: 1.25rem;
+  }
+
+  ol ol {
+    margin-top: 0.25rem;
+    list-style-type: lower-alpha;
+  }
+
+  li + li {
+    margin-top: 0.25rem;
+  }
+}
+
+// Older/newer post links under a post (P10).
+.post-navigation a {
+  color: var(--bs-body-color);
+  transition: border-color 0.15s ease-in-out, background-color 0.15s ease-in-out;
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--bs-primary-border-subtle) !important;
+    background-color: var(--bs-tertiary-bg);
+  }
+}
+
+// The theme menu (ThemeToggle, P14) only works with JavaScript, so it stays hidden until theme.js has set the theme.
+html:not([data-bs-theme]) .theme-toggle {
+  display: none !important;
 }
 
 // Public site (design 14). Readable line length for a post, and a little breathing room in lists.

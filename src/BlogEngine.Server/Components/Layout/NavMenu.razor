@@ -28,9 +28,21 @@
                             <span class="bi bi-tags" aria-hidden="true"></span> Tags
                         </NavLink>
                     </li>
+                    <li class="nav-item">
+                        <NavLink class="nav-link" href="@SitePaths.Archive" Match="NavLinkMatch.All">
+                            <span class="bi bi-archive" aria-hidden="true"></span> Archive
+                        </NavLink>
+                    </li>
+                    @* Standalone pages marked "show in navigation" (design 6.7, A17), in their chosen order. *@
+                    @foreach (var navPage in _navPages)
+                    {
+                        <li class="nav-item" @key="navPage.Id">
+                            <NavLink class="nav-link" href="@navPage.Path" Match="NavLinkMatch.All">@navPage.Title</NavLink>
+                        </li>
+                    }
                 </ul>
 
-                @* A plain GET form, so search works without JavaScript; the /search page arrives with T4.9. *@
+                @* A plain GET form, so search works without JavaScript (design 15). *@
                 <form class="site-search my-2 my-lg-0 me-lg-3" role="search" action="@SitePaths.Search" method="get">
                     <div class="form-floating">
                         <input type="search" class="form-control" id="site-search" name="q" placeholder="Search posts" autocomplete="off" />
@@ -39,6 +51,7 @@
                 </form>
 
                 <ul class="navbar-nav">
+                    <BlogEngine.Client.Components.ThemeToggle />
                     <AuthorizeView>
                         <Authorized>
                             <li class="nav-item dropdown">

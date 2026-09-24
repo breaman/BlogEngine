@@ -1,0 +1,28 @@
+@* Light / dark / auto theme menu (P14) for the public navbar and AdminLayout. Plain static markup: js/theme.js applies
+   the theme before the page paints, and js/public.js handles the menu with delegated clicks, so it also works in the
+   static admin layout and after enhanced navigation. site.scss hides it until theme.js has run (html[data-bs-theme]),
+   so readers without JavaScript never see a menu that can't work. *@
+<li class="nav-item dropdown theme-toggle">
+    <button class="btn btn-link nav-link dropdown-toggle d-flex align-items-center gap-2" type="button" id="theme-toggle"
+            data-bs-toggle="dropdown" aria-expanded="false" aria-label="Color theme">
+        <span class="bi bi-circle-half" data-theme-icon aria-hidden="true"></span>
+        <span class="d-lg-none">Theme</span>
+    </button>
+    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="theme-toggle">
+        <li>
+            <button type="button" class="dropdown-item d-flex align-items-center gap-2" data-theme-value="light" aria-pressed="false">
+                <span class="bi bi-sun-fill" aria-hidden="true"></span> Light
+            </button>
+        </li>
+        <li>
+            <button type="button" class="dropdown-item d-flex align-items-center gap-2" data-theme-value="dark" aria-pressed="false">
+                <span class="bi bi-moon-stars-fill" aria-hidden="true"></span> Dark
+            </button>
+        </li>
+        <li>
+            <button type="button" class="dropdown-item d-flex align-items-center gap-2" data-theme-value="auto" aria-pressed="true">
+                <span class="bi bi-circle-half" aria-hidden="true"></span> Auto
+            </button>
+        </li>
+    </ul>
+</li>

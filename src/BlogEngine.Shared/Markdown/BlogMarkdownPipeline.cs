@@ -176,6 +176,8 @@ public sealed class BlogMarkdownPipeline
             // Exact source spans on every node, for scroll sync between the editor and preview.
             .UsePreciseSourceLocation()
             .Use(new ExternalLinkRewriter(options.InternalHosts))
+            // Headings link to themselves (P13); the table of contents on the post page links to the same ids.
+            .Use<HeadingAnchorExtension>()
             // Must be registered last so the {.class} syntax applies to everything parsed above.
             .UseGenericAttributes()
             .Build();

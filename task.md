@@ -16,7 +16,7 @@
 | [1: Posts MVP](#phase-1--posts-mvp) | Can write and publish posts end to end | 25 | 25 |
 | [2: Media MVP](#phase-2--media-mvp) | Can add, edit and insert photos | 13 | 13 |
 | [3: Comments MVP](#phase-3--comments-mvp) | Readers can comment; the author moderates | 11 | 11 |
-| [4: V1 Polish](#phase-4--v1-polish) | Ready for public launch | 35 | 6 |
+| [4: V1 Polish](#phase-4--v1-polish) | Ready for public launch | 35 | 12 |
 | [5: Later](#phase-5--later) | As desired | 10 | 0 |
 
 Update the **Done** column as tasks are completed.
@@ -477,35 +477,43 @@ These apply to all tasks and are not repeated below:
 - [ ] **T4.7 — Full `SeoHead`** (§14.2, P8)
   - Open Graph, Twitter card, JSON-LD `BlogPosting`, canonical rules (§16: lowercase, zero-padded, no trailing slash, no `?page=1`).
   - **Done when:** a post passes a rich-results / OG validator check.
+  - *Status:* every public page gets `og:site_name/type/title/description/url`, Twitter card tags (`summary_large_image` with an image, else `summary`) and the social image, which falls back to the settings' default social image. Posts add `article:published_time/modified_time/tag` and a JSON-LD `BlogPosting` (`BlogPostingSchema`: headline ≤ 110 chars, UTC dates, Person author or the blog as Organization, keywords), serialized with HTML-sensitive characters escaped. Search results get `noindex, follow`. `SeoHeadTests` and `BlogPostingSchemaTests` check the markup and that the JSON-LD parses; **Left:** the external validators need a public URL, so run them once the site is deployed, then check this off.
 
-- [ ] **T4.8 — "Last updated" date** (P15)
+- [x] **T4.8 — "Last updated" date** (P15)
   - Set `LastUpdatedOn` when content changes after publish; show "Updated …" on the post page; use in sitemap `lastmod`.
   - **Done when:** editing a published post shows the updated date.
+  - *Status:* `LastUpdatedOn` is stamped when Update changes the title or content of a post that was live, and when a post that was live is republished under its original date with content edited while it was a draft. Drafts, scheduled posts and tag/summary-only changes aren't updates. The post page shows "Updated …" only when the update falls on a later local day than the publish date. `LastModified` (sitemap, feeds, JSON-LD) never precedes the publish time.
 
-- [ ] **T4.9 — Site search** (`/search?q=`; §15, P9)
+- [x] **T4.9 — Site search** (`/search?q=`; §15, P9)
   - `LIKE` over `Title`, `Summary`, `ContentMarkdown` for visible posts, title matches ranked first, paginated; navbar GET form. Rate limited (§12.4).
   - **Done when:** search returns visible posts only and works without JavaScript.
+  - *Status:* `PublicSearchQueries`: every word (up to 8, 100 chars) must appear in the title, summary or Markdown (EF `Contains` → escaped `LIKE`); matching ids come from the database and the results from the cached post snapshot, all-words-in-title first, then newest. Results aren't cached. `SearchRateLimiting` allows 30 searches a minute per IP hash with its own 429 page (a policy's `OnRejected` overrides the comment limiter's global one). `PostPaths.WithPage` now appends `&page=` to a path with a query, and the pager says Previous/Next for search.
 
-- [ ] **T4.10 — Standalone pages** (`/{pageSlug}`, `/admin/pages`; §6.7, A17, Q11)
+- [x] **T4.10 — Standalone pages** (`/{pageSlug}`, `/admin/pages`; §6.7, A17, Q11)
   - Admin list + editor reusing `MarkdownEditor`; nav visibility and order; reserved words rejected as slugs (`posts`, `tags`, `admin`, `api`, `media`, `preview`, `search`, `archive`, `setup`, `account`, `feed.xml`, …).
   - Lowest-priority public route; include pages in the sitemap. Provide a privacy page template (§12.3).
   - **Done when:** an About page is reachable at `/about` and appears in the nav.
+  - *Status:* `IPageAdminService` (server/client), `/api/admin/pages` (list, get, create, update, publish, unpublish, delete), `/admin/pages` list and editor (same Markdown editor and media picker as posts; no autosave, staging or revisions; saving a published page updates it at once). Blank slugs are generated and skip taken and `ReservedSlugs`; a typed reserved or taken slug is a 400. Renaming a published page records a redirect. Deleting is permanent (pages have no trash UI, and a soft-deleted row would keep its slug). `/{pageSlug}` redirects other spellings to the canonical path and checks the redirect table before 404. Pages are cached in `PublicPageQueries` (tag `pages`, evicted by `CacheInvalidator.PagesChangedAsync`, which also evicts the sitemap). Migration `AddPageHasCodeBlocks`. The privacy template is `PageTemplates.Privacy` ("New privacy page"). **Gap:** library images in a page render correctly but aren't counted as media usage (there is no `PageMedia` table), so the library can call them unused and deleting one breaks the page. Verified in a browser.
 
-- [ ] **T4.11 — Previous/next and related posts** (§14.2, P10)
+- [x] **T4.11 — Previous/next and related posts** (§14.2, P10)
   - Prev/next by publish date; up to 3 related posts by shared tags.
   - **Done when:** links are correct at the first/last post boundaries.
+  - *Status:* computed from the cached post snapshot (`PublicPostIndex.GetNeighbors/GetRelated`); related posts rank by shared tags, then recency. Boundaries are unit-tested; `PostNavigationTests` covers the middle post and related ordering.
 
-- [ ] **T4.12 — Archive overview** (`/archive`; P11)
+- [x] **T4.12 — Archive overview** (`/archive`; P11)
   - Years → months with post counts, linking to archives.
   - **Done when:** counts match the archive pages.
+  - *Status:* `ArchiveOverview` groups the same snapshot and local dates the archive pages filter on. `/archive` is in the navigation and the sitemap; an empty blog gets "No posts yet." rather than a 404.
 
-- [ ] **T4.13 — Heading anchors and table of contents** (P13)
+- [x] **T4.13 — Heading anchors and table of contents** (P13)
   - Anchor links on headings; TOC for posts with ≥ 4 H2 headings.
   - **Done when:** TOC links jump to the right headings.
+  - *Status:* `HeadingAnchorExtension` (shared pipeline, so the preview matches) makes each heading's text a link to its id, skipping headings that contain a link. `PostOutline` builds the TOC (h2 with nested h3, 4+ h2) from the stored HTML. Because every page has `<base href="/">`, bare `#id` links went to the home page (this also broke Markdig footnotes); `FragmentLinks` now prefixes them with the page path when post, page and preview HTML is loaded, and the editor preview scrolls in place. Existing posts get heading anchors the next time they are saved (the TOC and footnote fix apply at once). Verified in a browser.
 
 - [ ] **T4.14 — Light/dark theme** (P14)
   - Bootstrap 5.3 color modes; follow OS by default with a toggle persisted in `localStorage`; no flash of wrong theme; highlight.js theme follows.
   - **Done when:** both themes pass contrast checks.
+  - *Status:* `scripts/theme.js` (blocking, in `<head>`) sets `data-bs-theme` from `localStorage` or the OS before first paint, and a `MutationObserver` puts it back when enhanced navigation syncs the server's `<html>` attributes. `ThemeToggle` (Light/Dark/Auto) is in the public navbar and the admin layout, run by `public.js`, and hidden until the script has run. highlight.js GitHub Dark is scoped to `[data-bs-theme="dark"]` at build time (esbuild plugin in `build-js.mjs`) for the post pages and the editor preview. Tag badges use theme-aware colors. Checked in a browser that dark survives enhanced navigation; **Left:** a contrast check of both themes (for example with axe in T4.33), then check this off.
 
 ### Comments
 

@@ -1,0 +1,41 @@
+@page "/search"
+
+<SeoHead Title="@_title" CanonicalPath="@_canonicalPath" NoIndex="true" />
+
+<Breadcrumbs Items="@([new("Home", SitePaths.Home), new("Search")])" />
+<h1 class="mb-3">@(_query is null ? "Search" : $"Results for “{_query.Text}”")</h1>
+
+@* A plain GET form, like the one in the navbar, so search works without JavaScript (design 15). *@
+<form class="search-form row g-2 align-items-stretch mb-4" role="search" action="@SitePaths.Search" method="get">
+    <div class="col">
+        <div class="form-floating">
+            <input type="search" class="form-control" id="search-page-q" name="q" placeholder="Search posts"
+                   value="@_query?.Text" maxlength="@SearchQuery.MaxLength" autocomplete="off" />
+            <label for="search-page-q">Search posts</label>
+        </div>
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-primary h-100 px-4">
+            <span class="bi bi-search" aria-hidden="true"></span> Search
+        </button>
+    </div>
+</form>
+
+@if (_query is null)
+{
+    <p class="text-body-secondary">Type a few words to find posts by their title, summary or content.</p>
+}
+else if (_page is not null)
+{
+    <p class="text-body-secondary" role="status">
+        @(_page.TotalCount switch { 0 => "No posts matched.", 1 => "1 post matched.", var n => $"{n} posts matched." })
+    </p>
+    @if (_page.TotalCount > 0)
+    {
+        <PostList Page="_page" BasePath="@_basePath" DateFormat="@_dateFormat" PreviousText="Previous" NextText="Next" />
+    }
+    else
+    {
+        <p>Try fewer or different words, or browse the <a href="@TagPaths.Index">tags</a> and the <a href="@SitePaths.Archive">archive</a>.</p>
+    }
+}

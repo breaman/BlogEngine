@@ -25,9 +25,9 @@ namespace BlogEngine.Server.Components.Pages.Public;
 /// The redirect table is checked here rather than left to <see cref="RedirectFallbackMiddleware"/>, because
 /// <c>NavigationManager.NotFound()</c> renders the not-found page straight away in static SSR.
 /// <para>
-/// Below the post come its approved comments and the comment form (design 14.2, T3.3, T3.6). The page's only POST is
-/// that form, so the comment rate limit applies to this endpoint (<see cref="CommentRateLimiting"/>; GETs are never
-/// limited). The page is never output-cached, because the form carries a per-visitor antiforgery token (design 11).
+/// Under the post come the older and newer posts and related posts (P10), then its approved comments and the comment
+/// form (design 14.2, T3.3, T3.6). The page's only POST is that form, so the comment rate limit applies to this endpoint
+/// (<see cref="CommentRateLimiting"/>; GETs are never limited). The page is never output-cached, because the form carries a per-visitor antiforgery token (design 11).
 /// </para>
 /// </remarks>
 [EnableRateLimiting(CommentRateLimiting.PolicyName)]
@@ -60,7 +60,13 @@ public partial class PostDetail : ComponentBase
     [Parameter]
     public string Slug { get; set; } = string.Empty;
 
+    /// <summary>Related posts shown under a post (design 14.2, P10).</summary>
+    private const int RelatedPostCount = 3;
+
     private PublicPostContent? _post;
+    private DateOnly? _updatedDate;
+    private PublicPostNeighbors _neighbors = PublicPostNeighbors.None;
+    private IReadOnlyList<PublicPostSummary> _related = [];
     private IReadOnlyList<ShareLinks.Link> _shareLinks = [];
     private string _dateFormat = SiteSettingsDefaults.DateFormat;
     private IReadOnlyList<PublicComment> _comments = [];
@@ -86,7 +92,13 @@ public partial class PostDetail : ComponentBase
 
             var settings = await SettingsService.GetAsync();
             _dateFormat = settings.DateFormat;
+            _updatedDate = post.Post.UpdatedDateLocal(settings.TimeZoneId);
             _shareLinks = ShareLinks.For(post.Post.Title, NavigationManager.ToAbsoluteUri(post.Post.Path).AbsoluteUri);
+
+            // Previous/next and related posts come from the cached snapshot the post itself was found in (P10).
+            var index = await Queries.GetIndexAsync();
+            _neighbors = index.GetNeighbors(post.Post.Id);
+            _related = index.GetRelated(post.Post, RelatedPostCount);
 
             // Comments (design 8.5): the site-wide switch hides the form everywhere; a post can also close its own.
             _now = TimeProvider.GetUtcNow();

@@ -18,9 +18,19 @@ public partial class Pager : ComponentBase
     [Parameter, EditorRequired]
     public int TotalPages { get; set; }
 
-    /// <summary>The list's path without a query string, such as <c>/posts</c> or <c>/tags/dotnet</c>.</summary>
+    /// <summary>
+    /// The list's path without a page number, such as <c>/posts</c>, <c>/tags/dotnet</c> or <c>/search?q=blazor</c>.
+    /// </summary>
     [Parameter, EditorRequired]
     public string BasePath { get; set; } = string.Empty;
+
+    /// <summary>Label of the link to the previous page; lists are newest first, so it is "Newer" by default.</summary>
+    [Parameter]
+    public string PreviousText { get; set; } = "Newer";
+
+    /// <summary>Label of the link to the next page; "Older" by default.</summary>
+    [Parameter]
+    public string NextText { get; set; } = "Older";
 
     /// <summary>The link to a page; page 1 has no <c>?page=</c>, so each page has one canonical URL.</summary>
     private string PageHref(int page)

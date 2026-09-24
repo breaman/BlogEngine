@@ -1,0 +1,25 @@
+@* A long post's sections (design 14.2, P13): its h2 headings, with their h3 headings nested, linking to the ids the
+   Markdown pipeline gave them. Plain links to this page, so it needs no JavaScript. *@
+@if (Entries.Count > 0)
+{
+    <nav class="post-toc card card-body bg-body-tertiary border-0 mb-4" aria-labelledby="post-toc-heading">
+        <h2 id="post-toc-heading" class="h6 text-uppercase text-body-secondary mb-2">Contents</h2>
+        <ol class="mb-0">
+            @foreach (var entry in Entries)
+            {
+                <li>
+                    <a href="@Link(entry)">@entry.Text</a>
+                    @if (entry.Children.Count > 0)
+                    {
+                        <ol>
+                            @foreach (var child in entry.Children)
+                            {
+                                <li><a href="@Link(child)">@child.Text</a></li>
+                            }
+                        </ol>
+                    }
+                </li>
+            }
+        </ol>
+    </nav>
+}

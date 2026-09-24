@@ -1,0 +1,39 @@
+@page "/archive"
+
+<SeoHead Title="Archive" Description="Every post on the blog, by year and month." CanonicalPath="@SitePaths.Archive" />
+
+<Breadcrumbs Items="@([new("Home", SitePaths.Home), new("Archive")])" />
+<h1 class="mb-3">Archive</h1>
+
+@if (_years.Count == 0)
+{
+    <p class="text-body-secondary">No posts yet.</p>
+}
+else
+{
+    <p class="text-body-secondary">
+        @Count(_postCount) since @_years[^1].Year.
+    </p>
+
+    <div class="archive-overview">
+        @foreach (var year in _years)
+        {
+            <section class="mb-4" aria-labelledby="@($"archive-{year.Year}")">
+                <h2 id="@($"archive-{year.Year}")" class="h4 mb-2">
+                    <a class="text-decoration-none" href="@year.Path">@year.Year</a>
+                    <span class="badge rounded-pill text-bg-secondary fw-normal align-middle ms-1">@Count(year.PostCount)</span>
+                </h2>
+                <ul class="list-inline mb-0">
+                    @foreach (var month in year.Months)
+                    {
+                        <li class="list-inline-item mb-2">
+                            <a class="btn btn-sm btn-outline-secondary" href="@month.Path">
+                                @month.Name <span class="text-body-secondary">(@month.PostCount)</span>
+                            </a>
+                        </li>
+                    }
+                </ul>
+            </section>
+        }
+    </div>
+}

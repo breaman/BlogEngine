@@ -1,0 +1,20 @@
+@page "/{PageSlug}"
+
+@if (_page is not null)
+{
+    <SeoHead Title="@(_page.MetaTitle ?? _page.Page.Title)" Description="@(_page.MetaDescription ?? _page.Summary)"
+             CanonicalPath="@_page.Page.Path" />
+
+    <article class="post mx-auto">
+        <header class="mb-4">
+            <h1 class="post-title mb-0">@_page.Page.Title</h1>
+        </header>
+
+        <TableOfContents Entries="_page.Outline" PagePath="@_page.Page.Path" />
+
+        @* data-code-blocks tells js/public.js to load highlighting and copy buttons (design 10.3). *@
+        <div class="post-content" data-code-blocks="@(_page.HasCodeBlocks ? "true" : null)">
+            @((MarkupString)_page.Html)
+        </div>
+    </article>
+}

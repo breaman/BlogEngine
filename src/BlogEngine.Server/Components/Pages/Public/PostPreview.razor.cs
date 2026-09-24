@@ -39,6 +39,8 @@ public partial class PostPreview : ComponentBase
     public string Token { get; set; } = string.Empty;
 
     private PreviewPost? _post;
+    private string _html = string.Empty;
+    private IReadOnlyList<OutlineHeading> _outline = [];
     private string _expiresText = string.Empty;
     private string? _scheduledText;
 
@@ -65,6 +67,10 @@ public partial class PostPreview : ComponentBase
         _scheduledText = post.ScheduledFor is { } scheduledFor
             ? FormatInBlogTime(scheduledFor, settings.TimeZoneId, settings.DateFormat, includeTime: true)
             : null;
+
+        // Like the post page: in-page links need this page's path (FragmentLinks), and long posts get a table of contents.
+        _html = FragmentLinks.Resolve(post.Html, SitePaths.Preview(Token));
+        _outline = PostOutline.FromHtml(post.Html);
         _post = post;
     }
 

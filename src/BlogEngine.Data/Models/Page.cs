@@ -24,6 +24,12 @@ public class Page : FingerPrintEntityBase, ISoftDeletable
     /// <summary>Sanitized HTML rendered from <see cref="ContentMarkdown"/>.</summary>
     public string ContentHtml { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Whether <see cref="ContentHtml"/> has code blocks, so the public page loads the highlighting script only when it
+    /// is needed (design 10.3), as for posts.
+    /// </summary>
+    public bool HasCodeBlocks { get; set; }
+
     /// <summary>Draft or published; pages have no scheduling.</summary>
     public PostStatus Status { get; set; }
 
