@@ -4,13 +4,23 @@
 {
     var post = _post.Post;
 
-    <SeoHead Title="@(_post.MetaTitle ?? post.Title)" Description="@(_post.MetaDescription ?? post.Summary)" CanonicalPath="@post.Path" />
+    <SeoHead Title="@(_post.MetaTitle ?? post.Title)" Description="@(_post.MetaDescription ?? post.Summary)" CanonicalPath="@post.Path"
+             Image="_post.SocialImage" />
 
     <article class="post mx-auto">
         <header class="mb-4">
             <h1 class="post-title mb-2">@post.Title</h1>
             <PostMeta Post="post" DateFormat="@_dateFormat" LinkDate="true" />
         </header>
+
+        @if (_post.Cover is { } cover)
+        {
+            @* The cover is usually the largest element above the fold, so it loads first rather than lazily (A15). *@
+            <figure class="post-cover mb-4">
+                <img src="@cover.Url" alt="@cover.AltText" width="@cover.Width" height="@cover.Height"
+                     class="img-fluid rounded" fetchpriority="high" decoding="async" />
+            </figure>
+        }
 
         @* data-code-blocks tells js/public.js to load highlighting and copy buttons (design 10.3). *@
         <div class="post-content" data-code-blocks="@(_post.HasCodeBlocks ? "true" : null)">

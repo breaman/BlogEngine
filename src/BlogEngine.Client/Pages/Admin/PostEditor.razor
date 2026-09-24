@@ -6,12 +6,20 @@
 
 <PageTitle>@(Post is { Title.Length: > 0 } ? $"{Post.Title} · " : null)@PageHeading · BlogEngine Admin</PageTitle>
 
-<nav aria-label="breadcrumb">
-    <ol class="breadcrumb mb-2">
-        <li class="breadcrumb-item"><a href="admin/posts">Posts</a></li>
-        <li class="breadcrumb-item active" aria-current="page">@PageHeading</li>
-    </ol>
-</nav>
+<div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="admin/posts">Posts</a></li>
+            <li class="breadcrumb-item active" aria-current="page">@PageHeading</li>
+        </ol>
+    </nav>
+    @if (Post is { Id: > 0 })
+    {
+        <a class="btn btn-sm btn-outline-secondary ms-auto" href="@($"admin/posts/{Post.Id}/revisions")">
+            <span class="bi bi-clock-history me-1" aria-hidden="true"></span> Revisions
+        </a>
+    }
+</div>
 
 @if (_loadError is not null)
 {
@@ -76,25 +84,26 @@ else
                 <MarkdownEditor @ref="_markdownEditor"
                                 @bind-Value="Post.ContentMarkdown" @bind-Value:after="OnContentEditedAsync"
                                 Placeholder="Write your post in Markdown…"
-                                OnSave="SaveShortcutAsync" OnBlur="AutosaveAsync" OnInsertImage="InsertImageAsync" />
+                                OnSave="SaveShortcutAsync" OnBlur="AutosaveAsync" OnInsertImage="InsertImageAsync"
+                                AllowImageUpload="true" />
             </div>
 
             <aside class="col-12 col-xl-3" aria-label="Post settings">
-                @* Publishing *@
+                @* Publishing: publish now, schedule (design 6.3, 10.2, A9), update, unpublish or unschedule. *@
                 <section class="card mb-3" aria-labelledby="post-publish-heading">
                     <div class="card-header d-flex align-items-center">
                         <h2 class="h6 mb-0" id="post-publish-heading">Publish</h2>
-                        @if (IsPublished)
-                        {
-                            <span class="badge text-bg-success ms-auto">Published</span>
-                        }
-                        else
-                        {
-                            <span class="badge text-bg-secondary ms-auto">Draft</span>
-                        }
+                        <PostStatusBadge Status="Post.Status" PublishedOn="Post.PublishedOn" Class="ms-auto" />
                     </div>
                     <div class="card-body">
-                        @if (IsPublished && Post.PublishedDateLocal is { } publishedDate)
+                        @if (IsScheduled)
+                        {
+                            <p class="small mb-2">
+                                <span class="bi bi-calendar-event me-1" aria-hidden="true"></span>
+                                Scheduled for <strong>@ScheduledText</strong>@(_timeZoneId is null ? null : $" ({_timeZoneId})")
+                            </p>
+                        }
+                        else if (IsLive && Post.PublishedDateLocal is { } publishedDate)
                         {
                             <p class="small mb-2">Published on @DateText(publishedDate)</p>
                         }
@@ -106,11 +115,63 @@ else
 
                         @if (HasChangesNotLive)
                         {
-                            <div class="alert alert-warning small py-2">Your changes aren't live yet. Click <strong>Update</strong> to publish them.</div>
+                            <div class="alert alert-warning small py-2">
+                                @if (IsScheduled)
+                                {
+                                    <text>Your changes aren't in the scheduled post yet. Click <strong>Update</strong> to include them.</text>
+                                }
+                                else
+                                {
+                                    <text>Your changes aren't live yet. Click <strong>Update</strong> to publish them.</text>
+                                }
+                            </div>
+                        }
+
+                        @if (_showSchedule)
+                        {
+                            <div class="border rounded p-2 mb-3">
+                                <div class="form-floating">
+                                    <input id="post-schedule" type="datetime-local" class="form-control @(_scheduleError is null ? null : "is-invalid")"
+                                           placeholder="Publish on" disabled="@(_timeZoneId is null)"
+                                           value="@_scheduleText" @onchange="OnScheduleChanged" />
+                                    <label for="post-schedule">Publish on@(_timeZoneId is null ? null : $" ({_timeZoneId})")</label>
+                                </div>
+                                @if (_scheduleError is not null)
+                                {
+                                    <div class="text-danger small mt-1" role="alert">@_scheduleError</div>
+                                }
+                                <div class="form-text">In the blog's time zone, whatever this computer's time zone is.</div>
+                                <div class="d-flex gap-2 mt-2">
+                                    <button type="button" class="btn btn-sm btn-primary flex-fill" disabled="@(!CanAct || _timeZoneId is null)" @onclick="ScheduleAsync">
+                                        <span class="bi bi-calendar-check me-1" aria-hidden="true"></span> @(IsScheduled ? "Reschedule" : "Schedule")
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="CancelSchedule">Cancel</button>
+                                </div>
+                            </div>
                         }
 
                         <div class="d-grid gap-2">
-                            @if (IsPublished)
+                            @if (IsScheduled)
+                            {
+                                <button type="button" class="btn btn-primary" disabled="@(!CanAct)" @onclick="UpdateAsync">
+                                    <span class="bi bi-cloud-upload me-1" aria-hidden="true"></span> Update
+                                </button>
+                                <button type="button" class="btn btn-outline-primary" disabled="@(!CanAct)" @onclick="PublishAsync">
+                                    <span class="bi bi-send me-1" aria-hidden="true"></span> Publish now
+                                </button>
+                                <div class="d-flex gap-2">
+                                    @if (!_showSchedule)
+                                    {
+                                        <button type="button" class="btn btn-outline-secondary flex-fill" disabled="@(!CanAct)" @onclick="OpenSchedule">
+                                            <span class="bi bi-calendar me-1" aria-hidden="true"></span> Reschedule
+                                        </button>
+                                    }
+                                    <button type="button" class="btn btn-outline-warning flex-fill" disabled="@(!CanAct)" @onclick="UnpublishAsync">
+                                        <span class="bi bi-calendar-x me-1" aria-hidden="true"></span> Unschedule
+                                    </button>
+                                </div>
+                            }
+                            else if (IsPublished)
                             {
                                 <button type="button" class="btn btn-primary" disabled="@(!CanAct)" @onclick="UpdateAsync">
                                     <span class="bi bi-cloud-upload me-1" aria-hidden="true"></span> Update
@@ -132,9 +193,17 @@ else
                                 <button type="button" class="btn btn-primary" disabled="@(!CanAct)" @onclick="PublishAsync">
                                     <span class="bi bi-send me-1" aria-hidden="true"></span> Publish now
                                 </button>
-                                <button type="button" class="btn btn-outline-secondary" disabled="@(!CanAct)" @onclick="SaveDraftAsync">
-                                    <span class="bi bi-floppy me-1" aria-hidden="true"></span> Save draft
-                                </button>
+                                <div class="d-flex gap-2">
+                                    @if (!_showSchedule)
+                                    {
+                                        <button type="button" class="btn btn-outline-secondary flex-fill" disabled="@(!CanAct)" @onclick="OpenSchedule">
+                                            <span class="bi bi-calendar me-1" aria-hidden="true"></span> Schedule…
+                                        </button>
+                                    }
+                                    <button type="button" class="btn btn-outline-secondary flex-fill" disabled="@(!CanAct)" @onclick="SaveDraftAsync">
+                                        <span class="bi bi-floppy me-1" aria-hidden="true"></span> Save draft
+                                    </button>
+                                </div>
                             }
                         </div>
                     </div>
@@ -162,9 +231,13 @@ else
                                 Changing the slug creates a redirect from <code>@_stored?.PublicPath</code> when you click Update.
                             </div>
                         }
-                        else if (IsPublished)
+                        else if (IsLive)
                         {
                             <div class="form-text">Changing this creates a redirect from the current URL.</div>
+                        }
+                        else if (IsScheduled)
+                        {
+                            <div class="form-text">The post isn't live yet, so changing this needs no redirect.</div>
                         }
                         else
                         {
@@ -184,6 +257,16 @@ else
                         </div>
                         <ValidationMessage For="() => Post.Summary" class="text-danger small" />
                         <div class="form-text">Shown in post lists and search results. Leave blank to use the start of the post.</div>
+                    </div>
+                </section>
+
+                @* Cover image (A15): shown above the post, and its default social image. *@
+                <section class="card mb-3" aria-labelledby="post-cover-heading">
+                    <div class="card-header"><h2 class="h6 mb-0" id="post-cover-heading">Cover image</h2></div>
+                    <div class="card-body">
+                        <PostImageField Image="Post.CoverImage" ChooseText="Choose cover image" Disabled="@(!_interactive)"
+                                        OnChoose="ChooseCoverAsync" OnRemove="RemoveCoverAsync" />
+                        <ValidationMessage For="() => Post.CoverMediaId" class="text-danger small" />
                     </div>
                 </section>
 
@@ -213,6 +296,39 @@ else
                         </div>
                     </div>
                 </section>
+
+                @* SEO overrides (A16): what search results and social previews show instead of the title, summary and cover. *@
+                <section class="card mb-3" aria-labelledby="post-seo-heading">
+                    <div class="card-header"><h2 class="h6 mb-0" id="post-seo-heading">SEO</h2></div>
+                    <div class="card-body">
+                        <div class="form-floating">
+                            <input id="post-meta-title" type="text" class="form-control @_editContext.FieldCssClass(() => Post.MetaTitle)"
+                                   placeholder="Meta title" maxlength="@FieldLengths.MetaTitle" autocomplete="off"
+                                   @bind="Post.MetaTitle" @bind:event="oninput" @bind:after="OnMetaTitleEditedAsync" />
+                            <label for="post-meta-title">Meta title</label>
+                        </div>
+                        <CharacterCounter Length="@(Post.MetaTitle?.Length ?? 0)" Max="FieldLengths.MetaTitle" />
+                        <ValidationMessage For="() => Post.MetaTitle" class="text-danger small" />
+
+                        <div class="form-floating mt-2">
+                            <textarea id="post-meta-description" class="form-control @_editContext.FieldCssClass(() => Post.MetaDescription)"
+                                      placeholder="Meta description" rows="3" maxlength="@FieldLengths.MetaDescription"
+                                      @bind="Post.MetaDescription" @bind:event="oninput" @bind:after="OnMetaDescriptionEditedAsync"></textarea>
+                            <label for="post-meta-description">Meta description</label>
+                        </div>
+                        <CharacterCounter Length="@(Post.MetaDescription?.Length ?? 0)" Max="FieldLengths.MetaDescription" />
+                        <ValidationMessage For="() => Post.MetaDescription" class="text-danger small" />
+                        <div class="form-text mb-3">Leave blank to use the title and summary.</div>
+
+                        <div class="small fw-semibold mb-1">Social image</div>
+                        <PostImageField Image="Post.SocialImage" ChooseText="Choose social image" Disabled="@(!_interactive)"
+                                        OnChoose="ChooseSocialImageAsync" OnRemove="RemoveSocialImageAsync" />
+                        <ValidationMessage For="() => Post.SocialImageMediaId" class="text-danger small" />
+                        <div class="form-text">Shown when the post is shared. Leave empty to use the cover image.</div>
+                    </div>
+                </section>
+
+                <PreviewLinksCard PostId="Post.Id" />
 
                 @* Stats, computed live from the Markdown with the same rules the server uses. *@
                 <section class="card mb-3" aria-labelledby="post-stats-heading">

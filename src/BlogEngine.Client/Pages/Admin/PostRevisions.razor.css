@@ -1,0 +1,43 @@
+/* Side-by-side Markdown diff (A13): monospace, wrapped, with Bootstrap's subtle theme colors so it follows dark mode. */
+.diff-table {
+    font-family: var(--bs-font-monospace);
+    font-size: 0.8125rem;
+    table-layout: fixed;
+}
+
+.diff-number-col {
+    width: 3.5rem;
+}
+
+.diff-number {
+    color: var(--bs-secondary-color);
+    text-align: end;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.diff-text {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.diff-removed {
+    background-color: var(--bs-danger-bg-subtle);
+}
+
+.diff-added {
+    background-color: var(--bs-success-bg-subtle);
+}
+
+.diff-empty {
+    background-color: var(--bs-tertiary-bg);
+}
+
+.diff-skipped {
+    background-color: var(--bs-tertiary-bg);
+}
+
+.revision-list {
+    max-height: 70vh;
+    overflow-y: auto;
+}

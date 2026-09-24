@@ -75,6 +75,12 @@ public class Post : FingerPrintEntityBase, ISoftDeletable
     /// <summary>Optional SEO description override.</summary>
     public string? MetaDescription { get; set; }
 
+    /// <summary>Optional social sharing image (Open Graph and Twitter cards); the cover image is used when unset (A16).</summary>
+    public int? SocialImageMediaId { get; set; }
+
+    /// <summary>The social sharing image.</summary>
+    public MediaItem? SocialImageMedia { get; set; }
+
     /// <inheritdoc />
     public bool IsDeleted { get; set; }
 

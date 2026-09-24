@@ -7,8 +7,8 @@ using Microsoft.AspNetCore.Components;
 namespace BlogEngine.Server.Components.Blog;
 
 /// <summary>
-/// The basic SEO head of a public page (design 14.2, 16): the browser title, meta description, canonical URL
-/// and feed autodiscovery links.
+/// The basic SEO head of a public page (design 14.2, 16): the browser title, meta description, canonical URL,
+/// social sharing image and feed autodiscovery links.
 /// </summary>
 /// <remarks>
 /// Canonical URLs are absolute and built from the canonical paths (<see cref="PostPaths"/>, <see cref="TagPaths"/>),
@@ -31,6 +31,10 @@ public partial class SeoHead : ComponentBase
     /// <summary>The page's canonical path and query string, such as <c>/posts?page=2</c>.</summary>
     [Parameter, EditorRequired]
     public string CanonicalPath { get; set; } = SitePaths.Home;
+
+    /// <summary>The image for social sharing previews (Open Graph and Twitter cards), such as a post's cover.</summary>
+    [Parameter]
+    public PublicImage? Image { get; set; }
 
     /// <summary>A tag whose feed is advertised alongside the site feeds (tag pages).</summary>
     [Parameter]

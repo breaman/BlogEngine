@@ -6,8 +6,9 @@ namespace BlogEngine.Shared.Contracts;
 public sealed class PublishPostRequest
 {
     /// <summary>
-    /// The publish date and time. Leave <see langword="null"/> to publish now (or keep the original date
-    /// when republishing). Must not be in the future until scheduling is supported (T4.1).
+    /// The publish date and time. A future value schedules the post (design 6.3, A9): it stays hidden until then.
+    /// Leave <see langword="null"/> to publish now, or to keep the original date when republishing a post that was
+    /// live before; a scheduled post published with <see langword="null"/> goes live now.
     /// </summary>
     public DateTimeOffset? PublishOn { get; set; }
 

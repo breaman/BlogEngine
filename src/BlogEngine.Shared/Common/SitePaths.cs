@@ -22,4 +22,13 @@ public static class SitePaths
 
     /// <summary>Site search (wired in T4.9); the navbar's GET form already submits here.</summary>
     public const string Search = "/search";
+
+    /// <summary>Prefix of private post previews, <c>/preview/{token}</c> (design 7.1, A14).</summary>
+    public const string PreviewPrefix = "/preview";
+
+    /// <summary>The private preview URL path for a preview token (design 7.1, A14).</summary>
+    public static string Preview(string token)
+    {
+        return $"{PreviewPrefix}/{Uri.EscapeDataString(token)}";
+    }
 }

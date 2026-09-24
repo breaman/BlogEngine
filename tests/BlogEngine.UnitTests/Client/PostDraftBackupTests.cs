@@ -82,6 +82,44 @@ public class PostDraftBackupTests
         await Assert.That(PostEdits.DetailsEqual(edited, stored)).IsFalse();
     }
 
+    /// <summary>The SEO fields and the cover and social images (A15, A16) survive a backup and restore.</summary>
+    [Test]
+    public async Task ApplyTo_RestoresSeoAndImages()
+    {
+        var edited = SamplePost();
+        edited.MetaTitle = "Meta";
+        edited.MetaDescription = "Description";
+        edited.CoverMediaId = 3;
+        edited.CoverImage = new PostImageDto(3, "/media/abc/cover.jpg?v=1", "Cover", 800, 600);
+        edited.SocialImageMediaId = 4;
+        edited.SocialImage = new PostImageDto(4, "/media/def/social.jpg?v=2", "Social", 1200, 630);
+        var backup = PostDraftBackup.From(edited, SavedAt);
+        var stored = SamplePost();
+
+        await Assert.That(backup.DiffersFrom(stored)).IsTrue();
+
+        backup.ApplyTo(stored);
+
+        await Assert.That(PostEdits.AreEqual(stored, edited)).IsTrue();
+        await Assert.That(stored.MetaTitle).IsEqualTo("Meta");
+        await Assert.That(stored.CoverImage).IsEqualTo(edited.CoverImage);
+        await Assert.That(stored.SocialImage).IsEqualTo(edited.SocialImage);
+    }
+
+    /// <summary>Choosing a different cover or social image is a change to the post's details.</summary>
+    [Test]
+    public async Task PostEdits_DetectsImageChanges()
+    {
+        var stored = SamplePost();
+        var withCover = SamplePost();
+        withCover.CoverMediaId = 5;
+        var withSocial = SamplePost();
+        withSocial.SocialImageMediaId = 6;
+
+        await Assert.That(PostEdits.DetailsEqual(withCover, stored)).IsFalse();
+        await Assert.That(PostEdits.DetailsEqual(withSocial, stored)).IsFalse();
+    }
+
     /// <summary>A clone shares nothing mutable, so editing it never changes the original.</summary>
     [Test]
     public async Task Clone_IsIndependent()

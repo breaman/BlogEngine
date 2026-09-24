@@ -1,5 +1,6 @@
 @* Title and head tags for a public page (design 14.2, 16). The only <HeadContent> on a page, since the last
-   rendered one wins. Open Graph, Twitter cards and JSON-LD arrive with the full SeoHead in T4.7. *@
+   rendered one wins. The social image tags come from a post's social or cover image (A15, A16); the rest of Open
+   Graph, Twitter cards and JSON-LD arrive with the full SeoHead in T4.7. *@
 <PageTitle>@_fullTitle</PageTitle>
 <HeadContent>
     @if (!string.IsNullOrWhiteSpace(_description))
@@ -7,6 +8,19 @@
         <meta name="description" content="@_description" />
     }
     <link rel="canonical" href="@Absolute(CanonicalPath)" />
+    @if (Image is not null)
+    {
+        var imageUrl = Absolute(Image.Url);
+        <meta property="og:image" content="@imageUrl" />
+        <meta property="og:image:width" content="@Image.Width" />
+        <meta property="og:image:height" content="@Image.Height" />
+        @if (!string.IsNullOrWhiteSpace(Image.AltText))
+        {
+            <meta property="og:image:alt" content="@Image.AltText" />
+        }
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:image" content="@imageUrl" />
+    }
     <link rel="alternate" type="application/rss+xml" title="@($"{_siteTitle} (RSS)")" href="@Absolute(SitePaths.RssFeed)" />
     <link rel="alternate" type="application/atom+xml" title="@($"{_siteTitle} (Atom)")" href="@Absolute(SitePaths.AtomFeed)" />
     @if (TagFeed is not null)

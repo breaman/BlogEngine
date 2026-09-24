@@ -13,6 +13,8 @@ namespace BlogEngine.Server.Services.Public;
 /// <param name="MetaDescription">Optional SEO description override.</param>
 /// <param name="AllowComments">Whether the post takes comments at all (design 8.5).</param>
 /// <param name="CommentsCloseOn">When comments close, if they do.</param>
+/// <param name="Cover">The cover image shown above the content (A15), if any.</param>
+/// <param name="SocialImageOverride">The image chosen for social sharing previews (A16), if any.</param>
 [ImmutableObject(true)]
 public sealed record PublicPostContent(
     PublicPostSummary Post,
@@ -21,8 +23,13 @@ public sealed record PublicPostContent(
     string? MetaTitle,
     string? MetaDescription,
     bool AllowComments = true,
-    DateTimeOffset? CommentsCloseOn = null)
+    DateTimeOffset? CommentsCloseOn = null,
+    PublicImage? Cover = null,
+    PublicImage? SocialImageOverride = null)
 {
+    /// <summary>The image for social sharing previews: the chosen social image, otherwise the cover (A15, A16).</summary>
+    public PublicImage? SocialImage => SocialImageOverride ?? Cover;
+
     /// <summary>
     /// Whether readers may comment at <paramref name="now"/> (design 8.5): the post allows comments and its closing time,
     /// if any, hasn't passed. The site-wide switch is checked separately.

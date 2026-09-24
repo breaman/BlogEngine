@@ -1,0 +1,7 @@
+/* Keeps a tall image from pushing the rest of the sidebar far down. */
+.post-image-field-thumb {
+    display: block;
+    width: 100%;
+    max-height: 12rem;
+    object-fit: cover;
+}

@@ -9,8 +9,8 @@ using Microsoft.EntityFrameworkCore;
 namespace BlogEngine.Server.Services;
 
 /// <summary>
-/// Server implementation of <see cref="IDashboardService"/> (design 4.5 O1, T3.10): post counts by state, the pending
-/// comment count and the latest posts and comments, straight from the database so they are always current.
+/// Server implementation of <see cref="IDashboardService"/> (design 4.5 O1, T3.10, T4.1): post counts by state, the
+/// pending comment count, the next scheduled posts and the latest posts and comments, straight from the database so they are always current.
 /// </summary>
 public sealed class ServerDashboardService(
     ApplicationDbContext dbContext,
@@ -37,6 +37,13 @@ public sealed class ServerDashboardService(
         // Recently changed posts, exactly as the posts list shows them.
         var recentPosts = await postAdminService.GetPostsAsync(new PostListQuery { PageSize = RecentCount }, cancellationToken);
         summary.RecentPosts = [.. recentPosts.Items];
+
+        if (summary.ScheduledCount > 0)
+        {
+            var scheduled = await postAdminService.GetPostsAsync(
+                new PostListQuery { Status = PostListStatus.Scheduled, PageSize = RecentCount }, cancellationToken);
+            summary.ScheduledPosts = [.. scheduled.Items];
+        }
 
         var recentComments = await ServerCommentModerationService.Project(dbContext.Comments.AsNoTracking()
                 .OrderByDescending(c => c.CreatedOn)

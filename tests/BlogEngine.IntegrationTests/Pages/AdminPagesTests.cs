@@ -29,6 +29,7 @@ public class AdminPagesTests(BlogEngineWebApplicationFactory factory)
     [Arguments("/admin/posts")]
     [Arguments("/admin/posts/new")]
     [Arguments("/admin/posts/1")]
+    [Arguments("/admin/posts/1/revisions")]
     [Arguments("/admin/settings")]
     [Arguments("/admin/media")]
     [Arguments("/admin/media/1")]
@@ -41,6 +42,30 @@ public class AdminPagesTests(BlogEngineWebApplicationFactory factory)
 
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.Redirect);
         await Assert.That(response.Headers.Location!.AbsolutePath).IsEqualTo("/Account/Login").IgnoringCase();
+    }
+
+    /// <summary>The revision history prerenders its list and the comparison with the newest revision (T4.3).</summary>
+    [Test]
+    public async Task Revisions_PrerendersComparison()
+    {
+        var token = Guid.NewGuid().ToString("N")[..8];
+        var post = await CreatePostAsync($"History {token}", [], $"Line one {token}");
+        IReadOnlyList<PostRevisionSummaryDto> revisions;
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var posts = scope.ServiceProvider.GetRequiredService<IPostAdminService>();
+            post.ContentMarkdown = $"Line one {token}\n\nLine two {token}";
+            await posts.UpdateAsync(post.Id, post);
+            revisions = (await posts.GetRevisionsAsync(post.Id))!;
+        }
+
+        using var client = await CreateAdminClientAsync();
+        var html = await GetHtmlAsync(client, $"/admin/posts/{post.Id}/revisions?revision={revisions[^1].Id}");
+
+        await Assert.That(html).Contains("Revision history");
+        await Assert.That(html).Contains("Restore this revision");
+        await Assert.That(html).Contains($"Line two {token}");
+        await Assert.That(html).Contains("diff-added");
     }
 
     /// <summary>The posts list prerenders with the posts, and the tag filter narrows it.</summary>

@@ -16,7 +16,7 @@
 | [1: Posts MVP](#phase-1--posts-mvp) | Can write and publish posts end to end | 25 | 25 |
 | [2: Media MVP](#phase-2--media-mvp) | Can add, edit and insert photos | 13 | 13 |
 | [3: Comments MVP](#phase-3--comments-mvp) | Readers can comment; the author moderates | 11 | 11 |
-| [4: V1 Polish](#phase-4--v1-polish) | Ready for public launch | 35 | 0 |
+| [4: V1 Polish](#phase-4--v1-polish) | Ready for public launch | 35 | 6 |
 | [5: Later](#phase-5--later) | As desired | 10 | 0 |
 
 Update the **Done** column as tasks are completed.
@@ -439,32 +439,38 @@ These apply to all tasks and are not repeated below:
 
 ### Authoring
 
-- [ ] **T4.1 — Scheduled publishing** (§6.3, A9, Q4)
+- [x] **T4.1 — Scheduled publishing** (§6.3, A9, Q4)
   - Allow a future `publishOn` (date/time picker in the blog's time zone); "Unschedule" returns to Draft.
   - `ScheduledPublishWatcher` `BackgroundService`: every minute, evict `posts` cache (and trigger notifications) when a scheduled post goes live.
   - Admin posts list gains a **Scheduled** tab; dashboard shows scheduled posts.
   - **Done when:** an integration test using a fake `TimeProvider` shows a scheduled post appearing once its time passes.
+  - *Status:* `PostSchedule` derives Scheduled/Live; the picker works in the blog's time zone (`BlogTimeZone.FromLocalDateTime` moves skipped times forward and takes the first of repeated ones). Publishing a scheduled post without a date publishes it now; Unschedule (unpublish) forgets the date. Redirects are only created from URLs that were live. Rescheduling identical content adds no extra Publish revision. `ScheduledPublishingTests` drives the watcher with `FakeTimeProvider`. Verified in a browser.
 
-- [ ] **T4.2 — Paste/drag-drop image upload in the editor** (§9.5, A10)
+- [x] **T4.2 — Paste/drag-drop image upload in the editor** (§9.5, A10)
   - CodeMirror paste/drop hooks upload the file, insert `![Uploading name…]()` at the cursor, and replace it with the real link when done (or remove it with an error toast on failure).
   - **Done when:** pasting a screenshot inserts a working image link.
+  - *Status:* placeholders are tracked through edits (found by text if moved; nothing is inserted if the author deleted one). Uploads go one at a time so images keep their order; `MarkdownEditor.OnImageUploaded` builds the Markdown and toasts errors and an alt-text reminder. Response parsing is shared with the upload zone (`MediaUploadResponse`). Verified in a browser: paste and drop both insert working images.
 
-- [ ] **T4.3 — Revision history** (`/admin/posts/{id}/revisions`; A13)
+- [x] **T4.3 — Revision history** (`/admin/posts/{id}/revisions`; A13)
   - `GET /posts/{id}/revisions`; list with kind and timestamp; side-by-side diff against current; "Restore" loads a revision into the editor.
   - **Done when:** restoring a revision and saving produces the old content.
+  - *Status:* also `GET /posts/{id}/revisions/{revisionId}`. The diff (`LineDiff`, in Shared) collapses unchanged lines around changes; the comparison is with the saved post. Restore opens the editor with `?restore={id}`, which loads the revision as unsaved changes and strips the parameter. Verified in a browser.
 
-- [ ] **T4.4 — Private preview links** (`/preview/{token}`; §6.7, A14)
+- [x] **T4.4 — Private preview links** (`/preview/{token}`; §6.7, A14)
   - `POST /posts/{id}/preview-token` (256-bit URL-safe, 7-day default expiry, revocable). Preview page renders the draft with `X-Robots-Tag: noindex` and a "Preview" banner.
   - "Get preview link" in the editor sidebar.
   - **Done when:** expired/revoked tokens 404 and the response carries `noindex`.
+  - *Status:* `IPreviewLinkService` with `GET /posts/{id}/preview-tokens` and `DELETE /posts/{id}/preview-tokens/{linkId}` besides the create endpoint. The page shows the saved content (for a published post with staged changes, the live content) and also sends `Referrer-Policy: no-referrer` and `Cache-Control: no-store`. Verified in a browser.
 
-- [ ] **T4.5 — Cover images** (A15)
+- [x] **T4.5 — Cover images** (A15)
   - Pick a cover from the media library in the editor sidebar; render on the post page and as the default social image.
   - **Done when:** cover shows on the post page and is tracked in media usage.
+  - *Status:* picked with `MediaPicker.PickAsync` (no details step). The cover is the default `og:image`/`twitter:image` until T4.7 fills in the rest of Open Graph.
 
-- [ ] **T4.6 — Per-post SEO overrides** (A16)
+- [x] **T4.6 — Per-post SEO overrides** (A16)
   - Meta title, meta description and social image fields in the sidebar, with character counters.
   - **Done when:** overrides appear in the rendered `<head>`.
+  - *Status:* new `Post.SocialImageMediaId` (migration `AddPostSocialImage`), counted as media usage and cleared when the item is deleted. The local draft backup now also keeps the meta fields and images.
 
 ### Reading
 

@@ -1,5 +1,4 @@
 using System.Net;
-using System.Text.Json;
 
 using BlogEngine.Client.Services;
 using BlogEngine.Shared.Contracts;
@@ -36,8 +35,6 @@ public sealed partial class MediaUploadZone : ComponentBase, IAsyncDisposable
 {
     /// <summary>The <c>accept</c> filter of the file chooser (Q6).</summary>
     public const string AcceptedTypes = "image/jpeg,image/png,image/gif,image/webp";
-
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     [Inject] private IJSRuntime JS { get; set; } = default!;
     [Inject] private ISettingsService Settings { get; set; } = default!;
@@ -155,7 +152,7 @@ public sealed partial class MediaUploadZone : ComponentBase, IAsyncDisposable
             return;
         }
 
-        var result = status == (int)HttpStatusCode.OK ? ReadResult(body) : null;
+        var result = MediaUploadResponse.ReadResult(status, body);
         if (result is { Item: { } item })
         {
             row.Complete(item.FileName, result.Duplicates.FirstOrDefault());
@@ -163,7 +160,12 @@ public sealed partial class MediaUploadZone : ComponentBase, IAsyncDisposable
         }
         else
         {
-            row.Fail(result?.Error ?? DescribeFailure(status, body));
+            if (status == (int)HttpStatusCode.OK && result is null)
+            {
+                Logger.LogWarning("The upload response for {FileName} couldn't be read.", row.Name);
+            }
+
+            row.Fail(result?.Error ?? MediaUploadResponse.DescribeFailure(status, body));
         }
 
         if (!IsUploading)
@@ -190,50 +192,6 @@ public sealed partial class MediaUploadZone : ComponentBase, IAsyncDisposable
     private UploadRow? Find(string id)
     {
         return _uploads.Find(u => u.Id == id);
-    }
-
-    /// <summary>Reads the single file result of a 200 response.</summary>
-    private MediaUploadResult? ReadResult(string body)
-    {
-        try
-        {
-            return JsonSerializer.Deserialize<List<MediaUploadResult>>(body, JsonOptions)?.FirstOrDefault();
-        }
-        catch (JsonException ex)
-        {
-            Logger.LogWarning(ex, "The upload response couldn't be read.");
-            return null;
-        }
-    }
-
-    /// <summary>A message for a request that didn't produce a file result.</summary>
-    private static string DescribeFailure(int status, string body)
-    {
-        switch (status)
-        {
-            case 0:
-                return "The upload failed. Check your connection and try again.";
-            case (int)HttpStatusCode.Unauthorized:
-            case (int)HttpStatusCode.Forbidden:
-                return "Your session has expired. Sign in again and retry.";
-            case (int)HttpStatusCode.RequestEntityTooLarge:
-                return "The file is too large to upload.";
-        }
-
-        try
-        {
-            using var problem = JsonDocument.Parse(body);
-            if (problem.RootElement.TryGetProperty("detail", out var detail) && detail.GetString() is { Length: > 0 } text)
-            {
-                return text;
-            }
-        }
-        catch (JsonException)
-        {
-            // Not a problem document; use the generic message below.
-        }
-
-        return $"The upload failed (HTTP {status}).";
     }
 
     private static string UploadStatusText(UploadRow upload)

@@ -1,4 +1,10 @@
+using BlogEngine.Client.Services;
+using BlogEngine.Shared.Markdown;
+using BlogEngine.Shared.Security;
+using BlogEngine.Shared.Services;
+
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 
@@ -23,6 +29,12 @@ namespace BlogEngine.Client.Components;
 /// <para>
 /// Shortcuts: <c>Ctrl/Cmd+B</c> bold, <c>I</c> italic, <c>K</c> link, <c>`</c> code, <c>Shift+I</c> image
 /// (<see cref="OnInsertImage"/> when set, otherwise an image template) and <c>S</c> (<see cref="OnSave"/>).
+/// </para>
+/// <para>
+/// With <see cref="AllowImageUpload"/>, pasting or dropping image files uploads them to the media library (design 9.5,
+/// A10): editor.js inserts an <c>![Uploading name…]()</c> placeholder at the cursor or drop point, uploads the file,
+/// and <see cref="OnImageUploaded"/> turns the response into the image's Markdown, which replaces the placeholder. A
+/// failed upload removes the placeholder and shows an error toast.
 /// </para>
 /// </remarks>
 /// <example>
@@ -62,6 +74,10 @@ public sealed partial class MarkdownEditor : ComponentBase, IAsyncDisposable
 
     [Inject] private IJSRuntime JS { get; set; } = default!;
     [Inject] private ILogger<MarkdownEditor> Logger { get; set; } = default!;
+    [Inject] private IToastService Toasts { get; set; } = default!;
+    [Inject] private MediaLookupCache MediaLookup { get; set; } = default!;
+    [Inject] private RecentMediaStore RecentMedia { get; set; } = default!;
+    [Inject] private AntiforgeryStateProvider Antiforgery { get; set; } = default!;
 
     /// <summary>The Markdown being edited.</summary>
     [Parameter] public string? Value { get; set; }
@@ -83,6 +99,9 @@ public sealed partial class MarkdownEditor : ComponentBase, IAsyncDisposable
     /// calls <see cref="InsertBlockAsync"/>. Without a handler, an image template is inserted.
     /// </summary>
     [Parameter] public EventCallback OnInsertImage { get; set; }
+
+    /// <summary>Uploads images pasted or dropped into the editor to the media library and inserts them (A10).</summary>
+    [Parameter] public bool AllowImageUpload { get; set; }
 
     private ElementReference _host;
     private ElementReference _previewPane;
@@ -179,6 +198,33 @@ public sealed partial class MarkdownEditor : ComponentBase, IAsyncDisposable
         return OnSave.InvokeAsync();
     }
 
+    /// <summary>
+    /// Called by editor.js when a pasted or dropped image finished uploading, with the response's status (0 for a
+    /// network error) and body. Returns the Markdown to put in place of the placeholder, or <see langword="null"/> after
+    /// telling the author why the upload failed.
+    /// </summary>
+    [JSInvokable]
+    public async Task<string?> OnImageUploaded(string fileName, int status, string body)
+    {
+        var result = MediaUploadResponse.ReadResult(status, body);
+        if (result?.Item is not { } item)
+        {
+            Toasts.ShowError(result?.Error ?? MediaUploadResponse.DescribeFailure(status, body), $"{fileName} wasn't uploaded");
+            return null;
+        }
+
+        // The preview can render it at once, and the media picker offers it under "Recently used".
+        MediaLookup.Remember(item);
+        await RecentMedia.AddAsync(item);
+
+        if (string.IsNullOrWhiteSpace(item.AltText))
+        {
+            Toasts.ShowInfo("Describe the image for people who can't see it: type alt text between the [ ] brackets.", "Image uploaded");
+        }
+
+        return MediaMarkdown.Image(item.PublicId, item.FileName, item.AltText, item.Caption);
+    }
+
     /// <summary>Called by editor.js for the image command when <see cref="OnInsertImage"/> has a handler.</summary>
     [JSInvokable]
     public Task OnImageRequested()
@@ -246,7 +292,15 @@ public sealed partial class MarkdownEditor : ComponentBase, IAsyncDisposable
             {
                 value = _editorValue,
                 placeholder = Placeholder,
-                imageHandler = OnInsertImage.HasDelegate
+                imageHandler = OnInsertImage.HasDelegate,
+                uploads = AllowImageUpload
+                    ? new
+                    {
+                        url = ClientMediaService.BaseUri,
+                        headerName = AntiforgeryHeaders.RequestToken,
+                        token = Antiforgery.GetAntiforgeryToken()?.Value
+                    }
+                    : null
             });
             await _editor.InvokeVoidAsync("setPreview", _previewPane);
 

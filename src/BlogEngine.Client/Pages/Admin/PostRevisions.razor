@@ -1,0 +1,150 @@
+@page "/admin/posts/{Id:int}/revisions"
+@using BlogEngine.Shared.Text
+@layout AdminLayout
+@attribute [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
+@rendermode InteractiveWebAssembly
+
+<PageTitle>Revisions@(Post is null ? null : $" · {Post.Title}") · BlogEngine Admin</PageTitle>
+
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb mb-2">
+        <li class="breadcrumb-item"><a href="admin/posts">Posts</a></li>
+        @if (Post is not null)
+        {
+            <li class="breadcrumb-item"><a href="@($"admin/posts/{Id}")">@Post.Title</a></li>
+        }
+        <li class="breadcrumb-item active" aria-current="page">Revisions</li>
+    </ol>
+</nav>
+
+<h1 class="h3 mb-3">Revision history</h1>
+
+@if (_loadError is not null)
+{
+    <div class="alert alert-danger" role="alert">@_loadError</div>
+}
+else if (PostMissing)
+{
+    <div class="alert alert-warning" role="alert">
+        This post doesn't exist or is in the trash. <a href="admin/posts" class="alert-link">Back to posts</a>
+    </div>
+}
+else if (Post is null || Revisions is null)
+{
+    <p class="text-body-secondary"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Loading revisions…</p>
+}
+else if (Revisions.Count == 0)
+{
+    <p class="text-body-secondary">This post has no revisions yet. They are recorded when it is saved, autosaved and published.</p>
+}
+else
+{
+    <div class="row g-4">
+        <div class="col-12 col-lg-4">
+            <div class="list-group revision-list" role="list">
+                @foreach (var revision in Revisions)
+                {
+                    var badge = KindBadge(revision.Kind);
+                    var active = revision.Id == Selected?.Id;
+                    <a class="list-group-item list-group-item-action @(active ? "active" : null)" href="@RevisionUri(revision.Id)"
+                       aria-current="@(active ? "true" : null)" role="listitem" @key="revision.Id">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge @badge.CssClass">@badge.Label</span>
+                            <span class="small text-nowrap" title="@TimeText(revision.SavedOn)">@Relative(revision.SavedOn)</span>
+                            <span class="small ms-auto text-nowrap @(active ? null : "text-body-secondary")">@revision.ContentLength.ToString("N0") chars</span>
+                        </div>
+                        <div class="text-truncate small mt-1">@revision.Title</div>
+                    </a>
+                }
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-8">
+            @if (Selected is null)
+            {
+                <p class="text-body-secondary">@(_loading ? "Loading…" : "Choose a revision to compare it with the current post.")</p>
+            }
+            else
+            {
+                var badge = KindBadge(Selected.Kind);
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                    <span class="badge @badge.CssClass">@badge.Label</span>
+                    <span>@TimeText(Selected.SavedOn)</span>
+                    <button type="button" class="btn btn-primary btn-sm ms-auto" @onclick="Restore">
+                        <span class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></span> Restore this revision
+                    </button>
+                </div>
+
+                <p class="small text-body-secondary">
+                    Left: this revision. Right: the post as currently saved.
+                    Restoring opens it in the editor; nothing changes until you save.
+                </p>
+
+                @if (TitleChanged)
+                {
+                    <table class="table table-sm diff-table mb-3">
+                        <tbody>
+                            <tr>
+                                <th scope="row" class="diff-number">Title</th>
+                                <td class="diff-removed">@Selected.Title</td>
+                                <td class="diff-added">@Post.Title</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                }
+
+                @if (ChangeCount == 0)
+                {
+                    <div class="alert alert-secondary py-2">
+                        The content of this revision is the same as the current post@(TitleChanged ? "; only the title differs" : null).
+                    </div>
+                }
+                else
+                {
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="small text-body-secondary">@ChangeCount @(ChangeCount == 1 ? "changed line" : "changed lines")</span>
+                        <div class="form-check form-switch ms-auto mb-0">
+                            <input class="form-check-input" type="checkbox" role="switch" id="revision-show-all" checked="@_showAll" @onchange="ToggleShowAll" />
+                            <label class="form-check-label small" for="revision-show-all">Show all lines</label>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive border rounded">
+                        <table class="table table-sm diff-table mb-0">
+                            <caption class="visually-hidden">Differences between the revision (left) and the current post (right)</caption>
+                            <colgroup>
+                                <col class="diff-number-col" />
+                                <col />
+                                <col class="diff-number-col" />
+                                <col />
+                            </colgroup>
+                            <tbody>
+                                @foreach (var display in _rows)
+                                {
+                                    if (display.Row is { } row)
+                                    {
+                                        var classes = RowClasses(row.Kind);
+                                        <tr>
+                                            <td class="diff-number @classes.Old">@row.OldNumber</td>
+                                            <td class="diff-text @classes.Old">@(row.Kind == DiffRowKind.Removed || row.Kind == DiffRowKind.Changed ? "− " : null)@row.OldText</td>
+                                            <td class="diff-number @classes.New">@row.NewNumber</td>
+                                            <td class="diff-text @classes.New">@(row.Kind == DiffRowKind.Added || row.Kind == DiffRowKind.Changed ? "+ " : null)@row.NewText</td>
+                                        </tr>
+                                    }
+                                    else
+                                    {
+                                        <tr>
+                                            <td colspan="4" class="diff-skipped text-center small text-body-secondary">
+                                                ⋯ @display.Skipped unchanged @(display.Skipped == 1 ? "line" : "lines")
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+}

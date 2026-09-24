@@ -2,6 +2,7 @@ using System.Globalization;
 
 using BlogEngine.Client.Components;
 using BlogEngine.Client.Services;
+using BlogEngine.Shared.Common;
 using BlogEngine.Shared.Contracts;
 using BlogEngine.Shared.Enums;
 using BlogEngine.Shared.Services;
@@ -19,7 +20,8 @@ namespace BlogEngine.Client.Pages.Admin;
 
 /// <summary>
 /// The post editor at <c>/admin/posts/new</c> and <c>/admin/posts/{id}</c> (design 10.2, T1.13): title, Markdown
-/// editor with live preview, and a sidebar with publishing, slug, summary, tags, options and reading stats.
+/// editor with live preview, and a sidebar with publishing and scheduling, slug, summary, cover image, tags, options,
+/// SEO overrides and reading stats.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -45,10 +47,14 @@ namespace BlogEngine.Client.Pages.Admin;
 /// </remarks>
 public partial class PostEditor : ComponentBase, IAsyncDisposable
 {
+    /// <summary>Value formats of a <c>datetime-local</c> input, with and without seconds.</summary>
+    private static readonly string[] ScheduleInputFormats = ["yyyy-MM-dd'T'HH:mm", "yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ss.FFF"];
+
     /// <summary>How often autosave runs while there are unsaved changes (design 10.2).</summary>
     private static readonly TimeSpan AutosaveInterval = TimeSpan.FromSeconds(30);
 
     [Inject] private IPostAdminService Posts { get; set; } = default!;
+    [Inject] private ISettingsService Settings { get; set; } = default!;
     [Inject] private IToastService Toasts { get; set; } = default!;
     [Inject] private IValidator<PostEditDto> Validator { get; set; } = default!;
     [Inject] private DraftBackupStore Backups { get; set; } = default!;
@@ -59,6 +65,13 @@ public partial class PostEditor : ComponentBase, IAsyncDisposable
 
     /// <summary>The post id from the route; <see langword="null"/> on <c>/admin/posts/new</c>.</summary>
     [Parameter] public int? Id { get; set; }
+
+    /// <summary>
+    /// A revision to load into the editor as unsaved changes (<c>?restore=12</c>), set by the revision history page's
+    /// Restore button (A13, T4.3).
+    /// </summary>
+    [SupplyParameterFromQuery(Name = "restore")]
+    public int? RestoreRevisionId { get; set; }
 
     /// <summary>The post being edited; loaded while prerendering and restored in the browser.</summary>
     [PersistentState]
@@ -109,9 +122,38 @@ public partial class PostEditor : ComponentBase, IAsyncDisposable
     private bool _linkGuardEnabled;
     private bool _leaveApproved;
 
+    /// <summary>The blog's time zone, in which the schedule picker works (design 10.2, Q10); loaded once.</summary>
+    private string? _timeZoneId;
+
+    /// <summary>Whether the schedule picker is open.</summary>
+    private bool _showSchedule;
+
+    /// <summary>
+    /// The schedule picker's value as the <c>datetime-local</c> input reports it (<c>2026-10-01T09:00</c>): a wall-clock
+    /// time in <see cref="_timeZoneId"/>. Kept as text and parsed on submit, because browsers differ on whether they
+    /// include seconds.
+    /// </summary>
+    private string? _scheduleText;
+
+    /// <summary>Why the schedule picker's value can't be used, shown under it.</summary>
+    private string? _scheduleError;
+
+    /// <summary>The publish time sent by a <see cref="SaveKind.Schedule"/> save.</summary>
+    private DateTimeOffset? _scheduleOn;
+
+    /// <summary>The <see cref="RestoreRevisionId"/> already applied, so a re-render doesn't apply it twice.</summary>
+    private int? _restoredRevisionId;
+
     private bool IsNew => Post is { Id: 0 };
 
+    /// <summary>Published or scheduled: edits are staged, and <b>Update</b> saves them (Q3).</summary>
     private bool IsPublished => Post?.Status == PostStatus.Published;
+
+    /// <summary>Published with a date that is still ahead (design 6.3, A9).</summary>
+    private bool IsScheduled => Post is not null && PostSchedule.IsScheduled(Post.Status, Post.PublishedOn, TimeProvider.GetUtcNow());
+
+    /// <summary>Published and past its publish time, so readers can see it.</summary>
+    private bool IsLive => Post is not null && PostSchedule.IsLive(Post.Status, Post.PublishedOn, TimeProvider.GetUtcNow());
 
     private bool IsBusy => _status == SaveStatus.Saving;
 
@@ -136,6 +178,8 @@ public partial class PostEditor : ComponentBase, IAsyncDisposable
     /// <summary>Loads the post for the route, or starts a new one, unless restored state already belongs to it.</summary>
     protected override async Task OnParametersSetAsync()
     {
+        await LoadTimeZoneAsync();
+
         var routeId = Id ?? 0;
         if (_loadedRouteId == routeId)
         {
@@ -177,6 +221,32 @@ public partial class PostEditor : ComponentBase, IAsyncDisposable
             _checkBackup = false;
             await OfferBackupAsync();
         }
+
+        // After the backup check, so the restored revision (now unsaved) isn't mistaken for a stale backup.
+        if (_interactive && Post is { Id: > 0 } && RestoreRevisionId is { } revisionId && _restoredRevisionId != revisionId)
+        {
+            _restoredRevisionId = revisionId;
+            await RestoreRevisionAsync(revisionId);
+        }
+    }
+
+    /// <summary>Loads the blog's time zone for the schedule picker, once.</summary>
+    private async Task LoadTimeZoneAsync()
+    {
+        if (_timeZoneId is not null)
+        {
+            return;
+        }
+
+        try
+        {
+            _timeZoneId = (await Settings.GetAsync()).TimeZoneId;
+        }
+        catch (HttpRequestException ex)
+        {
+            // Only scheduling needs it; the picker says so if it is still missing.
+            Logger.LogWarning(ex, "Loading the blog's time zone failed.");
+        }
     }
 
     /// <summary>Loads a post from the service, or starts a blank one for <c>/admin/posts/new</c>.</summary>
@@ -210,6 +280,8 @@ public partial class PostEditor : ComponentBase, IAsyncDisposable
         _slugCheck = null;
         _backupOffer = null;
         _conflictUnresolved = false;
+        _showSchedule = false;
+        _scheduleError = null;
         _showPendingChanges = post.PendingChanges is not null;
         _stats = ReadingTime.Calculate(post.ContentMarkdown);
 
@@ -238,6 +310,61 @@ public partial class PostEditor : ComponentBase, IAsyncDisposable
     private Task OnTagsEditedAsync()
     {
         _editContext?.NotifyFieldChanged(FieldIdentifier.Create(() => Post!.Tags));
+        return OnEditedAsync();
+    }
+
+    private Task OnMetaTitleEditedAsync()
+    {
+        _editContext?.NotifyFieldChanged(FieldIdentifier.Create(() => Post!.MetaTitle));
+        return OnEditedAsync();
+    }
+
+    private Task OnMetaDescriptionEditedAsync()
+    {
+        _editContext?.NotifyFieldChanged(FieldIdentifier.Create(() => Post!.MetaDescription));
+        return OnEditedAsync();
+    }
+
+    /// <summary>Picks the cover image (A15) from the media library.</summary>
+    private async Task ChooseCoverAsync()
+    {
+        if (Post is not null && await _mediaPicker.PickAsync("Choose a cover image") is { } item)
+        {
+            Post.CoverMediaId = item.Id;
+            Post.CoverImage = PostImageDto.From(item);
+            await OnImageEditedAsync(nameof(PostEditDto.CoverMediaId));
+        }
+    }
+
+    private Task RemoveCoverAsync()
+    {
+        Post!.CoverMediaId = null;
+        Post.CoverImage = null;
+        return OnImageEditedAsync(nameof(PostEditDto.CoverMediaId));
+    }
+
+    /// <summary>Picks the social sharing image (A16) from the media library.</summary>
+    private async Task ChooseSocialImageAsync()
+    {
+        if (Post is not null && await _mediaPicker.PickAsync("Choose a social image") is { } item)
+        {
+            Post.SocialImageMediaId = item.Id;
+            Post.SocialImage = PostImageDto.From(item);
+            await OnImageEditedAsync(nameof(PostEditDto.SocialImageMediaId));
+        }
+    }
+
+    private Task RemoveSocialImageAsync()
+    {
+        Post!.SocialImageMediaId = null;
+        Post.SocialImage = null;
+        return OnImageEditedAsync(nameof(PostEditDto.SocialImageMediaId));
+    }
+
+    /// <summary>Records an image change, clearing a server error on its field (such as "no longer in the library").</summary>
+    private Task OnImageEditedAsync(string fieldName)
+    {
+        _editContext?.NotifyFieldChanged(_editContext.Field(fieldName));
         return OnEditedAsync();
     }
 
@@ -401,6 +528,92 @@ public partial class PostEditor : ComponentBase, IAsyncDisposable
     }
 
     /// <summary>
+    /// Opens the schedule picker at the current scheduled time, or at the start of the next hour, in the blog's time
+    /// zone.
+    /// </summary>
+    private void OpenSchedule()
+    {
+        _scheduleError = null;
+        if (_timeZoneId is null)
+        {
+            _scheduleError = "The blog's time zone couldn't be loaded, so posts can't be scheduled right now. Reload the page and try again.";
+            _showSchedule = true;
+            return;
+        }
+
+        try
+        {
+            var start = IsScheduled
+                ? Post!.PublishedOn!.Value
+                : TimeProvider.GetUtcNow().AddHours(1);
+            var local = BlogTimeZone.ToLocalDateTime(start, _timeZoneId);
+            var initial = IsScheduled ? local : local.Date.AddHours(local.Hour);
+            _scheduleText = initial.ToString(ScheduleInputFormats[0], CultureInfo.InvariantCulture);
+            _showSchedule = true;
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            _scheduleError = $"The time zone '{_timeZoneId}' isn't available in this browser, so posts can't be scheduled here.";
+            _showSchedule = true;
+        }
+    }
+
+    /// <summary>
+    /// Keeps the picker's raw value. Not <c>@bind</c>: Razor binds <c>datetime-local</c> inputs to typed values with a
+    /// fixed format, which rejected the browser's value and reverted the picker.
+    /// </summary>
+    private void OnScheduleChanged(ChangeEventArgs e)
+    {
+        _scheduleText = e.Value?.ToString();
+        _scheduleError = null;
+    }
+
+    private void CancelSchedule()
+    {
+        _showSchedule = false;
+        _scheduleError = null;
+    }
+
+    /// <summary>
+    /// Saves the editor and publishes the post at the picked time (design 6.3, A9). The time is read in the blog's time
+    /// zone, whatever the browser's own zone is, and must be in the future; to publish now there is <b>Publish now</b>.
+    /// </summary>
+    private async Task ScheduleAsync()
+    {
+        _scheduleError = null;
+        if (_timeZoneId is null
+            || !DateTime.TryParseExact(_scheduleText, ScheduleInputFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var local))
+        {
+            _scheduleError = "Choose the date and time to publish at.";
+            return;
+        }
+
+        DateTimeOffset publishOn;
+        try
+        {
+            publishOn = BlogTimeZone.FromLocalDateTime(local, _timeZoneId);
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            _scheduleError = $"The time zone '{_timeZoneId}' isn't available in this browser, so posts can't be scheduled here.";
+            return;
+        }
+
+        if (publishOn <= TimeProvider.GetUtcNow())
+        {
+            _scheduleError = "Choose a time in the future, or use Publish now.";
+            return;
+        }
+
+        _scheduleOn = publishOn;
+        await SaveAsync(SaveKind.Schedule);
+        if (_status == SaveStatus.Saved)
+        {
+            _showSchedule = false;
+        }
+    }
+
+    /// <summary>
     /// Saves the editor through the right service call for <paramref name="kind"/>, then copies the server's
     /// computed values back. A conflict is resolved with the author after the save lock is released.
     /// </summary>
@@ -470,25 +683,25 @@ public partial class PostEditor : ComponentBase, IAsyncDisposable
         if (sent.Id == 0)
         {
             var created = await Posts.CreateAsync(sent);
-            if (kind != SaveKind.Publish || created is not PostSaved createdPost)
+            if (kind is not (SaveKind.Publish or SaveKind.Schedule) || created is not PostSaved createdPost)
             {
                 return created;
             }
 
-            return await Posts.PublishAsync(createdPost.Post.Id, new PublishPostRequest { RowVersion = createdPost.Post.RowVersion });
+            return await Posts.PublishAsync(createdPost.Post.Id, PublishRequest(kind, createdPost.Post.RowVersion));
         }
 
         return kind switch
         {
             SaveKind.Autosave => await Posts.AutosaveAsync(sent.Id, sent),
             SaveKind.Draft or SaveKind.Update => await Posts.UpdateAsync(sent.Id, sent),
-            SaveKind.Publish => await PublishExistingAsync(sent),
+            SaveKind.Publish or SaveKind.Schedule => await PublishExistingAsync(kind, sent),
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null)
         };
     }
 
-    /// <summary>Saves a draft's latest edits, then publishes it.</summary>
-    private async Task<PostSaveResult> PublishExistingAsync(PostEditDto sent)
+    /// <summary>Saves the latest edits, then publishes the post now or at the scheduled time.</summary>
+    private async Task<PostSaveResult> PublishExistingAsync(SaveKind kind, PostEditDto sent)
     {
         var updated = await Posts.UpdateAsync(sent.Id, sent);
         if (updated is not PostSaved saved)
@@ -496,7 +709,20 @@ public partial class PostEditor : ComponentBase, IAsyncDisposable
             return updated;
         }
 
-        return await Posts.PublishAsync(sent.Id, new PublishPostRequest { RowVersion = saved.Post.RowVersion });
+        return await Posts.PublishAsync(sent.Id, PublishRequest(kind, saved.Post.RowVersion));
+    }
+
+    /// <summary>
+    /// The publish request for a save: <see cref="SaveKind.Schedule"/> sends the picked time; <see cref="SaveKind.Publish"/>
+    /// sends none, which publishes now (or keeps the original date of a post that was live before).
+    /// </summary>
+    private PublishPostRequest PublishRequest(SaveKind kind, byte[]? rowVersion)
+    {
+        return new PublishPostRequest
+        {
+            PublishOn = kind == SaveKind.Schedule ? _scheduleOn : null,
+            RowVersion = rowVersion
+        };
     }
 
     /// <summary>Applies a successful save to the editor state.</summary>
@@ -556,6 +782,9 @@ public partial class PostEditor : ComponentBase, IAsyncDisposable
         {
             case SaveKind.Publish:
                 Toasts.ShowSuccess("Your post is live.", "Published");
+                break;
+            case SaveKind.Schedule:
+                Toasts.ShowSuccess($"Your post will be published on {ScheduledText}.", "Scheduled");
                 break;
             case SaveKind.Update:
                 Toasts.ShowSuccess("Your changes are live.", "Updated");
@@ -652,14 +881,30 @@ public partial class PostEditor : ComponentBase, IAsyncDisposable
         await LoadAsync(Post.Id);
     }
 
-    /// <summary>Returns the post to draft after confirming; unsaved edits stay in the editor and are saved as the draft.</summary>
+    /// <summary>
+    /// Returns the post to draft after confirming; unsaved edits stay in the editor and are saved as the draft. For a
+    /// scheduled post this is <b>Unschedule</b>, which also forgets the scheduled date.
+    /// </summary>
     private async Task UnpublishAsync()
     {
-        if (Post is null || !await _confirm.ConfirmAsync(
+        var scheduled = IsScheduled;
+        if (Post is null)
+        {
+            return;
+        }
+
+        var confirmed = scheduled
+            ? await _confirm.ConfirmAsync(
+                "Unschedule post?",
+                "The post goes back to being a draft and won't be published at the scheduled time.",
+                "Unschedule",
+                "btn-warning")
+            : await _confirm.ConfirmAsync(
                 "Unpublish post?",
                 "The post goes back to being a draft and its public URL stops working until you publish it again.",
                 "Unpublish",
-                "btn-warning"))
+                "btn-warning");
+        if (!confirmed)
         {
             return;
         }
@@ -682,7 +927,7 @@ public partial class PostEditor : ComponentBase, IAsyncDisposable
                     _editVersion++;
                 }
 
-                Toasts.ShowSuccess("The post is a draft again.", "Unpublished");
+                Toasts.ShowSuccess("The post is a draft again.", scheduled ? "Unscheduled" : "Unpublished");
             }
             else
             {
@@ -692,7 +937,7 @@ public partial class PostEditor : ComponentBase, IAsyncDisposable
         catch (HttpRequestException)
         {
             _status = SaveStatus.Failed;
-            Toasts.ShowError("The post couldn't be unpublished. Check your connection and try again.");
+            Toasts.ShowError($"The post couldn't be {(scheduled ? "unscheduled" : "unpublished")}. Check your connection and try again.");
         }
         finally
         {
@@ -701,7 +946,7 @@ public partial class PostEditor : ComponentBase, IAsyncDisposable
 
         if (result is PostConflict)
         {
-            Toasts.ShowWarning("The post was changed in another tab. Reload the page before unpublishing.");
+            Toasts.ShowWarning($"The post was changed in another tab. Reload the page before {(scheduled ? "unscheduling" : "unpublishing")}.");
         }
     }
 
@@ -722,6 +967,17 @@ public partial class PostEditor : ComponentBase, IAsyncDisposable
         post.ReadingMinutes = saved.ReadingMinutes;
         post.PublicPath = saved.PublicPath;
         post.PendingChanges = saved.PendingChanges;
+
+        // The server's thumbnails carry the images' current versions; keep them while the choice is unchanged.
+        if (post.CoverMediaId == saved.CoverMediaId)
+        {
+            post.CoverImage = saved.CoverImage;
+        }
+
+        if (post.SocialImageMediaId == saved.SocialImageMediaId)
+        {
+            post.SocialImage = saved.SocialImage;
+        }
 
         if (!adoptEditableFields)
         {
@@ -806,6 +1062,49 @@ public partial class PostEditor : ComponentBase, IAsyncDisposable
         _showPendingChanges = false;
         await OnContentEditedAsync();
         _editContext?.NotifyValidationStateChanged();
+    }
+
+    /// <summary>
+    /// Loads a revision's title and content into the editor as unsaved changes (A13, T4.3). Nothing is saved until the
+    /// author saves, or clicks Update on a published post; until then the local backup keeps the restored text.
+    /// </summary>
+    private async Task RestoreRevisionAsync(int revisionId)
+    {
+        var post = Post!;
+        try
+        {
+            if (await Posts.GetRevisionAsync(post.Id, revisionId) is not { } revision)
+            {
+                Toasts.ShowWarning("That revision no longer exists, so nothing was restored.");
+            }
+            else
+            {
+                post.Title = revision.Title;
+                post.ContentMarkdown = revision.ContentMarkdown;
+                _showPendingChanges = false;
+                await OnContentEditedAsync();
+                _editContext?.NotifyValidationStateChanged();
+                Toasts.ShowInfo($"Restored the revision from {TimeText(revision.SavedOn)}. " +
+                    (IsPublished ? "Click Update to make it live." : "Save to keep it."));
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            Logger.LogWarning(ex, "Loading revision {RevisionId} of post {PostId} failed.", revisionId, post.Id);
+            Toasts.ShowError("The revision couldn't be loaded. Check your connection and try again.");
+        }
+
+        // Drop ?restore= from the address bar, so reloading the page doesn't restore the revision again.
+        try
+        {
+            await JS.InvokeVoidAsync("history.replaceState", null, string.Empty, Navigation.ToAbsoluteUri($"admin/posts/{post.Id}").ToString());
+        }
+        catch (JSException ex)
+        {
+            Logger.LogWarning(ex, "Updating the address bar for post {PostId} failed.", post.Id);
+        }
+
+        StateHasChanged();
     }
 
     private async Task DiscardBackupAsync()
@@ -934,6 +1233,7 @@ public partial class PostEditor : ComponentBase, IAsyncDisposable
         SaveStatus.Invalid when HasUnsavedEdits => ("bi-exclamation-circle", $"Not saved yet: {_autosaveProblem ?? "fix the highlighted fields."}", "text-warning"),
         _ when HasUnsavedEdits => ("bi-pencil", "Unsaved changes", "text-body-secondary"),
         _ when IsNew => ("bi-file-earmark", "Not saved yet", "text-body-secondary"),
+        _ when HasChangesNotLive && IsScheduled => ("bi-cloud-check", $"Saved {TimeText(_savedAt)}, not in the scheduled post yet", "text-warning"),
         _ when HasChangesNotLive => ("bi-cloud-check", $"Saved {TimeText(_savedAt)}, not live yet", "text-warning"),
         _ => ("bi-check2-circle", $"Saved {TimeText(_savedAt)}", "text-success")
     };
@@ -944,14 +1244,39 @@ public partial class PostEditor : ComponentBase, IAsyncDisposable
         return value?.ToLocalTime().ToString("t", CultureInfo.CurrentCulture) ?? string.Empty;
     }
 
+    /// <summary>
+    /// When a scheduled post goes live, in the blog's time zone (the zone the schedule was picked in), such as
+    /// "October 1, 2026 at 9:00 AM".
+    /// </summary>
+    private string ScheduledText
+    {
+        get
+        {
+            if (Post?.PublishedOn is not { } publishOn)
+            {
+                return string.Empty;
+            }
+
+            try
+            {
+                var local = _timeZoneId is null ? publishOn.ToLocalTime().DateTime : BlogTimeZone.ToLocalDateTime(publishOn, _timeZoneId);
+                return string.Create(CultureInfo.CurrentCulture, $"{local:MMMM d, yyyy} at {local:t}");
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                return string.Create(CultureInfo.CurrentCulture, $"{publishOn.ToLocalTime():MMMM d, yyyy} at {publishOn.ToLocalTime():t}");
+            }
+        }
+    }
+
     /// <summary>A publish date in the blog's time zone, as used in the URL.</summary>
     private static string DateText(DateOnly? value)
     {
         return value?.ToString("MMMM d, yyyy", CultureInfo.CurrentCulture) ?? string.Empty;
     }
 
-    /// <summary>Whether a published post's slug differs from the live one, so Update will add a redirect.</summary>
-    private bool SlugWillRedirect => IsPublished && _stored is not null && Post is not null
+    /// <summary>Whether a live post's slug differs from the stored one, so Update will add a redirect.</summary>
+    private bool SlugWillRedirect => IsLive && _stored is not null && Post is not null
         && !string.IsNullOrWhiteSpace(Post.Slug) && Post.Slug != _stored.Slug;
 
     /// <inheritdoc />
@@ -1000,7 +1325,10 @@ public partial class PostEditor : ComponentBase, IAsyncDisposable
         Update,
 
         /// <summary>Saves, then publishes now.</summary>
-        Publish
+        Publish,
+
+        /// <summary>Saves, then publishes at the time picked in the schedule picker (design 6.3, A9).</summary>
+        Schedule
     }
 
     /// <summary>State of the most recent save, for the status line.</summary>

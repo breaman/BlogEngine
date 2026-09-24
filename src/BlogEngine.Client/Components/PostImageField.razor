@@ -1,0 +1,18 @@
+@if (Image is not null)
+{
+    <img src="@Image.Url" alt="@Image.AltText" class="post-image-field-thumb img-fluid rounded border mb-2" loading="lazy" decoding="async" />
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-sm btn-outline-secondary flex-fill" disabled="@Disabled" @onclick="OnChoose">
+            <span class="bi bi-arrow-repeat me-1" aria-hidden="true"></span> Change
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-danger flex-fill" disabled="@Disabled" @onclick="OnRemove">
+            <span class="bi bi-x-lg me-1" aria-hidden="true"></span> Remove
+        </button>
+    </div>
+}
+else
+{
+    <button type="button" class="btn btn-sm btn-outline-secondary w-100" disabled="@Disabled" @onclick="OnChoose">
+        <span class="bi bi-image me-1" aria-hidden="true"></span> @ChooseText
+    </button>
+}

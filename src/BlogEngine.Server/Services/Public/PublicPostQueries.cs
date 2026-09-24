@@ -2,6 +2,7 @@ using System.Globalization;
 
 using BlogEngine.Data.Models;
 using BlogEngine.Data.Queries;
+using BlogEngine.Shared.Common;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
@@ -34,8 +35,8 @@ namespace BlogEngine.Server.Services.Public;
 /// </para>
 /// <para>
 /// <b>Time.</b> Visibility is evaluated when a cache entry is built. Scheduled posts (T4.1) become visible when
-/// the scheduled-publish watcher evicts <see cref="PublicCacheTags.Posts"/>; until then the expiration below is
-/// the upper bound on how stale an entry can be.
+/// <see cref="ScheduledPublishWatcher"/> evicts <see cref="PublicCacheTags.Posts"/>; should it fail, the expiration
+/// below is the upper bound on how stale an entry can be.
 /// </para>
 /// <para>
 /// Cache misses load through their own scope, like <see cref="ServerSettingsService"/>: during static SSR the
@@ -252,7 +253,13 @@ public sealed class PublicPostQueries(HybridCache cache, CacheInvalidator invali
                 p.MetaTitle,
                 p.MetaDescription,
                 p.AllowComments,
-                p.CommentsCloseOn
+                p.CommentsCloseOn,
+                Cover = p.CoverMedia == null
+                    ? null
+                    : new { p.CoverMedia.PublicId, p.CoverMedia.FileName, p.CoverMedia.Version, p.CoverMedia.Width, p.CoverMedia.Height, p.CoverMedia.AltText },
+                Social = p.SocialImageMedia == null
+                    ? null
+                    : new { p.SocialImageMedia.PublicId, p.SocialImageMedia.FileName, p.SocialImageMedia.Version, p.SocialImageMedia.Width, p.SocialImageMedia.Height, p.SocialImageMedia.AltText }
             })
             .ToListAsync(cancellationToken);
 
@@ -264,7 +271,13 @@ public sealed class PublicPostQueries(HybridCache cache, CacheInvalidator invali
                     new PublicPostSummary(r.Id, r.Title, r.Slug, r.Summary, r.PublishedOn, r.PublishedDateLocal!.Value,
                         r.LastUpdatedOn, r.ReadingMinutes, r.IsFeatured,
                         [.. r.Tags.Select(t => new PublicTagLink(t.Id, t.Name, t.Slug))]),
-                    r.ContentHtml, r.HasCodeBlocks, r.MetaTitle, r.MetaDescription, r.AllowComments, r.CommentsCloseOn))
+                    r.ContentHtml, r.HasCodeBlocks, r.MetaTitle, r.MetaDescription, r.AllowComments, r.CommentsCloseOn,
+                    r.Cover is { } cover
+                        ? new PublicImage(MediaPaths.Versioned(cover.PublicId, cover.FileName, cover.Version), cover.Width, cover.Height, cover.AltText)
+                        : null,
+                    r.Social is { } social
+                        ? new PublicImage(MediaPaths.Versioned(social.PublicId, social.FileName, social.Version), social.Width, social.Height, social.AltText)
+                        : null))
         ];
     }
 }

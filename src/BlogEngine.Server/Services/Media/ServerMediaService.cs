@@ -65,7 +65,8 @@ public sealed class ServerMediaService(
 
         if (query.Unused)
         {
-            items = items.Where(m => !UsingPosts().Any(p => p.CoverMediaId == m.Id || p.PostMedia.Any(pm => pm.MediaItemId == m.Id)));
+            items = items.Where(m => !UsingPosts().Any(p => p.CoverMediaId == m.Id || p.SocialImageMediaId == m.Id
+                || p.PostMedia.Any(pm => pm.MediaItemId == m.Id)));
         }
 
         var totalCount = await items.CountAsync(cancellationToken);
@@ -228,9 +229,14 @@ public sealed class ServerMediaService(
             return new MediaInUse(usage);
         }
 
-        // Cover and settings references don't cascade (SQL Server allows only one cascade path), so clear them.
-        var covers = await UsingPosts().Where(p => p.CoverMediaId == id).ToListAsync(cancellationToken);
-        covers.ForEach(p => p.CoverMediaId = null);
+        // Cover, social image and settings references don't cascade (SQL Server allows only one cascade path), so
+        // clear them.
+        var referencing = await UsingPosts().Where(p => p.CoverMediaId == id || p.SocialImageMediaId == id).ToListAsync(cancellationToken);
+        foreach (var post in referencing)
+        {
+            post.CoverMediaId = post.CoverMediaId == id ? null : post.CoverMediaId;
+            post.SocialImageMediaId = post.SocialImageMediaId == id ? null : post.SocialImageMediaId;
+        }
 
         var settings = await dbContext.SiteSettings
             .Where(s => s.AuthorAvatarMediaId == id || s.FaviconMediaId == id || s.DefaultSocialImageMediaId == id)
@@ -390,12 +396,12 @@ public sealed class ServerMediaService(
         return dbContext.Posts.IgnoreQueryFilters([QueryFilters.SoftDelete]);
     }
 
-    /// <summary>The posts that use an item in their content or as their cover.</summary>
+    /// <summary>The posts that use an item in their content, as their cover or as their social image.</summary>
     private async Task<List<MediaUsageDto>> LoadUsageAsync(int mediaId, CancellationToken cancellationToken)
     {
         return await UsingPosts()
             .AsNoTracking()
-            .Where(p => p.CoverMediaId == mediaId || p.PostMedia.Any(pm => pm.MediaItemId == mediaId))
+            .Where(p => p.CoverMediaId == mediaId || p.SocialImageMediaId == mediaId || p.PostMedia.Any(pm => pm.MediaItemId == mediaId))
             .OrderBy(p => p.Title)
             .Select(p => new MediaUsageDto { PostId = p.Id, Title = p.Title, IsInTrash = p.IsDeleted })
             .ToListAsync(cancellationToken);
@@ -405,7 +411,7 @@ public sealed class ServerMediaService(
     private async Task<List<int>> LoadUsingPostIdsAsync(int mediaId, CancellationToken cancellationToken)
     {
         return await UsingPosts()
-            .Where(p => p.CoverMediaId == mediaId || p.PostMedia.Any(pm => pm.MediaItemId == mediaId))
+            .Where(p => p.CoverMediaId == mediaId || p.SocialImageMediaId == mediaId || p.PostMedia.Any(pm => pm.MediaItemId == mediaId))
             .Select(p => p.Id)
             .ToListAsync(cancellationToken);
     }
@@ -430,7 +436,7 @@ public sealed class ServerMediaService(
         return items.Select(m => new MediaRow(
             m.Id, m.PublicId, m.FileName, m.ContentType, m.Width, m.Height, m.SizeBytes, m.AltText, m.Caption,
             m.Version, m.CreatedOn, m.EditOperationsJson,
-            posts.Count(p => p.CoverMediaId == m.Id || p.PostMedia.Any(pm => pm.MediaItemId == m.Id))));
+            posts.Count(p => p.CoverMediaId == m.Id || p.SocialImageMediaId == m.Id || p.PostMedia.Any(pm => pm.MediaItemId == m.Id))));
     }
 
     private static MediaItemDto ToDto(MediaRow row)

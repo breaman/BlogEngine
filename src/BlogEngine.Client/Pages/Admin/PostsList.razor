@@ -103,14 +103,7 @@ else
                             <div class="small text-body-secondary font-monospace">@post.Slug</div>
                         </td>
                         <td>
-                            @if (post.Status == PostStatus.Published)
-                            {
-                                <span class="badge text-bg-success">Published</span>
-                            }
-                            else
-                            {
-                                <span class="badge text-bg-secondary">Draft</span>
-                            }
+                            <PostStatusBadge Status="post.Status" PublishedOn="post.PublishedOn" />
                         </td>
                         <td>
                             @foreach (var tag in post.Tags)
@@ -125,7 +118,14 @@ else
                             <a class="btn btn-sm btn-outline-primary" href="@($"admin/posts/{post.Id}")" title="Edit" aria-label="Edit @post.Title">
                                 <span class="bi bi-pencil" aria-hidden="true"></span>
                             </a>
-                            @if (post.PublicPath is { } path)
+                            @if (IsScheduled(post))
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-warning" title="Unschedule" aria-label="Unschedule @post.Title"
+                                        disabled="@busy" @onclick="() => UnpublishAsync(post)">
+                                    <span class="bi bi-calendar-x" aria-hidden="true"></span>
+                                </button>
+                            }
+                            else if (post.PublicPath is { } path)
                             {
                                 <a class="btn btn-sm btn-outline-secondary" href="@path" target="_blank" rel="noopener" title="View" aria-label="View @post.Title">
                                     <span class="bi bi-box-arrow-up-right" aria-hidden="true"></span>

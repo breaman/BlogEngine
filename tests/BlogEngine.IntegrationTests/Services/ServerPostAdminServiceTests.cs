@@ -325,17 +325,100 @@ public class ServerPostAdminServiceTests(BlogEngineWebApplicationFactory factory
         await Assert.That(await IsPubliclyVisibleAsync(created.Id)).IsTrue();
     }
 
-    /// <summary>Scheduling isn't supported yet (T4.1), so a future date is rejected and the post stays a draft.</summary>
+    /// <summary>A future date schedules the post (T4.1): published, but hidden from readers until the date passes.</summary>
     [Test]
-    public async Task Publish_FutureDate_IsRejected()
+    public async Task Publish_FutureDate_SchedulesPost()
     {
         var created = await CreateAsync(new PostEditDto { Title = $"Future {Unique()}" });
+        var publishOn = DateTimeOffset.UtcNow.AddDays(1);
 
-        var result = await WithServiceAsync(s => s.PublishAsync(created.Id,
-            new PublishPostRequest { PublishOn = DateTimeOffset.UtcNow.AddDays(1) }));
+        var scheduled = await ExpectSavedAsync(s => s.PublishAsync(created.Id, new PublishPostRequest { PublishOn = publishOn }));
 
-        await Assert.That(((PostInvalid)result).Errors.Keys).IsEquivalentTo([nameof(PublishPostRequest.PublishOn)]);
-        await Assert.That((await FindAsync(created.Id)).Status).IsEqualTo(PostStatus.Draft);
+        await Assert.That(scheduled.Status).IsEqualTo(PostStatus.Published);
+        await Assert.That(scheduled.PublishedOn).IsEqualTo(publishOn);
+        await Assert.That(scheduled.PublishedDateLocal).IsNotNull();
+        await Assert.That(await IsPubliclyVisibleAsync(created.Id)).IsFalse();
+        await Assert.That(await RevisionKindsAsync(created.Id)).Contains(RevisionKind.Publish);
+    }
+
+    /// <summary>Rescheduling without changing the content doesn't add another identical publish revision.</summary>
+    [Test]
+    public async Task Reschedule_SameContent_KeepsOnePublishRevision()
+    {
+        var created = await CreateAsync(new PostEditDto { Title = $"Reschedule {Unique()}", ContentMarkdown = "Same." });
+        await ExpectSavedAsync(s => s.PublishAsync(created.Id, new PublishPostRequest { PublishOn = DateTimeOffset.UtcNow.AddDays(1) }));
+        await ExpectSavedAsync(s => s.PublishAsync(created.Id, new PublishPostRequest { PublishOn = DateTimeOffset.UtcNow.AddDays(2) }));
+
+        var kinds = await RevisionKindsAsync(created.Id);
+
+        await Assert.That(kinds.Count(k => k == RevisionKind.Publish)).IsEqualTo(1);
+    }
+
+    /// <summary>Publishing a scheduled post without a date publishes it now instead of keeping the future date.</summary>
+    [Test]
+    public async Task Publish_ScheduledPostWithoutDate_PublishesNow()
+    {
+        var created = await CreateAsync(new PostEditDto { Title = $"Early {Unique()}" });
+        await ExpectSavedAsync(s => s.PublishAsync(created.Id, new PublishPostRequest { PublishOn = DateTimeOffset.UtcNow.AddDays(3) }));
+
+        var published = await PublishAsync(created.Id);
+
+        await Assert.That(published.PublishedOn!.Value).IsLessThanOrEqualTo(DateTimeOffset.UtcNow);
+        await Assert.That(await IsPubliclyVisibleAsync(created.Id)).IsTrue();
+    }
+
+    /// <summary>Unscheduling returns the post to draft and forgets the scheduled date, so the next publish is "now".</summary>
+    [Test]
+    public async Task Unpublish_ScheduledPost_ForgetsScheduledDate()
+    {
+        var created = await CreateAsync(new PostEditDto { Title = $"Unschedule {Unique()}" });
+        await ExpectSavedAsync(s => s.PublishAsync(created.Id, new PublishPostRequest { PublishOn = DateTimeOffset.UtcNow.AddDays(2) }));
+
+        var unscheduled = await ExpectSavedAsync(s => s.UnpublishAsync(created.Id, new UnpublishPostRequest()));
+
+        await Assert.That(unscheduled.Status).IsEqualTo(PostStatus.Draft);
+        await Assert.That(unscheduled.PublishedOn).IsNull();
+        await Assert.That(unscheduled.PublishedDateLocal).IsNull();
+    }
+
+    /// <summary>
+    /// Re-dating or re-slugging a scheduled post adds no redirect, because its old URL was never live; the same change on
+    /// a live post does.
+    /// </summary>
+    [Test]
+    public async Task Update_ScheduledPost_AddsNoRedirect()
+    {
+        var created = await CreateAsync(new PostEditDto { Title = $"Scheduled slug {Unique()}" });
+        var scheduled = await ExpectSavedAsync(s => s.PublishAsync(created.Id, new PublishPostRequest { PublishOn = DateTimeOffset.UtcNow.AddDays(2) }));
+        var oldPath = scheduled.PublicPath!;
+
+        scheduled.Slug = $"moved-{Unique()}";
+        var renamed = await UpdateAsync(scheduled);
+        var redated = await ExpectSavedAsync(s => s.PublishAsync(created.Id, new PublishPostRequest { PublishOn = DateTimeOffset.UtcNow.AddDays(9) }));
+
+        await Assert.That(renamed.PublicPath).IsNotEqualTo(oldPath);
+        await Assert.That(redated.PublicPath).IsNotEqualTo(renamed.PublicPath);
+        await Assert.That(await RedirectTargetAsync(oldPath)).IsNull();
+        await Assert.That(await RedirectTargetAsync(renamed.PublicPath!)).IsNull();
+    }
+
+    /// <summary>The Published tab shows only live posts, and the Scheduled tab only future ones, soonest first.</summary>
+    [Test]
+    public async Task GetPosts_SplitsPublishedAndScheduled()
+    {
+        var tag = $"Sched{Unique()}";
+        var live = await CreateAsync(new PostEditDto { Title = $"Live {Unique()}", Tags = [tag] });
+        var later = await CreateAsync(new PostEditDto { Title = $"Later {Unique()}", Tags = [tag] });
+        var sooner = await CreateAsync(new PostEditDto { Title = $"Sooner {Unique()}", Tags = [tag] });
+        await PublishAsync(live.Id);
+        await ExpectSavedAsync(s => s.PublishAsync(later.Id, new PublishPostRequest { PublishOn = DateTimeOffset.UtcNow.AddDays(5) }));
+        await ExpectSavedAsync(s => s.PublishAsync(sooner.Id, new PublishPostRequest { PublishOn = DateTimeOffset.UtcNow.AddDays(1) }));
+
+        var published = await WithServiceAsync(s => s.GetPostsAsync(new PostListQuery { Tag = tag, Status = PostListStatus.Published }));
+        var scheduled = await WithServiceAsync(s => s.GetPostsAsync(new PostListQuery { Tag = tag, Status = PostListStatus.Scheduled }));
+
+        await Assert.That(published.Items.Select(p => p.Id)).IsEquivalentTo([live.Id]);
+        await Assert.That(scheduled.Items.Select(p => p.Id)).IsEquivalentTo([sooner.Id, later.Id], TUnit.Assertions.Enums.CollectionOrdering.Matching);
     }
 
     /// <summary>Publishing with a stale row version is a conflict.</summary>
@@ -583,6 +666,49 @@ public class ServerPostAdminServiceTests(BlogEngineWebApplicationFactory factory
 
         await Assert.That(tags.Select(t => t.Name)).IsEquivalentTo([$"{token}Go", $"x{token}Rust"], TUnit.Assertions.Enums.CollectionOrdering.Matching);
         await Assert.That(tags.All(t => t.PostCount == 1)).IsTrue();
+    }
+
+    /// <summary>
+    /// Restoring a revision and saving brings back the old title and content (A13, T4.3), on a draft and, through
+    /// Update, on a published post.
+    /// </summary>
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task RestoringRevision_AndSaving_ProducesOldContent(bool published)
+    {
+        var originalTitle = $"Original {Unique()}";
+        var created = await CreateAsync(new PostEditDto { Title = originalTitle, ContentMarkdown = "The **first** version." });
+        var post = published ? await PublishAsync(created.Id) : created;
+        post.Title = $"Rewritten {Unique()}";
+        post.ContentMarkdown = "Something else entirely.";
+        post = await UpdateAsync(post);
+
+        var revisions = await WithServiceAsync(s => s.GetRevisionsAsync(post.Id));
+        var oldest = revisions!.Last(r => r.Title == originalTitle);
+        var revision = await WithServiceAsync(s => s.GetRevisionAsync(post.Id, oldest.Id));
+        post.Title = revision!.Title;
+        post.ContentMarkdown = revision.ContentMarkdown;
+        var restored = await UpdateAsync(post);
+
+        var stored = await FindAsync(post.Id);
+        await Assert.That(restored.Title).IsEqualTo(originalTitle);
+        await Assert.That(stored.ContentMarkdown).IsEqualTo("The **first** version.");
+        await Assert.That(stored.ContentHtml).Contains("<strong>first</strong>");
+        await Assert.That((await WithServiceAsync(s => s.GetRevisionsAsync(post.Id)))![0].Title).IsEqualTo(originalTitle);
+    }
+
+    /// <summary>Revisions of another post aren't reachable through this post's id.</summary>
+    [Test]
+    public async Task GetRevision_OfAnotherPost_IsNull()
+    {
+        var first = await CreateAsync(new PostEditDto { Title = $"First {Unique()}" });
+        var second = await CreateAsync(new PostEditDto { Title = $"Second {Unique()}" });
+        var firstRevision = (await WithServiceAsync(s => s.GetRevisionsAsync(first.Id)))!.Single();
+
+        var crossed = await WithServiceAsync(s => s.GetRevisionAsync(second.Id, firstRevision.Id));
+
+        await Assert.That(crossed).IsNull();
     }
 
     /// <summary>A short random token that keeps each test's titles, slugs and tags apart.</summary>

@@ -45,6 +45,12 @@ public sealed class PostConfiguration : IEntityTypeConfiguration<Post>
             .HasForeignKey(p => p.CoverMediaId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // Same reasoning as the cover: media deletion clears the reference explicitly.
+        builder.HasOne(p => p.SocialImageMedia)
+            .WithMany()
+            .HasForeignKey(p => p.SocialImageMediaId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasMany(p => p.Tags)
             .WithMany(t => t.Posts)
             .UsingEntity<PostTag>(

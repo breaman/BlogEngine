@@ -49,6 +49,21 @@ public sealed class PostEditDto
     /// <summary>Optional SEO description override.</summary>
     public string? MetaDescription { get; set; }
 
+    /// <summary>Media library item shown above the post and used as its default social image (A15).</summary>
+    public int? CoverMediaId { get; set; }
+
+    /// <summary>
+    /// Thumbnail details of <see cref="CoverMediaId"/>; filled by the server, and by the editor when the author picks
+    /// an image. The server ignores it on save.
+    /// </summary>
+    public PostImageDto? CoverImage { get; set; }
+
+    /// <summary>Media library item used for social sharing previews instead of the cover (A16).</summary>
+    public int? SocialImageMediaId { get; set; }
+
+    /// <summary>Thumbnail details of <see cref="SocialImageMediaId"/>; ignored on save, like <see cref="CoverImage"/>.</summary>
+    public PostImageDto? SocialImage { get; set; }
+
     /// <summary>
     /// Concurrency token from the last load or save. Required for updates; a stale value makes the save
     /// fail with a conflict instead of overwriting changes made in another tab.

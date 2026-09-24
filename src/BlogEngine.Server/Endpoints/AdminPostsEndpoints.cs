@@ -1,12 +1,15 @@
 using BlogEngine.Shared.Contracts;
 using BlogEngine.Shared.Services;
 
+using FluentValidation;
+
 using Microsoft.AspNetCore.Http.HttpResults;
 
 namespace BlogEngine.Server.Endpoints;
 
 /// <summary>
-/// Admin API for posts (design 7.4): listing, editing, autosave, publishing, trash and slug checks. Each
+/// Admin API for posts (design 7.4): listing, editing, autosave, publishing, trash, revisions, preview links and slug
+/// checks. Each
 /// handler delegates to <see cref="IPostAdminService"/> and maps its <see cref="PostSaveResult"/> to HTTP:
 /// 200 with the saved post, 404, 409 for a stale <c>RowVersion</c>, or a 400 validation problem.
 /// </summary>
@@ -29,6 +32,11 @@ public static class AdminPostsEndpoints
         posts.MapPost("/{id:int}/unpublish", (int id, UnpublishPostRequest? request, IPostAdminService service, CancellationToken ct) =>
             ToHttpResultAsync(service.UnpublishAsync(id, request ?? new UnpublishPostRequest(), ct)));
         posts.MapDelete("/{id:int}", DeletePostAsync);
+        posts.MapGet("/{id:int}/revisions", GetRevisionsAsync);
+        posts.MapGet("/{id:int}/revisions/{revisionId:int}", GetRevisionAsync);
+        posts.MapGet("/{id:int}/preview-tokens", GetPreviewLinksAsync);
+        posts.MapPost("/{id:int}/preview-token", CreatePreviewLinkAsync);
+        posts.MapDelete("/{id:int}/preview-tokens/{linkId:int}", RevokePreviewLinkAsync);
         posts.MapPost("/slug-check", CheckSlugAsync);
 
         return group;
@@ -70,6 +78,59 @@ public static class AdminPostsEndpoints
         CancellationToken cancellationToken)
     {
         return await service.DeleteAsync(id, cancellationToken)
+            ? TypedResults.NoContent()
+            : TypedResults.NotFound();
+    }
+
+    /// <summary>Lists a post's revisions, newest first (A13).</summary>
+    private static async Task<Results<Ok<IReadOnlyList<PostRevisionSummaryDto>>, NotFound>> GetRevisionsAsync(int id,
+        IPostAdminService service, CancellationToken cancellationToken)
+    {
+        return await service.GetRevisionsAsync(id, cancellationToken) is { } revisions
+            ? TypedResults.Ok(revisions)
+            : TypedResults.NotFound();
+    }
+
+    /// <summary>Loads one revision with its content, for comparing and restoring.</summary>
+    private static async Task<Results<Ok<PostRevisionDto>, NotFound>> GetRevisionAsync(int id, int revisionId,
+        IPostAdminService service, CancellationToken cancellationToken)
+    {
+        return await service.GetRevisionAsync(id, revisionId, cancellationToken) is { } revision
+            ? TypedResults.Ok(revision)
+            : TypedResults.NotFound();
+    }
+
+    /// <summary>Lists a post's preview links that haven't expired (A14).</summary>
+    private static async Task<Results<Ok<IReadOnlyList<PreviewLinkDto>>, NotFound>> GetPreviewLinksAsync(int id,
+        IPreviewLinkService service, CancellationToken cancellationToken)
+    {
+        return await service.GetLinksAsync(id, cancellationToken) is { } links
+            ? TypedResults.Ok(links)
+            : TypedResults.NotFound();
+    }
+
+    /// <summary>Creates a preview link (A14); the body is optional and defaults to a 7-day link.</summary>
+    private static async Task<Results<Ok<PreviewLinkDto>, NotFound, ValidationProblem>> CreatePreviewLinkAsync(int id,
+        CreatePreviewLinkRequest? request, IPreviewLinkService service, IValidator<CreatePreviewLinkRequest> validator,
+        CancellationToken cancellationToken)
+    {
+        request ??= new CreatePreviewLinkRequest();
+        var validation = await validator.ValidateAsync(request, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return TypedResults.ValidationProblem(validation.ToDictionary());
+        }
+
+        return await service.CreateAsync(id, request, cancellationToken) is { } link
+            ? TypedResults.Ok(link)
+            : TypedResults.NotFound();
+    }
+
+    /// <summary>Revokes a preview link; its URL returns 404 from then on.</summary>
+    private static async Task<Results<NoContent, NotFound>> RevokePreviewLinkAsync(int id, int linkId, IPreviewLinkService service,
+        CancellationToken cancellationToken)
+    {
+        return await service.RevokeAsync(id, linkId, cancellationToken)
             ? TypedResults.NoContent()
             : TypedResults.NotFound();
     }

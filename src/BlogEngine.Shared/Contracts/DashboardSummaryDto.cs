@@ -17,6 +17,9 @@ public sealed class DashboardSummaryDto
     /// <summary>Comments awaiting moderation.</summary>
     public int PendingCommentCount { get; set; }
 
+    /// <summary>The next scheduled posts to go live, soonest first (design 6.3, A9).</summary>
+    public List<PostSummaryDto> ScheduledPosts { get; set; } = [];
+
     /// <summary>The most recently changed posts, newest first.</summary>
     public List<PostSummaryDto> RecentPosts { get; set; } = [];
 

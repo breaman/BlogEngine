@@ -486,6 +486,9 @@ namespace BlogEngine.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<int?>("SocialImageMediaId")
+                        .HasColumnType("int");
+
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
@@ -508,6 +511,8 @@ namespace BlogEngine.Data.Migrations
 
                     b.HasIndex("Slug")
                         .IsUnique();
+
+                    b.HasIndex("SocialImageMediaId");
 
                     b.HasIndex("PublishedDateLocal", "Slug")
                         .IsUnique()
@@ -1139,7 +1144,14 @@ namespace BlogEngine.Data.Migrations
                         .HasForeignKey("CoverMediaId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("BlogEngine.Data.Models.MediaItem", "SocialImageMedia")
+                        .WithMany()
+                        .HasForeignKey("SocialImageMediaId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("CoverMedia");
+
+                    b.Navigation("SocialImageMedia");
                 });
 
             modelBuilder.Entity("BlogEngine.Data.Models.PostMedia", b =>

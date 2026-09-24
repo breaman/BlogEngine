@@ -15,7 +15,8 @@ namespace BlogEngine.Client.Components;
 /// <summary>
 /// The Markdown editor's insert-image dialog (design 9.5, A5, M3, M4, T2.11): a searchable library grid with a
 /// "Recently used" row, an Upload tab, and a details step for alt text (pre-filled from the library, required unless
-/// the image is decorative), caption, size and alignment.
+/// the image is decorative), caption, size and alignment. <see cref="PickAsync"/> uses the same dialog to choose one
+/// image without the details step, such as a post's cover (A15).
 /// </summary>
 /// <remarks>
 /// It produces standard Markdown through <see cref="MediaMarkdown"/>, such as
@@ -56,6 +57,8 @@ public sealed partial class MediaPicker : ComponentBase
     private readonly List<MediaItemDto> _uploadedInBatch = [];
     private List<MediaItemDto> _recent = [];
     private TaskCompletionSource<string?>? _pending;
+    private TaskCompletionSource<MediaItemDto?>? _pendingPick;
+    private string? _pickTitle;
     private InsertDetails _details = new();
     private MediaItemDto? _selected;
     private PickerTab _tab = PickerTab.Library;
@@ -76,10 +79,34 @@ public sealed partial class MediaPicker : ComponentBase
     /// </summary>
     public async Task<string?> ShowAsync()
     {
-        _pending?.TrySetResult(null);
+        CancelPending();
         _pending = new TaskCompletionSource<string?>(TaskCreationOptions.RunContinuationsAsynchronously);
         var pending = _pending;
+        _pickTitle = null;
 
+        await OpenAsync();
+        return await pending.Task;
+    }
+
+    /// <summary>
+    /// Opens the dialog to choose one library image (or upload one) without the insert details, for example a post's
+    /// cover image (A15). Completes with the item, or <see langword="null"/> when cancelled.
+    /// </summary>
+    /// <param name="title">The dialog title, such as "Choose a cover image".</param>
+    public async Task<MediaItemDto?> PickAsync(string title)
+    {
+        CancelPending();
+        _pendingPick = new TaskCompletionSource<MediaItemDto?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var pending = _pendingPick;
+        _pickTitle = title;
+
+        await OpenAsync();
+        return await pending.Task;
+    }
+
+    /// <summary>Shows the library tab and loads its first page and the recently used row.</summary>
+    private async Task OpenAsync()
+    {
         _open = true;
         _selected = null;
         _tab = PickerTab.Library;
@@ -88,8 +115,15 @@ public sealed partial class MediaPicker : ComponentBase
 
         await Task.WhenAll(LoadPageAsync(reset: true), LoadRecentAsync());
         StateHasChanged();
+    }
 
-        return await pending.Task;
+    /// <summary>Completes an earlier request that is still open as cancelled.</summary>
+    private void CancelPending()
+    {
+        _pending?.TrySetResult(null);
+        _pending = null;
+        _pendingPick?.TrySetResult(null);
+        _pendingPick = null;
     }
 
     private async Task SearchAsync()
@@ -146,8 +180,18 @@ public sealed partial class MediaPicker : ComponentBase
         }
     }
 
-    private void Select(MediaItemDto item)
+    private async Task Select(MediaItemDto item)
     {
+        if (_pendingPick is { } pick)
+        {
+            // Choosing only: no details step. Remember it for the "Recently used" row like an inserted image.
+            await RecentMedia.AddAsync(item);
+            _open = false;
+            _pendingPick = null;
+            pick.TrySetResult(item);
+            return;
+        }
+
         _selected = item;
         _details = new InsertDetails
         {
@@ -164,11 +208,11 @@ public sealed partial class MediaPicker : ComponentBase
     }
 
     /// <summary>A single upload goes straight to its details; several go back to the grid, where they appear first.</summary>
-    private void OnUploadBatchCompleted()
+    private async Task OnUploadBatchCompleted()
     {
         if (_uploadedInBatch.Count == 1)
         {
-            Select(_uploadedInBatch[0]);
+            await Select(_uploadedInBatch[0]);
         }
         else if (_uploadedInBatch.Count > 1)
         {
@@ -241,6 +285,10 @@ public sealed partial class MediaPicker : ComponentBase
         var pending = _pending;
         _pending = null;
         pending?.TrySetResult(markdown);
+
+        var pick = _pendingPick;
+        _pendingPick = null;
+        pick?.TrySetResult(null);
     }
 
     private static string AriaBool(bool value)

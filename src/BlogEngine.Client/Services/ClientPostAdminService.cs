@@ -104,6 +104,32 @@ public sealed class ClientPostAdminService(HttpClient http) : IPostAdminService
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<PostRevisionSummaryDto>?> GetRevisionsAsync(int postId, CancellationToken cancellationToken = default)
+    {
+        using var response = await http.GetAsync($"{BaseUri}/{postId}/revisions", cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<List<PostRevisionSummaryDto>>(cancellationToken) ?? [];
+    }
+
+    /// <inheritdoc />
+    public async Task<PostRevisionDto?> GetRevisionAsync(int postId, int revisionId, CancellationToken cancellationToken = default)
+    {
+        using var response = await http.GetAsync($"{BaseUri}/{postId}/revisions/{revisionId}", cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<PostRevisionDto>(cancellationToken);
+    }
+
+    /// <inheritdoc />
     public async Task<SlugCheckResult> CheckSlugAsync(SlugCheckRequest request, CancellationToken cancellationToken = default)
     {
         using var response = await http.PostAsJsonAsync($"{BaseUri}/slug-check", request, cancellationToken);

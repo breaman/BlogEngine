@@ -1,0 +1,58 @@
+@page "/preview/{Token}"
+
+@if (_post is not null)
+{
+    <PageTitle>Preview: @_post.Title</PageTitle>
+    @* A preview must never be indexed or become the canonical copy of the post (design 7.1, A14). *@
+    <HeadContent>
+        <meta name="robots" content="noindex, nofollow" />
+    </HeadContent>
+
+    <div class="alert alert-warning post mx-auto d-flex align-items-start gap-2" role="status">
+        <span class="bi bi-eye mt-1" aria-hidden="true"></span>
+        <div>
+            <strong class="me-1">Preview.</strong>
+            @if (_post.IsLive)
+            {
+                <text>This post is published; the preview shows it as last saved.</text>
+            }
+            else if (_post.ScheduledFor is not null)
+            {
+                <text>This post is scheduled for @_scheduledText and isn't public yet.</text>
+            }
+            else
+            {
+                <text>This post isn't published yet.</text>
+            }
+            <span class="ms-1">Please don't pass this link on. It stops working on @_expiresText.</span>
+        </div>
+    </div>
+
+    <article class="post mx-auto">
+        <header class="mb-4">
+            <h1 class="post-title mb-2">@_post.Title</h1>
+            <p class="post-meta small text-body-secondary d-flex flex-wrap align-items-center column-gap-2 row-gap-1">
+                <span>@_post.ReadingMinutes min read</span>
+                @if (_post.Tags.Count > 0)
+                {
+                    <span aria-hidden="true">&middot;</span>
+                    @foreach (var tag in _post.Tags)
+                    {
+                        <span class="tag-badge badge rounded-pill text-bg-light border fw-normal">#@tag.Name</span>
+                    }
+                }
+            </p>
+        </header>
+
+        @if (_post.Cover is { } cover)
+        {
+            <figure class="post-cover mb-4">
+                <img src="@cover.Url" alt="@cover.AltText" width="@cover.Width" height="@cover.Height" class="img-fluid rounded" decoding="async" />
+            </figure>
+        }
+
+        <div class="post-content" data-code-blocks="@(_post.HasCodeBlocks ? "true" : null)">
+            @((MarkupString)_post.Html)
+        </div>
+    </article>
+}

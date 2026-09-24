@@ -93,6 +93,49 @@ public class BlogTimeZoneTests
             .Throws<TimeZoneNotFoundException>();
     }
 
+    /// <summary>The schedule picker's wall-clock time is read in the blog's time zone, in daylight and standard time.</summary>
+    [Test]
+    [Arguments("2026-10-01T09:00:00", "2026-10-01T14:00:00Z")]
+    [Arguments("2026-12-01T09:00:00", "2026-12-01T15:00:00Z")]
+    public async Task FromLocalDateTime_UsesBlogTimeZone(string local, string expected)
+    {
+        var instant = BlogTimeZone.FromLocalDateTime(DateTime.Parse(local, CultureInfo.InvariantCulture), Chicago);
+
+        await Assert.That(instant).IsEqualTo(ParseInstant(expected));
+        await Assert.That(instant.Offset).IsEqualTo(TimeSpan.Zero);
+    }
+
+    /// <summary>A time skipped by spring forward (2:30 AM on March 8, 2026) moves forward past the gap, to 3:30 AM CDT.</summary>
+    [Test]
+    public async Task FromLocalDateTime_SkippedTime_MovesForward()
+    {
+        var instant = BlogTimeZone.FromLocalDateTime(new DateTime(2026, 3, 8, 2, 30, 0), Chicago);
+
+        await Assert.That(instant).IsEqualTo(ParseInstant("2026-03-08T08:30:00Z"));
+    }
+
+    /// <summary>A time repeated by fall back (1:30 AM on November 1, 2026) is taken the first time, in daylight time.</summary>
+    [Test]
+    public async Task FromLocalDateTime_RepeatedTime_TakesTheFirst()
+    {
+        var instant = BlogTimeZone.FromLocalDateTime(new DateTime(2026, 11, 1, 1, 30, 0), Chicago);
+
+        await Assert.That(instant).IsEqualTo(ParseInstant("2026-11-01T06:30:00Z"));
+    }
+
+    /// <summary>Converting to wall-clock time and back returns the same instant.</summary>
+    [Test]
+    public async Task ToLocalDateTime_RoundTrips()
+    {
+        var instant = ParseInstant("2026-07-04T17:45:00Z");
+
+        var local = BlogTimeZone.ToLocalDateTime(instant, Chicago);
+
+        await Assert.That(local).IsEqualTo(new DateTime(2026, 7, 4, 12, 45, 0));
+        await Assert.That(local.Kind).IsEqualTo(DateTimeKind.Unspecified);
+        await Assert.That(BlogTimeZone.FromLocalDateTime(local, Chicago)).IsEqualTo(instant);
+    }
+
     private static DateTimeOffset ParseInstant(string value)
     {
         return DateTimeOffset.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);

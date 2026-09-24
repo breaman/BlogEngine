@@ -1,0 +1,43 @@
+@* "Get preview link" in the post editor's sidebar (design 10.2, A14): private, expiring links to the saved post. *@
+<section class="card mb-3" aria-labelledby="post-preview-links-heading">
+    <div class="card-header"><h2 class="h6 mb-0" id="post-preview-links-heading">Preview links</h2></div>
+    <div class="card-body">
+        @if (PostId == 0)
+        {
+            <p class="small text-body-secondary mb-0">Save the post to get a preview link.</p>
+        }
+        else
+        {
+            @if (_links.Count > 0)
+            {
+                <ul class="list-unstyled mb-2">
+                    @foreach (var link in _links)
+                    {
+                        var url = AbsoluteUrl(link);
+                        <li class="mb-2" @key="link.Id">
+                            <div class="input-group input-group-sm">
+                                <input type="text" class="form-control font-monospace" value="@url" readonly aria-label="Preview link" />
+                                <button type="button" class="btn btn-outline-secondary" title="Copy link" aria-label="Copy link" @onclick="() => CopyAsync(url)">
+                                    <span class="bi bi-clipboard" aria-hidden="true"></span>
+                                </button>
+                                <button type="button" class="btn btn-outline-danger" title="Revoke link" aria-label="Revoke link" disabled="@_busy"
+                                        @onclick="() => RevokeAsync(link)">
+                                    <span class="bi bi-x-lg" aria-hidden="true"></span>
+                                </button>
+                            </div>
+                            <div class="form-text">Expires @ExpiresText(link.ExpiresOn)</div>
+                        </li>
+                    }
+                </ul>
+            }
+
+            <button type="button" class="btn btn-sm btn-outline-secondary w-100" disabled="@(!_ready || _busy)" @onclick="CreateAsync">
+                <span class="bi bi-link-45deg me-1" aria-hidden="true"></span> Get preview link
+            </button>
+            <div class="form-text">
+                Anyone with the link can read the saved post for @CreatePreviewLinkRequest.DefaultExpiresInDays days, even before it's
+                published. Save first to include your latest changes.
+            </div>
+        }
+    </div>
+</section>

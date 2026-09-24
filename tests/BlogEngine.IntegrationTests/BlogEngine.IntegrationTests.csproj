@@ -12,6 +12,8 @@
     <PackageReference Include="TUnit.AspNetCore" />
     <!-- Throwaway SQL Server instance per test session. Requires a running Docker engine. -->
     <PackageReference Include="Testcontainers.MsSql" />
+    <!-- FakeTimeProvider, to move the clock past a scheduled post's publish time (T4.1). -->
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
   </ItemGroup>
 
   <ItemGroup>

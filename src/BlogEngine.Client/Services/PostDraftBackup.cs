@@ -36,6 +36,24 @@ public sealed class PostDraftBackup
     /// <summary>Whether the post is featured.</summary>
     public bool IsFeatured { get; set; }
 
+    /// <summary>SEO title override.</summary>
+    public string? MetaTitle { get; set; }
+
+    /// <summary>SEO description override.</summary>
+    public string? MetaDescription { get; set; }
+
+    /// <summary>Cover image id.</summary>
+    public int? CoverMediaId { get; set; }
+
+    /// <summary>Cover image thumbnail details, so a restored cover shows without another request.</summary>
+    public PostImageDto? CoverImage { get; set; }
+
+    /// <summary>Social image id.</summary>
+    public int? SocialImageMediaId { get; set; }
+
+    /// <summary>Social image thumbnail details.</summary>
+    public PostImageDto? SocialImage { get; set; }
+
     /// <summary>Captures the editable fields of <paramref name="post"/>.</summary>
     public static PostDraftBackup From(PostEditDto post, DateTimeOffset savedAt)
     {
@@ -50,7 +68,13 @@ public sealed class PostDraftBackup
             ContentMarkdown = post.ContentMarkdown,
             Tags = [.. post.Tags],
             AllowComments = post.AllowComments,
-            IsFeatured = post.IsFeatured
+            IsFeatured = post.IsFeatured,
+            MetaTitle = post.MetaTitle,
+            MetaDescription = post.MetaDescription,
+            CoverMediaId = post.CoverMediaId,
+            CoverImage = post.CoverImage,
+            SocialImageMediaId = post.SocialImageMediaId,
+            SocialImage = post.SocialImage
         };
     }
 
@@ -66,6 +90,12 @@ public sealed class PostDraftBackup
         post.Tags = [.. Tags];
         post.AllowComments = AllowComments;
         post.IsFeatured = IsFeatured;
+        post.MetaTitle = MetaTitle;
+        post.MetaDescription = MetaDescription;
+        post.CoverMediaId = CoverMediaId;
+        post.CoverImage = CoverImage;
+        post.SocialImageMediaId = SocialImageMediaId;
+        post.SocialImage = SocialImage;
     }
 
     /// <summary>Whether restoring this backup would change anything in <paramref name="post"/>.</summary>

@@ -34,15 +34,30 @@ public interface IPostAdminService
     /// </summary>
     Task<PostSaveResult> AutosaveAsync(int id, PostEditDto post, CancellationToken cancellationToken = default);
 
-    /// <summary>Publishes the post now, or re-dates an already published post (design 6.3).</summary>
+    /// <summary>
+    /// Publishes the post now, schedules it for a future <see cref="PublishPostRequest.PublishOn"/>, or re-dates an
+    /// already published post (design 6.3, A9).
+    /// </summary>
     Task<PostSaveResult> PublishAsync(int id, PublishPostRequest request, CancellationToken cancellationToken = default);
 
-    /// <summary>Returns a published post to draft, so its public URL stops working.</summary>
+    /// <summary>
+    /// Returns a published post to draft, so its public URL stops working; for a scheduled post this is
+    /// <b>Unschedule</b>, which also forgets the scheduled date.
+    /// </summary>
     Task<PostSaveResult> UnpublishAsync(int id, UnpublishPostRequest request, CancellationToken cancellationToken = default);
 
     /// <summary>Moves the post to the trash (soft delete).</summary>
     /// <returns><see langword="false"/> if there is no such post outside the trash.</returns>
     Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lists the post's revisions, newest first, without their content (design 7.4, A13), or <see langword="null"/>
+    /// if there is no such post outside the trash.
+    /// </summary>
+    Task<IReadOnlyList<PostRevisionSummaryDto>?> GetRevisionsAsync(int postId, CancellationToken cancellationToken = default);
+
+    /// <summary>Loads one revision of the post with its content, or <see langword="null"/> if either doesn't exist.</summary>
+    Task<PostRevisionDto?> GetRevisionAsync(int postId, int revisionId, CancellationToken cancellationToken = default);
 
     /// <summary>Checks whether a slug is well formed and free, and suggests the slug a save would use.</summary>
     Task<SlugCheckResult> CheckSlugAsync(SlugCheckRequest request, CancellationToken cancellationToken = default);

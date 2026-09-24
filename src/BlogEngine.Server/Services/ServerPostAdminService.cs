@@ -69,11 +69,14 @@ public sealed class ServerPostAdminService(
         var page = Math.Max(1, query.Page);
         var pageSize = Math.Clamp(query.PageSize, 1, PostListQuery.MaxPageSize);
 
+        // "Scheduled" is a published post whose date is still ahead (design 6.3), so the tabs split on the time.
+        var now = timeProvider.GetUtcNow();
         IQueryable<Post> posts = dbContext.Posts.AsNoTracking();
         posts = query.Status switch
         {
             PostListStatus.Draft => posts.Where(p => p.Status == PostStatus.Draft),
-            PostListStatus.Published => posts.Where(p => p.Status == PostStatus.Published),
+            PostListStatus.Published => posts.Where(p => p.Status == PostStatus.Published && p.PublishedOn <= now),
+            PostListStatus.Scheduled => posts.Where(p => p.Status == PostStatus.Published && p.PublishedOn > now),
             _ => posts
         };
 
@@ -94,9 +97,13 @@ public sealed class ServerPostAdminService(
 
         var totalCount = await posts.CountAsync(cancellationToken);
 
-        var ordered = query.Status == PostListStatus.Published
-            ? posts.OrderByDescending(p => p.PublishedOn).ThenByDescending(p => p.Id)
-            : posts.OrderByDescending(p => p.ModifiedOn).ThenByDescending(p => p.Id);
+        // Published: newest first; scheduled: the next to go live first; everything else: most recently changed first.
+        var ordered = query.Status switch
+        {
+            PostListStatus.Published => posts.OrderByDescending(p => p.PublishedOn).ThenByDescending(p => p.Id),
+            PostListStatus.Scheduled => posts.OrderBy(p => p.PublishedOn).ThenBy(p => p.Id),
+            _ => posts.OrderByDescending(p => p.ModifiedOn).ThenByDescending(p => p.Id)
+        };
 
         var rows = await ordered
             .Skip((page - 1) * pageSize)
@@ -150,7 +157,7 @@ public sealed class ServerPostAdminService(
     public async Task<PostSaveResult> CreateAsync(PostEditDto post, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(post);
-        if (Validate(post) is { } invalid)
+        if ((Validate(post) ?? await ValidateImagesAsync(post, cancellationToken)) is { } invalid)
         {
             return invalid;
         }
@@ -173,7 +180,7 @@ public sealed class ServerPostAdminService(
     public async Task<PostSaveResult> UpdateAsync(int id, PostEditDto post, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(post);
-        if (Validate(post, requireRowVersion: true) is { } invalid)
+        if ((Validate(post, requireRowVersion: true) ?? await ValidateImagesAsync(post, cancellationToken)) is { } invalid)
         {
             return invalid;
         }
@@ -192,7 +199,7 @@ public sealed class ServerPostAdminService(
             }
 
             var settings = await settingsService.GetAsync(ct);
-            var oldPath = PublicPathOf(entity);
+            var oldPath = LivePathOf(entity);
             var contentChanged = entity.Title != post.Title.Trim() || entity.ContentMarkdown != (post.ContentMarkdown ?? string.Empty);
 
             await ApplyEditsAsync(entity, post, settings, ct);
@@ -218,7 +225,7 @@ public sealed class ServerPostAdminService(
     public async Task<PostSaveResult> AutosaveAsync(int id, PostEditDto post, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(post);
-        if (Validate(post, requireRowVersion: true) is { } invalid)
+        if ((Validate(post, requireRowVersion: true) ?? await ValidateImagesAsync(post, cancellationToken)) is { } invalid)
         {
             return invalid;
         }
@@ -281,23 +288,20 @@ public sealed class ServerPostAdminService(
             }
 
             var now = timeProvider.GetUtcNow();
-            if (request.PublishOn > now)
-            {
-                // Scheduling arrives with T4.1; until then a future date would publish a post nobody can see.
-                return PostSaveResult.Invalid(nameof(PublishPostRequest.PublishOn),
-                    "Scheduled publishing isn't available yet. Choose a date and time that has already passed.");
-            }
-
             var settings = await settingsService.GetAsync(ct);
-            var oldPath = PublicPathOf(entity);
+            var oldPath = LivePathOf(entity);
 
-            // The original date survives unpublishing and republishing; only an explicit date changes it.
-            var publishOn = (request.PublishOn ?? entity.PublishedOn ?? now).ToUniversalTime();
+            // An explicit date wins, and a future one schedules the post (design 6.3, A9): it stays hidden until then,
+            // and ScheduledPublishWatcher evicts the public caches when the time comes. Without one, a post that was
+            // live before keeps its original date across unpublishing and republishing, and anything else (a new
+            // post, or a scheduled one published early) goes live now.
+            var publishOn = (request.PublishOn ?? (entity.PublishedOn is { } existing && existing <= now ? existing : now))
+                .ToUniversalTime();
             entity.Status = PostStatus.Published;
             entity.PublishedOn = publishOn;
             entity.PublishedDateLocal = BlogTimeZone.ToLocalDate(publishOn, settings.TimeZoneId);
 
-            AddRevision(entity, RevisionKind.Publish);
+            await AddPublishRevisionAsync(entity, ct);
             await AddRedirectIfMovedAsync(oldPath, entity, ct);
             MarkModified(entity);
 
@@ -329,7 +333,15 @@ public sealed class ServerPostAdminService(
 
             if (entity.Status != PostStatus.Draft)
             {
-                // PublishedOn and PublishedDateLocal are kept, so republishing restores the same URL.
+                // PublishedOn and PublishedDateLocal are kept, so republishing restores the same URL. Unscheduling
+                // forgets the scheduled date instead: the post was never live at it, and the slug should follow the
+                // title again until the post really is published.
+                if (PostSchedule.IsScheduled(entity.Status, entity.PublishedOn, timeProvider.GetUtcNow()))
+                {
+                    entity.PublishedOn = null;
+                    entity.PublishedDateLocal = null;
+                }
+
                 entity.Status = PostStatus.Draft;
                 MarkModified(entity);
                 await dbContext.SaveChangesAsync(ct);
@@ -360,6 +372,49 @@ public sealed class ServerPostAdminService(
         }
 
         return true;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<PostRevisionSummaryDto>?> GetRevisionsAsync(int postId, CancellationToken cancellationToken = default)
+    {
+        // The revisions' query filter already hides a trashed post's revisions; this tells "no post" from "none yet".
+        if (!await dbContext.Posts.AnyAsync(p => p.Id == postId, cancellationToken))
+        {
+            return null;
+        }
+
+        return await dbContext.PostRevisions
+            .AsNoTracking()
+            .Where(r => r.PostId == postId)
+            .OrderByDescending(r => r.SavedOn)
+            .ThenByDescending(r => r.Id)
+            .Select(r => new PostRevisionSummaryDto
+            {
+                Id = r.Id,
+                Kind = r.Kind,
+                SavedOn = r.SavedOn,
+                Title = r.Title,
+                ContentLength = r.ContentMarkdown.Length
+            })
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<PostRevisionDto?> GetRevisionAsync(int postId, int revisionId, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.PostRevisions
+            .AsNoTracking()
+            .Where(r => r.Id == revisionId && r.PostId == postId)
+            .Select(r => new PostRevisionDto
+            {
+                Id = r.Id,
+                PostId = r.PostId,
+                Kind = r.Kind,
+                SavedOn = r.SavedOn,
+                Title = r.Title,
+                ContentMarkdown = r.ContentMarkdown
+            })
+            .SingleOrDefaultAsync(cancellationToken);
     }
 
     /// <inheritdoc />
@@ -442,6 +497,8 @@ public sealed class ServerPostAdminService(
         post.IsFeatured = dto.IsFeatured;
         post.MetaTitle = NullIfBlank(dto.MetaTitle);
         post.MetaDescription = NullIfBlank(dto.MetaDescription);
+        post.CoverMediaId = dto.CoverMediaId;
+        post.SocialImageMediaId = dto.SocialImageMediaId;
 
         // Recomputed on every save so it follows the configured time zone (Q10).
         if (post.PublishedOn is { } publishedOn)
@@ -553,7 +610,10 @@ public sealed class ServerPostAdminService(
         return taken.ToHashSet(StringComparer.Ordinal);
     }
 
-    /// <summary>Records a redirect when a post that was public before this save is public at a new URL (T1.5).</summary>
+    /// <summary>
+    /// Records a redirect when a post that was live before this save is published at a new URL (T1.5). The old URL
+    /// must have been live: a scheduled post that is re-dated was never reachable, so its old URL needs no redirect.
+    /// </summary>
     private async Task AddRedirectIfMovedAsync(string? oldPath, Post post, CancellationToken cancellationToken)
     {
         if (oldPath is not null && PublicPathOf(post) is { } newPath && newPath != oldPath)
@@ -588,6 +648,29 @@ public sealed class ServerPostAdminService(
             .SingleOrDefaultAsync(p => p.Id == id, cancellationToken);
     }
 
+    /// <summary>
+    /// Records the published content as a <see cref="RevisionKind.Publish"/> revision, unless the newest revision
+    /// already is exactly that publish: rescheduling or re-dating a post republishes the same content, and a history
+    /// full of identical entries would bury the real changes.
+    /// </summary>
+    private async Task AddPublishRevisionAsync(Post post, CancellationToken cancellationToken)
+    {
+        var latest = await dbContext.PostRevisions
+            .AsNoTracking()
+            .Where(r => r.PostId == post.Id)
+            .OrderByDescending(r => r.SavedOn)
+            .ThenByDescending(r => r.Id)
+            .Select(r => new { r.Kind, r.Title, r.ContentMarkdown })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (latest is { Kind: RevisionKind.Publish } && latest.Title == post.Title && latest.ContentMarkdown == post.ContentMarkdown)
+        {
+            return;
+        }
+
+        AddRevision(post, RevisionKind.Publish);
+    }
+
     /// <summary>Adds a revision of the post's current title and content.</summary>
     private void AddRevision(Post post, RevisionKind kind)
     {
@@ -613,6 +696,8 @@ public sealed class ServerPostAdminService(
     /// <summary>Builds the editor DTO, including pending autosaved changes for a published post.</summary>
     private async Task<PostEditDto> ToEditDtoAsync(Post post, CancellationToken cancellationToken)
     {
+        var (cover, social) = await LoadImagesAsync(post, cancellationToken);
+
         return new PostEditDto
         {
             Id = post.Id,
@@ -625,6 +710,10 @@ public sealed class ServerPostAdminService(
             IsFeatured = post.IsFeatured,
             MetaTitle = post.MetaTitle,
             MetaDescription = post.MetaDescription,
+            CoverMediaId = post.CoverMediaId,
+            CoverImage = cover,
+            SocialImageMediaId = post.SocialImageMediaId,
+            SocialImage = social,
             RowVersion = post.RowVersion,
             Status = post.Status,
             PublishedOn = post.PublishedOn,
@@ -674,16 +763,71 @@ public sealed class ServerPostAdminService(
         return errors.Count == 0 ? null : new PostInvalid(errors.AsReadOnly());
     }
 
+    /// <summary>
+    /// Checks that the cover and social images (A15, A16) are library items that still exist, returning
+    /// <see langword="null"/> when they do. An item deleted while the editor was open is reported on its field.
+    /// </summary>
+    private async Task<PostInvalid?> ValidateImagesAsync(PostEditDto post, CancellationToken cancellationToken)
+    {
+        int[] ids = [.. new[] { post.CoverMediaId, post.SocialImageMediaId }.OfType<int>().Distinct()];
+        if (ids.Length == 0)
+        {
+            return null;
+        }
+
+        var existing = await dbContext.MediaItems.Where(m => ids.Contains(m.Id)).Select(m => m.Id).ToListAsync(cancellationToken);
+        var errors = new Dictionary<string, string[]>();
+        if (post.CoverMediaId is { } coverId && !existing.Contains(coverId))
+        {
+            errors[nameof(PostEditDto.CoverMediaId)] = ["The cover image is no longer in the media library. Choose another one."];
+        }
+
+        if (post.SocialImageMediaId is { } socialId && !existing.Contains(socialId))
+        {
+            errors[nameof(PostEditDto.SocialImageMediaId)] = ["The social image is no longer in the media library. Choose another one."];
+        }
+
+        return errors.Count == 0 ? null : new PostInvalid(errors.AsReadOnly());
+    }
+
+    /// <summary>Loads the thumbnails of the post's cover and social images.</summary>
+    private async Task<(PostImageDto? Cover, PostImageDto? Social)> LoadImagesAsync(Post post, CancellationToken cancellationToken)
+    {
+        int[] ids = [.. new[] { post.CoverMediaId, post.SocialImageMediaId }.OfType<int>().Distinct()];
+        if (ids.Length == 0)
+        {
+            return (null, null);
+        }
+
+        var images = await dbContext.MediaItems
+            .AsNoTracking()
+            .Where(m => ids.Contains(m.Id))
+            .Select(m => new { m.Id, m.PublicId, m.FileName, m.Version, m.AltText, m.Width, m.Height })
+            .ToListAsync(cancellationToken);
+        var byId = images.ToDictionary(
+            m => m.Id,
+            m => new PostImageDto(m.Id, MediaPaths.Versioned(m.PublicId, m.FileName, m.Version), m.AltText, m.Width, m.Height));
+
+        return (post.CoverMediaId is { } coverId ? byId.GetValueOrDefault(coverId) : null,
+            post.SocialImageMediaId is { } socialId ? byId.GetValueOrDefault(socialId) : null);
+    }
+
     /// <summary>Whether the caller's concurrency token matches the stored one.</summary>
     private static bool RowVersionMatches(Post post, byte[]? rowVersion)
     {
         return rowVersion is not null && post.RowVersion.AsSpan().SequenceEqual(rowVersion);
     }
 
-    /// <summary>The post's public URL path while it is published.</summary>
+    /// <summary>The post's public URL path while it is published (including scheduled, where it is the URL to come).</summary>
     private static string? PublicPathOf(Post post)
     {
         return PublicPathOf(post.Status, post.PublishedDateLocal, post.Slug);
+    }
+
+    /// <summary>The post's public URL path if readers can reach it right now, otherwise <see langword="null"/>.</summary>
+    private string? LivePathOf(Post post)
+    {
+        return PostSchedule.IsLive(post.Status, post.PublishedOn, timeProvider.GetUtcNow()) ? PublicPathOf(post) : null;
     }
 
     /// <summary>The public URL path of a published post with this date and slug, otherwise <see langword="null"/>.</summary>

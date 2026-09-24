@@ -33,6 +33,11 @@ public class AdminPostsApiTests(BlogEngineWebApplicationFactory factory)
         yield return ("POST", $"{PostsApi}/1/unpublish");
         yield return ("DELETE", $"{PostsApi}/1");
         yield return ("POST", $"{PostsApi}/slug-check");
+        yield return ("GET", $"{PostsApi}/1/revisions");
+        yield return ("GET", $"{PostsApi}/1/revisions/1");
+        yield return ("GET", $"{PostsApi}/1/preview-tokens");
+        yield return ("POST", $"{PostsApi}/1/preview-token");
+        yield return ("DELETE", $"{PostsApi}/1/preview-tokens/1");
         yield return ("GET", "/api/admin/tags?search=c");
     }
 
@@ -133,6 +138,68 @@ public class AdminPostsApiTests(BlogEngineWebApplicationFactory factory)
         }
     }
 
+    /// <summary>
+    /// Revisions list newest first without content, one revision loads with its content, and unknown posts or revisions
+    /// are 404 (A13, T4.3).
+    /// </summary>
+    [Test]
+    public async Task Revisions_ListAndLoad()
+    {
+        var (client, token) = await LoginAdminAsync();
+        using var _ = client;
+        var post = await CreatePostAsync(client, token);
+        post.ContentMarkdown = "Second version.";
+        using var update = await SendAsync(client, token, HttpMethod.Put, $"{PostsApi}/{post.Id}", post);
+
+        var revisions = await client.GetFromJsonAsync<List<PostRevisionSummaryDto>>($"{PostsApi}/{post.Id}/revisions");
+        var newest = await client.GetFromJsonAsync<PostRevisionDto>($"{PostsApi}/{post.Id}/revisions/{revisions![0].Id}");
+        using var unknownPost = await client.GetAsync($"{PostsApi}/{int.MaxValue}/revisions");
+        using var unknownRevision = await client.GetAsync($"{PostsApi}/{post.Id}/revisions/{int.MaxValue}");
+
+        await Assert.That(update.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(revisions.Select(r => r.Kind)).IsEquivalentTo([RevisionKind.Manual, RevisionKind.Manual]);
+        await Assert.That(revisions[0].SavedOn).IsGreaterThanOrEqualTo(revisions[1].SavedOn);
+        await Assert.That(revisions[0].ContentLength).IsEqualTo("Second version.".Length);
+        await Assert.That(newest!.ContentMarkdown).IsEqualTo("Second version.");
+        await Assert.That(newest.PostId).IsEqualTo(post.Id);
+        await Assert.That(unknownPost.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        await Assert.That(unknownRevision.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+    }
+
+    /// <summary>
+    /// Preview links (A14, T4.4): POST creates a 7-day link (the body is optional), GET lists it, DELETE revokes it, and
+    /// an out-of-range lifetime is a 400.
+    /// </summary>
+    [Test]
+    public async Task PreviewLinks_CreateListRevoke()
+    {
+        var (client, token) = await LoginAdminAsync();
+        using var _ = client;
+        var post = await CreatePostAsync(client, token);
+
+        using var create = await SendAsync(client, token, HttpMethod.Post, $"{PostsApi}/{post.Id}/preview-token");
+        var link = await create.Content.ReadFromJsonAsync<PreviewLinkDto>();
+        var listed = await client.GetFromJsonAsync<List<PreviewLinkDto>>($"{PostsApi}/{post.Id}/preview-tokens");
+        using var invalid = await SendAsync(client, token, HttpMethod.Post, $"{PostsApi}/{post.Id}/preview-token",
+            new CreatePreviewLinkRequest { ExpiresInDays = CreatePreviewLinkRequest.MaxExpiresInDays + 1 });
+        using var unknownPost = await SendAsync(client, token, HttpMethod.Post, $"{PostsApi}/{int.MaxValue}/preview-token");
+        using var revoke = await SendAsync(client, token, HttpMethod.Delete, $"{PostsApi}/{post.Id}/preview-tokens/{link!.Id}");
+        using var revokeAgain = await SendAsync(client, token, HttpMethod.Delete, $"{PostsApi}/{post.Id}/preview-tokens/{link.Id}");
+        var afterRevoke = await client.GetFromJsonAsync<List<PreviewLinkDto>>($"{PostsApi}/{post.Id}/preview-tokens");
+
+        await Assert.That(create.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(link.Token.Length).IsEqualTo(43);
+        await Assert.That(link.Path).IsEqualTo($"/preview/{link.Token}");
+        await Assert.That(link.ExpiresOn).IsGreaterThan(DateTimeOffset.UtcNow.AddDays(6.9));
+        await Assert.That(link.ExpiresOn).IsLessThan(DateTimeOffset.UtcNow.AddDays(7.1));
+        await Assert.That(listed!.Select(l => l.Id)).IsEquivalentTo([link.Id]);
+        await Assert.That(invalid.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+        await Assert.That(unknownPost.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        await Assert.That(revoke.StatusCode).IsEqualTo(HttpStatusCode.NoContent);
+        await Assert.That(revokeAgain.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        await Assert.That(afterRevoke).IsEmpty();
+    }
+
     /// <summary>PUT saves with the current RowVersion, then the old RowVersion is a 409 conflict.</summary>
     [Test]
     public async Task Update_Returns200_ThenStaleVersionReturns409()
@@ -209,18 +276,26 @@ public class AdminPostsApiTests(BlogEngineWebApplicationFactory factory)
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
     }
 
-    /// <summary>A future publish date is a 400 until scheduling exists.</summary>
+    /// <summary>A future publish date schedules the post (T4.1): 200, and the post shows under the Scheduled tab only.</summary>
     [Test]
-    public async Task Publish_FutureDate_Returns400()
+    public async Task Publish_FutureDate_SchedulesPost()
     {
         var (client, token) = await LoginAdminAsync();
         using var _ = client;
         var post = await CreatePostAsync(client, token);
+        var publishOn = new DateTimeOffset(DateTimeOffset.UtcNow.AddHours(2).Ticks / TimeSpan.TicksPerSecond * TimeSpan.TicksPerSecond, TimeSpan.Zero);
 
         using var response = await SendAsync(client, token, HttpMethod.Post, $"{PostsApi}/{post.Id}/publish",
-            new PublishPostRequest { PublishOn = DateTimeOffset.UtcNow.AddHours(2) });
+            new PublishPostRequest { PublishOn = publishOn });
+        var scheduled = await response.Content.ReadFromJsonAsync<PostEditDto>();
+        var scheduledTab = await client.GetFromJsonAsync<PagedResult<PostSummaryDto>>($"{PostsApi}?status=Scheduled&search={post.Slug}&page=1&pageSize=20");
+        var publishedTab = await client.GetFromJsonAsync<PagedResult<PostSummaryDto>>($"{PostsApi}?status=Published&search={post.Slug}&page=1&pageSize=20");
 
-        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(scheduled!.Status).IsEqualTo(PostStatus.Published);
+        await Assert.That(scheduled.PublishedOn).IsEqualTo(publishOn);
+        await Assert.That(scheduledTab!.Items.Select(p => p.Id)).IsEquivalentTo([post.Id]);
+        await Assert.That(publishedTab!.Items).IsEmpty();
     }
 
     /// <summary>DELETE moves the post to the trash: 204, then the post is gone from the API.</summary>

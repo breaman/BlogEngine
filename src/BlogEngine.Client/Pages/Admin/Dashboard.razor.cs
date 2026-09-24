@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Text.RegularExpressions;
 
@@ -12,8 +13,8 @@ using Microsoft.AspNetCore.Components;
 namespace BlogEngine.Client.Pages.Admin;
 
 /// <summary>
-/// The admin landing page at <c>/admin</c> (design 7.3, O1, T3.10): counts of drafts, scheduled and published posts and
-/// of comments awaiting moderation, and the latest posts and comments.
+/// The admin landing page at <c>/admin</c> (design 7.3, O1, T3.10, T4.1): counts of drafts, scheduled and published posts
+/// and of comments awaiting moderation, the next scheduled posts, and the latest posts and comments.
 /// </summary>
 /// <remarks>
 /// The summary loaded while prerendering is carried into WebAssembly with <see cref="PersistentStateAttribute"/>. The
@@ -25,7 +26,7 @@ public partial class Dashboard : ComponentBase
     private static readonly IReadOnlyList<DashboardCard> Cards =
     [
         new("Drafts", "bi-pencil-square", "admin/posts?status=Draft", s => s.DraftCount),
-        new("Scheduled", "bi-calendar-event", "admin/posts?status=Published", s => s.ScheduledCount),
+        new("Scheduled", "bi-calendar-event", "admin/posts?status=Scheduled", s => s.ScheduledCount),
         new("Published", "bi-journal-check", "admin/posts?status=Published", s => s.PublishedCount),
         new("Pending comments", "bi-chat-dots", "admin/comments", s => s.PendingCommentCount, Highlight: true)
     ];
@@ -70,6 +71,18 @@ public partial class Dashboard : ComponentBase
     private string Relative(DateTimeOffset? value)
     {
         return value is { } date ? RelativeTime.Format(date, TimeProvider.GetUtcNow()) : string.Empty;
+    }
+
+    /// <summary>When a scheduled post goes live, in the author's local time, such as "Oct 1, 9:00 AM".</summary>
+    private static string Scheduled(DateTimeOffset? value)
+    {
+        if (value is not { } date)
+        {
+            return string.Empty;
+        }
+
+        var local = date.ToLocalTime();
+        return string.Create(CultureInfo.CurrentCulture, $"{local:MMM d}, {local:t}");
     }
 
     /// <summary>The start of a comment as plain text, for a one-line preview.</summary>

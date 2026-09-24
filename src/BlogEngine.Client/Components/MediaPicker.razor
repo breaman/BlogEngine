@@ -6,7 +6,7 @@
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h2 class="modal-title fs-5" id="@_titleId">@(_selected is null ? "Insert image" : "Image details")</h2>
+                    <h2 class="modal-title fs-5" id="@_titleId">@(_pickTitle ?? (_selected is null ? "Insert image" : "Image details"))</h2>
                     <button type="button" class="btn-close" aria-label="Close" @onclick="Cancel"></button>
                 </div>
 

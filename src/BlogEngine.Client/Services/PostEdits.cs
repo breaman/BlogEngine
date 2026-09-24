@@ -42,7 +42,9 @@ public static class PostEdits
             && TextEquals(left.MetaDescription, right.MetaDescription)
             && left.Tags.SequenceEqual(right.Tags, StringComparer.Ordinal)
             && left.AllowComments == right.AllowComments
-            && left.IsFeatured == right.IsFeatured;
+            && left.IsFeatured == right.IsFeatured
+            && left.CoverMediaId == right.CoverMediaId
+            && left.SocialImageMediaId == right.SocialImageMediaId;
     }
 
     private static bool TextEquals(string? left, string? right)

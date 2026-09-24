@@ -1,6 +1,7 @@
 using System.Globalization;
 
 using BlogEngine.Client.Components;
+using BlogEngine.Shared.Common;
 using BlogEngine.Shared.Contracts;
 using BlogEngine.Shared.Enums;
 using BlogEngine.Shared.Services;
@@ -10,8 +11,8 @@ using Microsoft.AspNetCore.Components;
 namespace BlogEngine.Client.Pages.Admin;
 
 /// <summary>
-/// The admin posts list at <c>/admin/posts</c> (design 7.3, O2, T1.14): status tabs, tag filter, text search,
-/// paging and row actions (edit, view, unpublish, move to trash).
+/// The admin posts list at <c>/admin/posts</c> (design 7.3, O2, T1.14, T4.1): status tabs (including Scheduled), tag
+/// filter, text search, paging and row actions (edit, view, unpublish or unschedule, move to trash).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -26,19 +27,21 @@ namespace BlogEngine.Client.Pages.Admin;
 /// </remarks>
 public partial class PostsList : ComponentBase
 {
-    /// <summary>The status tabs; Scheduled and Trash are added in Phase 4 (T4.1, T4.23).</summary>
+    /// <summary>The status tabs; Trash is added with T4.23.</summary>
     private static readonly IReadOnlyList<(PostListStatus Status, string Label)> StatusTabs =
     [
         (PostListStatus.All, "All"),
         (PostListStatus.Draft, "Drafts"),
+        (PostListStatus.Scheduled, "Scheduled"),
         (PostListStatus.Published, "Published")
     ];
 
     [Inject] private IPostAdminService PostService { get; set; } = default!;
     [Inject] private IToastService Toasts { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private TimeProvider TimeProvider { get; set; } = default!;
 
-    /// <summary>Status tab from the query string (<c>All</c>, <c>Draft</c> or <c>Published</c>).</summary>
+    /// <summary>Status tab from the query string (<c>All</c>, <c>Draft</c>, <c>Scheduled</c> or <c>Published</c>).</summary>
     [SupplyParameterFromQuery(Name = "status")]
     public string? StatusParameter { get; set; }
 
@@ -162,14 +165,24 @@ public partial class PostsList : ComponentBase
         Navigation.NavigateTo(ListUri(clearFilters: true));
     }
 
-    /// <summary>Returns a published post to draft after confirming; its public URL stops working.</summary>
+    /// <summary>
+    /// Returns a published post to draft after confirming; its public URL stops working. For a scheduled post this is
+    /// "Unschedule", which also forgets the scheduled date.
+    /// </summary>
     private async Task UnpublishAsync(PostSummaryDto post)
     {
-        var confirmed = await _confirm.ConfirmAsync(
-            "Unpublish post?",
-            $"\"{post.Title}\" goes back to being a draft and its public URL stops working until you publish it again.",
-            "Unpublish",
-            "btn-warning");
+        var scheduled = IsScheduled(post);
+        var confirmed = scheduled
+            ? await _confirm.ConfirmAsync(
+                "Unschedule post?",
+                $"\"{post.Title}\" goes back to being a draft and won't be published at the scheduled time.",
+                "Unschedule",
+                "btn-warning")
+            : await _confirm.ConfirmAsync(
+                "Unpublish post?",
+                $"\"{post.Title}\" goes back to being a draft and its public URL stops working until you publish it again.",
+                "Unpublish",
+                "btn-warning");
         if (!confirmed)
         {
             return;
@@ -243,10 +256,31 @@ public partial class PostsList : ComponentBase
         }
     }
 
-    /// <summary>Publish date for published posts, otherwise the last change, as a short local date.</summary>
-    private static string DateText(PostSummaryDto post)
+    /// <summary>Whether the post is published with a date that is still ahead.</summary>
+    private bool IsScheduled(PostSummaryDto post)
     {
-        var date = post.Status == PostStatus.Published ? post.PublishedOn : post.ModifiedOn;
-        return date?.ToLocalTime().ToString("d", CultureInfo.CurrentCulture) ?? "—";
+        return PostSchedule.IsScheduled(post.Status, post.PublishedOn, TimeProvider.GetUtcNow());
+    }
+
+    /// <summary>
+    /// Publish date for published posts, with the time as well for scheduled ones (when they go live matters),
+    /// otherwise the last change, in the author's local time.
+    /// </summary>
+    private string DateText(PostSummaryDto post)
+    {
+        if (post.Status != PostStatus.Published)
+        {
+            return post.ModifiedOn?.ToLocalTime().ToString("d", CultureInfo.CurrentCulture) ?? "—";
+        }
+
+        if (post.PublishedOn is not { } publishedOn)
+        {
+            return "—";
+        }
+
+        var local = publishedOn.ToLocalTime();
+        return IsScheduled(post)
+            ? string.Create(CultureInfo.CurrentCulture, $"{local:d} {local:t}")
+            : local.ToString("d", CultureInfo.CurrentCulture);
     }
 }

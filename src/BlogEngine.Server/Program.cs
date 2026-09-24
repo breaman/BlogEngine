@@ -104,6 +104,7 @@ try
     builder.Services.AddScoped<IToastService, ToastService>();
     builder.Services.AddScoped<ISettingsService, ServerSettingsService>();
     builder.Services.AddScoped<IPostAdminService, ServerPostAdminService>();
+    builder.Services.AddScoped<IPreviewLinkService, ServerPreviewLinkService>();
     builder.Services.AddScoped<ITagService, ServerTagService>();
     builder.Services.AddSingleton<PostHtmlSanitizer>();
     builder.Services.AddScoped<PostContentRenderer>();
@@ -135,7 +136,11 @@ try
     builder.Services.AddSingleton<PublicCommentQueries>();
     builder.Services.AddSingleton<CacheInvalidator>();
     builder.Services.AddSingleton<RedirectLookup>();
+    builder.Services.AddSingleton<PreviewPostQuery>();
     builder.Services.AddSingleton<SyndicationFeedWriter>();
+    // Evicts the public caches when a scheduled post's time comes (T4.1); a singleton so tests can drive it directly.
+    builder.Services.AddSingleton<ScheduledPublishWatcher>();
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<ScheduledPublishWatcher>());
 
     // Client services injected by admin pages; they only touch the browser after prerendering (T1.13).
     builder.Services.AddScoped<DraftBackupStore>();

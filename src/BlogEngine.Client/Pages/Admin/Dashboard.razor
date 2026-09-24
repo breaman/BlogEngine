@@ -42,6 +42,26 @@
     }
 </div>
 
+@if (Summary is { ScheduledPosts.Count: > 0 })
+{
+    @* Upcoming posts (design 6.3, T4.1), soonest first, with when each goes live. *@
+    <div class="card mb-3">
+        <div class="card-header d-flex align-items-center">
+            <span class="bi bi-calendar-event me-1" aria-hidden="true"></span> Scheduled posts
+            <a class="ms-auto small" href="admin/posts?status=Scheduled">All scheduled</a>
+        </div>
+        <ul class="list-group list-group-flush">
+            @foreach (var post in Summary.ScheduledPosts)
+            {
+                <li class="list-group-item d-flex align-items-center gap-2" @key="post.Id">
+                    <a class="text-truncate" href="@($"admin/posts/{post.Id}")">@post.Title</a>
+                    <span class="ms-auto small text-body-secondary text-nowrap">@Scheduled(post.PublishedOn)</span>
+                </li>
+            }
+        </ul>
+    </div>
+}
+
 <div class="row g-3">
     <div class="col-12 col-xl-6">
         <div class="card h-100">
@@ -56,14 +76,7 @@
                     {
                         <li class="list-group-item d-flex align-items-center gap-2" @key="post.Id">
                             <a class="text-truncate" href="@($"admin/posts/{post.Id}")">@post.Title</a>
-                            @if (post.Status == PostStatus.Published)
-                            {
-                                <span class="badge text-bg-success">Published</span>
-                            }
-                            else
-                            {
-                                <span class="badge text-bg-secondary">Draft</span>
-                            }
+                            <PostStatusBadge Status="post.Status" PublishedOn="post.PublishedOn" />
                             <span class="ms-auto small text-body-secondary text-nowrap">@Relative(post.ModifiedOn)</span>
                         </li>
                     }
