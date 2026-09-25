@@ -5,7 +5,7 @@ namespace BlogEngine.Shared.Enums;
 /// </summary>
 /// <remarks>
 /// Separate from <see cref="PostStatus"/> because the list filters on derived states too: <see cref="Scheduled"/>
-/// is published with a future date, and <c>Trash</c> (soft-deleted, T4.23) follows. Values travel in the query
+/// is published with a future date, and <see cref="Trash"/> is soft-deleted (design 6.8). Values travel in the query
 /// string by name, so they may be renamed only together with the client.
 /// </remarks>
 public enum PostListStatus
@@ -20,5 +20,8 @@ public enum PostListStatus
     Published = 2,
 
     /// <summary>Published posts whose publish time is still in the future (design 6.3, A9).</summary>
-    Scheduled = 3
+    Scheduled = 3,
+
+    /// <summary>Posts in the trash (soft-deleted), whatever their status (design 6.8, O6).</summary>
+    Trash = 4
 }

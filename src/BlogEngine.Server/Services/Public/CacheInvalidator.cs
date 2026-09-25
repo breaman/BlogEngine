@@ -57,6 +57,19 @@ public sealed class CacheInvalidator(HybridCache cache, IOutputCacheStore output
     }
 
     /// <summary>
+    /// Evicts every post-derived entry after tags were renamed or merged (design 6.4, O3): post pages, lists and feeds show
+    /// tag names and link to tag pages, and the tag index and tag pages are built from the same snapshot.
+    /// </summary>
+    public async Task TagsChangedAsync()
+    {
+        Interlocked.Increment(ref postsGeneration);
+        await cache.RemoveByTagAsync(PublicCacheTags.Posts, CancellationToken.None);
+        await outputCache.EvictByTagAsync(PublicCacheTags.Posts, CancellationToken.None);
+
+        logger.LogDebug("Evicted the public caches after tags changed.");
+    }
+
+    /// <summary>
     /// Evicts the approved comments of the posts, after a comment was approved, or one that was approved was
     /// rejected, flagged or deleted (design 11).
     /// </summary>

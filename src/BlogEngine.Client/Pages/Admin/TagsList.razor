@@ -1,0 +1,193 @@
+@page "/admin/tags"
+@layout AdminLayout
+@attribute [Authorize(Policy = AuthorizationPolicies.AdminOnly)]
+@rendermode InteractiveWebAssembly
+
+<PageTitle>Tags · BlogEngine Admin</PageTitle>
+
+<h1 class="h3 mb-3">Tags</h1>
+
+<p class="text-body-secondary">
+    Tags are created as you add them to posts. Here you can rename or describe them, merge duplicates, and delete tags no
+    post uses. Changing a tag's slug, or merging it into another tag, redirects its old page to the new one.
+</p>
+
+@if (_loadError is not null)
+{
+    <div class="alert alert-danger d-flex align-items-center gap-2" role="alert">
+        <span>@_loadError</span>
+        <button type="button" class="btn btn-sm btn-outline-danger ms-auto" @onclick="LoadAsync">Retry</button>
+    </div>
+}
+else if (Items is null)
+{
+    <p class="text-body-secondary"><span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Loading tags…</p>
+}
+else if (Items.Count == 0)
+{
+    <div class="card">
+        <div class="card-body text-center text-body-secondary py-5">
+            <p class="mb-0">No tags yet. Tags appear here once you add them to a post.</p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="row g-2 align-items-center mb-3">
+        <div class="col-12 col-md-6">
+            <div class="form-floating">
+                <input type="search" id="tags-filter" class="form-control" placeholder="Filter" @bind="_filter" @bind:event="oninput" />
+                <label for="tags-filter">Filter by name or slug</label>
+            </div>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th scope="col">Tag</th>
+                    <th scope="col" class="text-end">Posts</th>
+                    <th scope="col" class="text-end"><span class="visually-hidden">Actions</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var tag in FilteredItems)
+                {
+                    var busy = _busyTagId == tag.Id || !RendererInfo.IsInteractive;
+                    <tr @key="tag.Id">
+                        <td>
+                            <span class="fw-semibold">@tag.Name</span>
+                            <div class="small text-body-secondary font-monospace">@TagPaths.Tag(tag.Slug)</div>
+                            @if (!string.IsNullOrWhiteSpace(tag.Description))
+                            {
+                                <div class="small text-body-secondary">@tag.Description</div>
+                            }
+                        </td>
+                        <td class="text-end text-nowrap">
+                            @if (tag.PostCount > 0)
+                            {
+                                <a href="@($"admin/posts?tag={Uri.EscapeDataString(tag.Slug)}")" title="Show posts tagged @tag.Name">@tag.PostCount.ToString("N0")</a>
+                            }
+                            else
+                            {
+                                <span class="text-body-secondary">0</span>
+                            }
+                            @if (tag.TrashedPostCount > 0)
+                            {
+                                <div class="small text-body-secondary">@tag.TrashedPostCount.ToString("N0") in trash</div>
+                            }
+                        </td>
+                        <td class="text-end text-nowrap">
+                            <button type="button" class="btn btn-sm btn-outline-primary" title="Edit" aria-label="Edit @tag.Name"
+                                    disabled="@busy" @onclick="() => StartEdit(tag)">
+                                <span class="bi bi-pencil" aria-hidden="true"></span>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" title="Merge into another tag" aria-label="Merge @tag.Name into another tag"
+                                    disabled="@(busy || Items.Count < 2)" @onclick="() => StartMerge(tag)">
+                                <span class="bi bi-intersect" aria-hidden="true"></span>
+                            </button>
+                            @* Only unused tags can be deleted; the title says why the button is off otherwise. *@
+                            <button type="button" class="btn btn-sm btn-outline-danger" aria-label="Delete @tag.Name"
+                                    title="@(tag.IsUnused ? "Delete" : "Only tags that no post uses can be deleted")"
+                                    disabled="@(busy || !tag.IsUnused)" @onclick="() => DeleteAsync(tag)">
+                                <span class="bi bi-trash" aria-hidden="true"></span>
+                            </button>
+                        </td>
+                    </tr>
+
+                    @if (_editingId == tag.Id && _editModel is not null && _editContext is not null)
+                    {
+                        <tr @key="@($"edit-{tag.Id}")" class="table-active">
+                            <td colspan="3">
+                                <EditForm EditContext="_editContext" OnValidSubmit="() => SaveEditAsync(tag)">
+                                    <FluentValidator />
+                                    <ValidationSummary class="text-danger" role="alert" />
+                                    @if (_editError is not null)
+                                    {
+                                        <div class="alert alert-warning py-2" role="alert">@_editError</div>
+                                    }
+                                    <div class="row g-2">
+                                        <div class="col-12 col-md-6">
+                                            <div class="form-floating">
+                                                <InputText @bind-Value="_editModel.Name" id="tag-edit-name" class="form-control" placeholder="Name" maxlength="@FieldLengths.TagName" />
+                                                <label for="tag-edit-name">Name</label>
+                                                <ValidationMessage For="() => _editModel.Name" class="text-danger" />
+                                            </div>
+                                        </div>
+                                        <div class="col-12 col-md-6">
+                                            <div class="form-floating">
+                                                <InputText @bind-Value="_editModel.Slug" id="tag-edit-slug" class="form-control font-monospace" placeholder="Slug" maxlength="@FieldLengths.TagSlug" />
+                                                <label for="tag-edit-slug">Slug (blank: from the name)</label>
+                                                <ValidationMessage For="() => _editModel.Slug" class="text-danger" />
+                                            </div>
+                                        </div>
+                                        <div class="col-12">
+                                            <div class="form-floating">
+                                                <InputTextArea @bind-Value="_editModel.Description" id="tag-edit-description" class="form-control" placeholder="Description" rows="2" maxlength="@FieldLengths.TagDescription" />
+                                                <label for="tag-edit-description">Description (shown on the tag page)</label>
+                                                <ValidationMessage For="() => _editModel.Description" class="text-danger" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    @if (SlugChanging(tag))
+                                    {
+                                        <div class="form-text">
+                                            <span class="bi bi-signpost-split me-1" aria-hidden="true"></span>
+                                            The tag's URL changes, and <code>@TagPaths.Tag(tag.Slug)</code> will redirect to it.
+                                        </div>
+                                    }
+                                    <div class="d-flex gap-2 mt-2">
+                                        <button type="submit" class="btn btn-sm btn-primary" disabled="@_saving">
+                                            <span class="bi bi-check-lg" aria-hidden="true"></span> Save
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_saving" @onclick="CancelEdit">Cancel</button>
+                                    </div>
+                                </EditForm>
+                            </td>
+                        </tr>
+                    }
+
+                    @if (_mergingId == tag.Id)
+                    {
+                        <tr @key="@($"merge-{tag.Id}")" class="table-active">
+                            <td colspan="3">
+                                @if (_mergeError is not null)
+                                {
+                                    <div class="alert alert-warning py-2" role="alert">@_mergeError</div>
+                                }
+                                <div class="row g-2 align-items-center">
+                                    <div class="col-12 col-md-6">
+                                        <div class="form-floating">
+                                            <select id="tag-merge-target" class="form-select" @bind="_mergeTargetId">
+                                                <option value="0">Choose a tag…</option>
+                                                @foreach (var target in Items.Where(t => t.Id != tag.Id))
+                                                {
+                                                    <option value="@target.Id">@target.Name (@target.Slug)</option>
+                                                }
+                                            </select>
+                                            <label for="tag-merge-target">Merge "@tag.Name" into</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md-6 d-flex gap-2">
+                                        <button type="button" class="btn btn-sm btn-primary" disabled="@(_mergeTargetId == 0 || _busyTagId is not null)" @onclick="() => MergeAsync(tag)">
+                                            <span class="bi bi-intersect" aria-hidden="true"></span> Merge
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="CancelMerge">Cancel</button>
+                                    </div>
+                                </div>
+                                <div class="form-text">
+                                    Posts tagged "@tag.Name" get the chosen tag instead, "@tag.Name" is deleted, and its page redirects to the chosen tag's page.
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <p class="text-body-secondary small">@TagCountText</p>
+}
+
+<ConfirmDialog @ref="_confirm" />

@@ -141,5 +141,14 @@ public class TagInputTests
             IReadOnlyList<TagDto> matches = [.. _tags.Where(t => TagNormalizer.ToNormalizedName(t.Name).Contains(term, StringComparison.Ordinal))];
             return Task.FromResult(matches);
         }
+
+        public Task<IReadOnlyList<TagAdminDto>> GetAllAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<TagResult> UpdateAsync(int id, UpdateTagRequest request, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<TagResult> MergeAsync(int id, int targetId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<TagResult> DeleteAsync(int id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 }

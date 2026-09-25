@@ -16,7 +16,7 @@
 | [1: Posts MVP](#phase-1--posts-mvp) | Can write and publish posts end to end | 25 | 25 |
 | [2: Media MVP](#phase-2--media-mvp) | Can add, edit and insert photos | 13 | 13 |
 | [3: Comments MVP](#phase-3--comments-mvp) | Readers can comment; the author moderates | 11 | 11 |
-| [4: V1 Polish](#phase-4--v1-polish) | Ready for public launch | 35 | 19 |
+| [4: V1 Polish](#phase-4--v1-polish) | Ready for public launch | 35 | 25 |
 | [5: Later](#phase-5--later) | As desired | 10 | 0 |
 
 Update the **Done** column as tasks are completed.
@@ -557,30 +557,36 @@ These apply to all tasks and are not repeated below:
 
 ### Administration
 
-- [ ] **T4.22 — Tag management** (`/admin/tags`; §6.4, O3)
+- [x] **T4.22 — Tag management** (`/admin/tags`; §6.4, O3)
   - List with usage counts; rename (re-normalize, check collisions); merge (move `PostTag`s, add redirect from old tag slug); delete only when unused.
   - Endpoints `PUT /tags/{id}`, `POST /tags/{id}/merge/{targetId}`, `DELETE /tags/{id}`.
   - **Done when:** merging `csharp` into `c-sharp` redirects the old tag URL.
+  - *Status:* `ITagService` gained `GetAllAsync`/`UpdateAsync`/`MergeAsync`/`DeleteAsync` (results as `TagResult`), plus `GET /tags/all` for the list. Rename edits name, slug and description (`UpdateTagRequestValidator`); a name another tag has is a 409 suggesting a merge, a typed slug another tag has is a 400, and a blank slug is derived from the name (kept when only the casing changes). A changed slug and a merge both redirect the old tag page **and** feed (`TagDetail` now checks the redirect table before 404). Posts in the trash keep their tags: merges retag them, and a tag they use can't be deleted (the list shows "N in trash"). Renames and merges bump the affected posts' row versions (`ExecuteUpdate`), so an editor opened earlier gets a conflict instead of recreating the old tag. Log events `TagUpdated`/`TagMerged`/`TagDeleted` (5001–5003). `AdminTagsApiTests` covers the done-when.
 
-- [ ] **T4.23 — Trash** (§6.8, O6)
+- [x] **T4.23 — Trash** (§6.8, O6)
   - Trash tab in the posts list (`IgnoreQueryFilters()`); `POST /posts/{id}/restore` (restores to Draft); "Empty trash" hard-deletes with cascades.
   - **Done when:** restore and empty trash work and cascades remove related rows.
+  - *Status:* `PostListStatus.Trash` (newest trashed first, `PostSummaryDto.DeletedOn`). Besides `POST /posts/{id}/restore` and `POST /posts/empty-trash`, there is `DELETE /posts/{id}/permanent` for one post. Restore gives a draft that keeps a live post's date (republishing restores its URL); a scheduled post forgets its date, like Unschedule. Hard deletes go through the change tracker (audited) and the database cascades remove tag links, comments (replies included), revisions, media usage and preview links; redirects that pointed at the post's URL are removed too. Media items stay in the library. `TrashTests` covers it; the empty-trash test runs alone (`[NotInParallel]`) because it purges the shared database's trash.
 
-- [ ] **T4.24 — Export** (`GET /api/admin/export`; §17, O7)
+- [x] **T4.24 — Export** (`GET /api/admin/export`; §17, O7)
   - Stream `blog-export-{date}.zip`: `posts/*.md` and `pages/*.md` with Hugo/Jekyll-style YAML front matter, `media/{publicId}/original.*` + `metadata.json`, `comments.json`, `settings.json`. Button on the settings page.
   - **Done when:** the zip opens and a post's front matter contains title, slug, date, tags, summary, status and cover.
+  - *Status:* `BlogExporter` + `FrontMatterWriter` (quotes and escapes every string, so titles with `:`, `"` or `#` round-trip). Posts are `posts/{yyyy-MM-dd}-{slug}.md` (never-published drafts `posts/{slug}.md`) with `title, slug, date, lastmod, tags, summary, status, draft, featured, allowComments, cover, socialImage, metaTitle, metaDescription`; trashed posts are left out. The zip also has `tags.json` (descriptions) and `redirects.json`; `comments.json` includes emails but not IP hashes. The .NET zip library flushes entries with synchronous writes even through its async APIs, which ASP.NET Core rejects, so entries go through `ZipOutputSpool` and are passed on asynchronously one at a time (memory bounded by the largest entry). Response is `no-store`. Log event `BlogExported` (6001). `ExportTests` covers the done-when.
 
-- [ ] **T4.25 — Settings: remaining groups** (§13)
+- [x] **T4.25 — Settings: remaining groups** (§13)
   - Author avatar, favicon, default social image, `robots.txt` extras, notification toggle, media settings (max upload, downscale threshold, rendition widths), avatars on/off.
   - **Done when:** every §13 setting is editable.
+  - *Status:* The settings page adds the avatar, favicon and default social image (media picker, thumbnails persisted with the settings), commenter avatars, a Media card (rendition widths typed as `320, 640, 960`, parsed by `RenditionWidthsText`), `robots.txt` extras and the export button; the notification toggle was already there (T4.21) and the keyword blocklist is on the comments page (T3.9). "Require approval" stays locked on (Q2). The server rejects an image no longer in the library as a field error instead of a foreign-key failure. The favicon replaces `favicon.png` in `App.razor`, and the avatar is the `Person` author's `image` in post JSON-LD. **Gap:** the author bio and avatar still aren't shown on a public page (nothing displays the bio yet).
 
-- [ ] **T4.26 — Dashboard completion** (O1, §12.1)
+- [x] **T4.26 — Dashboard completion** (O1, §12.1)
   - Scheduled posts, recent activity, and a nudge when the admin has neither a passkey nor 2FA.
   - **Done when:** the dashboard shows all cards from O1.
+  - *Status:* Scheduled posts and recent activity already existed (T3.10, T4.1). `DashboardSummaryDto.ShowSecurityNudge` is set when the signed-in admin has neither two-factor authentication nor a passkey, and the dashboard then links to the passkey and 2FA pages. `AdminPagesTests.Dashboard_NudgesUntilTwoFactorIsOn` covers it.
 
-- [ ] **T4.27 — Post publish log events** (§18)
+- [x] **T4.27 — Post publish log events** (§18)
   - `PostPublished`, `PostUnpublished` structured events.
   - **Done when:** events appear in logs.
+  - *Status:* `PostLog` (event ids 1001–1005): `PostPublished` (with `IsScheduled`), `PostUnpublished` (with `WasScheduled`), and for the trash `PostTrashed`, `PostRestored` and `PostsPurged`. `PostLogTests` checks the structured properties; the events also show in the integration test output.
 
 ### Launch hardening
 

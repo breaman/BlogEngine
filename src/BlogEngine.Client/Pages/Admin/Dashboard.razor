@@ -20,6 +20,20 @@
     </div>
 }
 
+@if (Summary is { ShowSecurityNudge: true })
+{
+    @* Design 12.1: a password alone guards the whole blog, so suggest a second factor until one is set up. *@
+    <div class="alert alert-warning d-flex flex-wrap align-items-center gap-2" role="status">
+        <span class="bi bi-shield-exclamation fs-5" aria-hidden="true"></span>
+        <span class="me-auto">
+            <strong>Protect your account.</strong> Only a password guards this blog. Add a passkey or turn on two-factor
+            authentication, so a stolen password isn't enough to sign in.
+        </span>
+        <a class="btn btn-sm btn-warning" href="Account/Manage/Passkeys">Add a passkey</a>
+        <a class="btn btn-sm btn-outline-warning" href="Account/Manage/TwoFactorAuthentication">Set up two-factor authentication</a>
+    </div>
+}
+
 <div class="row row-cols-1 row-cols-sm-2 row-cols-xl-4 g-3 mb-4">
     @foreach (var card in Cards)
     {

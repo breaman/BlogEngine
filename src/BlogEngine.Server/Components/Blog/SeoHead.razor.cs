@@ -87,10 +87,13 @@ public partial class SeoHead : ComponentBase
             : null);
         _imageUrl = _image is null ? null : Absolute(_image.Url);
 
-        _jsonLd = Article is null
-            ? null
-            : BlogPostingSchema.ToJson(new BlogPostingSchema.Data(new Uri(_canonicalUrl), Article, _description, _imageUrl,
-                settings.AuthorName, settings.SiteTitle, new Uri(Absolute(SitePaths.Home))));
+        _jsonLd = null;
+        if (Article is not null)
+        {
+            var avatar = settings.AuthorAvatarMediaId is { } avatarId ? await Queries.GetMediaImageAsync(avatarId) : null;
+            _jsonLd = BlogPostingSchema.ToJson(new BlogPostingSchema.Data(new Uri(_canonicalUrl), Article, _description, _imageUrl,
+                settings.AuthorName, settings.SiteTitle, new Uri(Absolute(SitePaths.Home)), avatar is null ? null : Absolute(avatar.Url)));
+        }
     }
 
     /// <summary>An absolute URL on this site for <paramref name="path"/>.</summary>

@@ -32,6 +32,7 @@ public static class AdminApiEndpoints
         group.MapAdminMediaEndpoints();
         group.MapAdminCommentsEndpoints();
         group.MapAdminDashboardEndpoints();
+        group.MapAdminExportEndpoints();
 
         return group;
     }

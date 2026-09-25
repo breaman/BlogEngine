@@ -5,6 +5,7 @@ using BlogEngine.Shared.Services;
 using BlogEngine.Shared.Validation;
 
 using FluentValidation;
+using FluentValidation.Results;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Hybrid;
@@ -67,6 +68,7 @@ public sealed class ServerSettingsService(
     {
         ArgumentNullException.ThrowIfNull(settings);
         await validator.ValidateAndThrowAsync(settings, cancellationToken);
+        await EnsureImagesExistAsync(settings, cancellationToken);
 
         var entity = await dbContext.SiteSettings
             .SingleOrDefaultAsync(s => s.Id == SiteSettings.SingletonId, cancellationToken);
@@ -96,6 +98,38 @@ public sealed class ServerSettingsService(
 
         // Evict only after the save commits, so a concurrent read can't re-cache the old values after this.
         await cacheInvalidator.SettingsChangedAsync(CacheKey);
+    }
+
+    /// <summary>
+    /// Checks that the author avatar, favicon and default social image are library items that still exist (the shared
+    /// validator can't see the library). One deleted while the settings page was open is reported on its field rather
+    /// than failing the save on the foreign key.
+    /// </summary>
+    /// <exception cref="ValidationException">An image is no longer in the media library.</exception>
+    private async Task EnsureImagesExistAsync(SiteSettingsDto settings, CancellationToken cancellationToken)
+    {
+        (string Property, int? MediaId, string Label)[] images =
+        [
+            (nameof(SiteSettingsDto.AuthorAvatarMediaId), settings.AuthorAvatarMediaId, "author avatar"),
+            (nameof(SiteSettingsDto.FaviconMediaId), settings.FaviconMediaId, "favicon"),
+            (nameof(SiteSettingsDto.DefaultSocialImageMediaId), settings.DefaultSocialImageMediaId, "default social image")
+        ];
+
+        int[] ids = [.. images.Select(i => i.MediaId).OfType<int>().Distinct()];
+        if (ids.Length == 0)
+        {
+            return;
+        }
+
+        var existing = await dbContext.MediaItems.Where(m => ids.Contains(m.Id)).Select(m => m.Id).ToListAsync(cancellationToken);
+        var failures = images
+            .Where(i => i.MediaId is { } id && !existing.Contains(id))
+            .Select(i => new ValidationFailure(i.Property, $"The {i.Label} is no longer in the media library. Choose another one."))
+            .ToList();
+        if (failures.Count > 0)
+        {
+            throw new ValidationException(failures);
+        }
     }
 
     /// <summary>

@@ -104,6 +104,34 @@ public sealed class ClientPostAdminService(HttpClient http) : IPostAdminService
     }
 
     /// <inheritdoc />
+    public Task<PostSaveResult> RestoreAsync(int id, CancellationToken cancellationToken = default)
+    {
+        return SendAsync<object?>(HttpMethod.Post, $"{BaseUri}/{id}/restore", null, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> DeletePermanentlyAsync(int id, CancellationToken cancellationToken = default)
+    {
+        using var response = await http.DeleteAsync($"{BaseUri}/{id}/permanent", cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return false;
+        }
+
+        response.EnsureSuccessStatusCode();
+        return true;
+    }
+
+    /// <inheritdoc />
+    public async Task<int> EmptyTrashAsync(CancellationToken cancellationToken = default)
+    {
+        using var response = await http.PostAsync($"{BaseUri}/empty-trash", null, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return (await response.Content.ReadFromJsonAsync<EmptyTrashResponse>(cancellationToken))?.Deleted ?? 0;
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<PostRevisionSummaryDto>?> GetRevisionsAsync(int postId, CancellationToken cancellationToken = default)
     {
         using var response = await http.GetAsync($"{BaseUri}/{postId}/revisions", cancellationToken);

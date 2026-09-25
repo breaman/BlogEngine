@@ -38,6 +38,16 @@ internal static class ProblemResponseReader
         return new Dictionary<string, string[]> { [string.Empty] = [message] };
     }
 
+    /// <summary>
+    /// The message of a problem that isn't about fields, such as a 409 explaining what is in the way: its detail, else its
+    /// title, else <see cref="FallbackMessage"/>.
+    /// </summary>
+    public static async Task<string> ReadMessageAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        var errors = await ReadErrorsAsync(response, cancellationToken);
+        return errors.Values.SelectMany(messages => messages).FirstOrDefault() ?? FallbackMessage;
+    }
+
     /// <summary>The parts of an RFC 9457 problem document this client reads.</summary>
     private sealed record ProblemResponse(string? Title, string? Detail, Dictionary<string, string[]>? Errors);
 }

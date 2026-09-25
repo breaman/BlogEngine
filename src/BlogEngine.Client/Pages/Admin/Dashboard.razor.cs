@@ -13,8 +13,9 @@ using Microsoft.AspNetCore.Components;
 namespace BlogEngine.Client.Pages.Admin;
 
 /// <summary>
-/// The admin landing page at <c>/admin</c> (design 7.3, O1, T3.10, T4.1): counts of drafts, scheduled and published posts
-/// and of comments awaiting moderation, the next scheduled posts, and the latest posts and comments.
+/// The admin landing page at <c>/admin</c> (design 7.3, O1, 12.1, T3.10, T4.1, T4.26): counts of drafts, scheduled and
+/// published posts and of comments awaiting moderation, the next scheduled posts, the latest posts and comments, and a nudge
+/// to add a passkey or two-factor authentication while the admin has neither.
 /// </summary>
 /// <remarks>
 /// The summary loaded while prerendering is carried into WebAssembly with <see cref="PersistentStateAttribute"/>. The

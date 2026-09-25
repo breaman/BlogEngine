@@ -10,6 +10,7 @@ using BlogEngine.Server.Endpoints;
 using BlogEngine.Server.Services;
 using BlogEngine.Server.Services.Comments;
 using BlogEngine.Server.Services.Email;
+using BlogEngine.Server.Services.Export;
 using BlogEngine.Server.Services.Media;
 using BlogEngine.Server.Services.Public;
 using BlogEngine.Server.Storage;
@@ -146,6 +147,7 @@ try
     builder.Services.AddScoped<CommentSubmissionService>();
     builder.Services.AddScoped<ICommentModerationService, ServerCommentModerationService>();
     builder.Services.AddScoped<IDashboardService, ServerDashboardService>();
+    builder.Services.AddScoped<BlogExporter>();
     builder.Services.AddCommentRateLimiting();
     // Site search runs an uncached LIKE scan, so it is rate limited too (design 12.4, T4.9).
     builder.Services.AddRateLimiter(options => options.AddPolicy<string, SearchRateLimiting>(SearchRateLimiting.PolicyName));

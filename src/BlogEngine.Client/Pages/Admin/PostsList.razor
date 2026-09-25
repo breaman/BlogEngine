@@ -15,12 +15,28 @@
 <ul class="nav nav-tabs mb-3">
     @foreach (var tab in StatusTabs)
     {
-        <li class="nav-item">
+        <li class="nav-item @(tab.Status == PostListStatus.Trash ? "ms-auto" : null)">
             <a class="nav-link @(tab.Status == Status ? "active" : null)" aria-current="@(tab.Status == Status ? "page" : null)"
-               href="@ListUri(status: tab.Status)">@tab.Label</a>
+               href="@ListUri(status: tab.Status)">
+                @if (tab.Status == PostListStatus.Trash)
+                {
+                    <span class="bi bi-trash me-1" aria-hidden="true"></span>
+                }
+                @tab.Label
+            </a>
         </li>
     }
 </ul>
+
+@if (IsTrash && Result is { Items.Count: > 0 })
+{
+    <div class="alert alert-secondary d-flex flex-wrap align-items-center gap-2" role="status">
+        <span>Posts in the trash are hidden from the site. Restoring a post makes it a draft again.</span>
+        <button type="button" class="btn btn-sm btn-outline-danger ms-auto" disabled="@_emptyingTrash" @onclick="EmptyTrashAsync">
+            <span class="bi bi-trash3" aria-hidden="true"></span> Empty trash
+        </button>
+    </div>
+}
 
 <form class="row g-2 align-items-center mb-3" role="search" @onsubmit="ApplyFilters" @onsubmit:preventDefault>
     <div class="col-12 col-md-5">
@@ -63,7 +79,11 @@ else if (Result.Items.Count == 0)
 {
     <div class="card">
         <div class="card-body text-center text-body-secondary py-5">
-            @if (HasFilters || Status != PostListStatus.All)
+            @if (IsTrash && !HasFilters)
+            {
+                <p class="mb-0">The trash is empty.</p>
+            }
+            else if (HasFilters || Status != PostListStatus.All)
             {
                 <p class="mb-0">No posts match these filters.</p>
             }
@@ -84,7 +104,7 @@ else
                     <th scope="col">Title</th>
                     <th scope="col">Status</th>
                     <th scope="col">Tags</th>
-                    <th scope="col">Date</th>
+                    <th scope="col">@(IsTrash ? "Trashed" : "Date")</th>
                     <th scope="col" class="text-end">Words</th>
                     <th scope="col" class="text-end"><span class="visually-hidden">Actions</span></th>
                 </tr>
@@ -95,7 +115,15 @@ else
                     var busy = _busyPostId == post.Id;
                     <tr @key="post.Id">
                         <td>
-                            <a class="fw-semibold text-decoration-none" href="@($"admin/posts/{post.Id}")">@post.Title</a>
+                            @if (IsTrash)
+                            {
+                                @* Posts in the trash can't be opened in the editor until they are restored. *@
+                                <span class="fw-semibold">@post.Title</span>
+                            }
+                            else
+                            {
+                                <a class="fw-semibold text-decoration-none" href="@($"admin/posts/{post.Id}")">@post.Title</a>
+                            }
                             @if (post.IsFeatured)
                             {
                                 <span class="bi bi-star-fill text-warning ms-1" title="Featured" aria-label="Featured"></span>
@@ -115,30 +143,44 @@ else
                         <td class="text-nowrap">@DateText(post)</td>
                         <td class="text-end">@post.WordCount.ToString("N0")</td>
                         <td class="text-end text-nowrap">
-                            <a class="btn btn-sm btn-outline-primary" href="@($"admin/posts/{post.Id}")" title="Edit" aria-label="Edit @post.Title">
-                                <span class="bi bi-pencil" aria-hidden="true"></span>
-                            </a>
-                            @if (IsScheduled(post))
+                            @if (IsTrash)
                             {
-                                <button type="button" class="btn btn-sm btn-outline-warning" title="Unschedule" aria-label="Unschedule @post.Title"
-                                        disabled="@busy" @onclick="() => UnpublishAsync(post)">
-                                    <span class="bi bi-calendar-x" aria-hidden="true"></span>
+                                <button type="button" class="btn btn-sm btn-outline-primary" title="Restore as draft" aria-label="Restore @post.Title"
+                                        disabled="@busy" @onclick="() => RestoreAsync(post)">
+                                    <span class="bi bi-arrow-counterclockwise" aria-hidden="true"></span>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-danger" title="Delete permanently" aria-label="Delete @post.Title permanently"
+                                        disabled="@busy" @onclick="() => DeletePermanentlyAsync(post)">
+                                    <span class="bi bi-x-octagon" aria-hidden="true"></span>
                                 </button>
                             }
-                            else if (post.PublicPath is { } path)
+                            else
                             {
-                                <a class="btn btn-sm btn-outline-secondary" href="@path" target="_blank" rel="noopener" title="View" aria-label="View @post.Title">
-                                    <span class="bi bi-box-arrow-up-right" aria-hidden="true"></span>
+                                <a class="btn btn-sm btn-outline-primary" href="@($"admin/posts/{post.Id}")" title="Edit" aria-label="Edit @post.Title">
+                                    <span class="bi bi-pencil" aria-hidden="true"></span>
                                 </a>
-                                <button type="button" class="btn btn-sm btn-outline-warning" title="Unpublish" aria-label="Unpublish @post.Title"
-                                        disabled="@busy" @onclick="() => UnpublishAsync(post)">
-                                    <span class="bi bi-eye-slash" aria-hidden="true"></span>
+                                @if (IsScheduled(post))
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-warning" title="Unschedule" aria-label="Unschedule @post.Title"
+                                            disabled="@busy" @onclick="() => UnpublishAsync(post)">
+                                        <span class="bi bi-calendar-x" aria-hidden="true"></span>
+                                    </button>
+                                }
+                                else if (post.PublicPath is { } path)
+                                {
+                                    <a class="btn btn-sm btn-outline-secondary" href="@path" target="_blank" rel="noopener" title="View" aria-label="View @post.Title">
+                                        <span class="bi bi-box-arrow-up-right" aria-hidden="true"></span>
+                                    </a>
+                                    <button type="button" class="btn btn-sm btn-outline-warning" title="Unpublish" aria-label="Unpublish @post.Title"
+                                            disabled="@busy" @onclick="() => UnpublishAsync(post)">
+                                        <span class="bi bi-eye-slash" aria-hidden="true"></span>
+                                    </button>
+                                }
+                                <button type="button" class="btn btn-sm btn-outline-danger" title="Move to trash" aria-label="Move @post.Title to trash"
+                                        disabled="@busy" @onclick="() => DeleteAsync(post)">
+                                    <span class="bi bi-trash" aria-hidden="true"></span>
                                 </button>
                             }
-                            <button type="button" class="btn btn-sm btn-outline-danger" title="Move to trash" aria-label="Move @post.Title to trash"
-                                    disabled="@busy" @onclick="() => DeleteAsync(post)">
-                                <span class="bi bi-trash" aria-hidden="true"></span>
-                            </button>
                         </td>
                     </tr>
                 }

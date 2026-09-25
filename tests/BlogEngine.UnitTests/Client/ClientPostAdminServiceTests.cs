@@ -85,6 +85,46 @@ public class ClientPostAdminServiceTests
         await Assert.That(await service.DeleteAsync(99)).IsFalse();
     }
 
+    /// <summary>Restoring posts to <c>/posts/{id}/restore</c> and returns the restored draft; 404 is not found.</summary>
+    [Test]
+    public async Task RestoreAsync_MapsResponses()
+    {
+        var handler = new StubHttpHandler(_ => JsonResponse(HttpStatusCode.OK, new PostEditDto { Id = 5, Title = "Back", Status = PostStatus.Draft }));
+        var missing = CreateService(new StubHttpHandler(_ => new HttpResponseMessage(HttpStatusCode.NotFound)));
+
+        var restored = await CreateService(handler).RestoreAsync(5);
+
+        await Assert.That(restored).IsTypeOf<PostSaved>();
+        await Assert.That(handler.Requests.Single().Method).IsEqualTo(HttpMethod.Post);
+        await Assert.That(handler.Requests.Single().RequestUri!.AbsolutePath).IsEqualTo("/api/admin/posts/5/restore");
+        await Assert.That(await missing.RestoreAsync(5)).IsTypeOf<PostNotFound>();
+    }
+
+    /// <summary>Deleting permanently uses <c>DELETE /posts/{id}/permanent</c>; 404 means the post isn't in the trash.</summary>
+    [Test]
+    public async Task DeletePermanentlyAsync_MapsResponses()
+    {
+        var handler = new StubHttpHandler(_ => new HttpResponseMessage(HttpStatusCode.NoContent));
+        var missing = CreateService(new StubHttpHandler(_ => new HttpResponseMessage(HttpStatusCode.NotFound)));
+
+        await Assert.That(await CreateService(handler).DeletePermanentlyAsync(6)).IsTrue();
+        await Assert.That(handler.Requests.Single().Method).IsEqualTo(HttpMethod.Delete);
+        await Assert.That(handler.Requests.Single().RequestUri!.AbsolutePath).IsEqualTo("/api/admin/posts/6/permanent");
+        await Assert.That(await missing.DeletePermanentlyAsync(6)).IsFalse();
+    }
+
+    /// <summary>Emptying the trash reports how many posts were deleted.</summary>
+    [Test]
+    public async Task EmptyTrashAsync_ReturnsDeletedCount()
+    {
+        var handler = new StubHttpHandler(_ => JsonResponse(HttpStatusCode.OK, new EmptyTrashResponse(3)));
+
+        var deleted = await CreateService(handler).EmptyTrashAsync();
+
+        await Assert.That(deleted).IsEqualTo(3);
+        await Assert.That(handler.Requests.Single().RequestUri!.AbsolutePath).IsEqualTo("/api/admin/posts/empty-trash");
+    }
+
     /// <summary>List filters are sent in the query string, escaped.</summary>
     [Test]
     public async Task GetPostsAsync_SendsFiltersInQueryString()

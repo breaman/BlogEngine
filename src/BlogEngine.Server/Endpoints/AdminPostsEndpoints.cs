@@ -8,8 +8,8 @@ using Microsoft.AspNetCore.Http.HttpResults;
 namespace BlogEngine.Server.Endpoints;
 
 /// <summary>
-/// Admin API for posts (design 7.4): listing, editing, autosave, publishing, trash, revisions, preview links and slug
-/// checks. Each
+/// Admin API for posts (design 7.4): listing, editing, autosave, publishing, trash (move, restore, delete permanently,
+/// empty), revisions, preview links and slug checks. Each
 /// handler delegates to <see cref="IPostAdminService"/> and maps its <see cref="PostSaveResult"/> to HTTP:
 /// 200 with the saved post, 404, 409 for a stale <c>RowVersion</c>, or a 400 validation problem.
 /// </summary>
@@ -32,6 +32,11 @@ public static class AdminPostsEndpoints
         posts.MapPost("/{id:int}/unpublish", (int id, UnpublishPostRequest? request, IPostAdminService service, CancellationToken ct) =>
             ToHttpResultAsync(service.UnpublishAsync(id, request ?? new UnpublishPostRequest(), ct)));
         posts.MapDelete("/{id:int}", DeletePostAsync);
+        posts.MapPost("/{id:int}/restore", (int id, IPostAdminService service, CancellationToken ct) =>
+            ToHttpResultAsync(service.RestoreAsync(id, ct)));
+        posts.MapDelete("/{id:int}/permanent", DeletePostPermanentlyAsync);
+        posts.MapPost("/empty-trash", async (IPostAdminService service, CancellationToken ct) =>
+            TypedResults.Ok(new EmptyTrashResponse(await service.EmptyTrashAsync(ct))));
         posts.MapGet("/{id:int}/revisions", GetRevisionsAsync);
         posts.MapGet("/{id:int}/revisions/{revisionId:int}", GetRevisionAsync);
         posts.MapGet("/{id:int}/preview-tokens", GetPreviewLinksAsync);
@@ -78,6 +83,15 @@ public static class AdminPostsEndpoints
         CancellationToken cancellationToken)
     {
         return await service.DeleteAsync(id, cancellationToken)
+            ? TypedResults.NoContent()
+            : TypedResults.NotFound();
+    }
+
+    /// <summary>Deletes a post in the trash for good (design 6.8); 404 unless the post is in the trash.</summary>
+    private static async Task<Results<NoContent, NotFound>> DeletePostPermanentlyAsync(int id, IPostAdminService service,
+        CancellationToken cancellationToken)
+    {
+        return await service.DeletePermanentlyAsync(id, cancellationToken)
             ? TypedResults.NoContent()
             : TypedResults.NotFound();
     }

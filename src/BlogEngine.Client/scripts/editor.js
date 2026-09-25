@@ -10,7 +10,8 @@ import { EditorState, EditorSelection, Annotation, Prec } from '@codemirror/stat
 import { EditorView, keymap, drawSelection, placeholder as placeholderText } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
-import { syntaxHighlighting, defaultHighlightStyle, indentOnInput, bracketMatching } from '@codemirror/language';
+import { syntaxHighlighting, HighlightStyle, indentOnInput, bracketMatching } from '@codemirror/language';
+import { tags } from '@lezer/highlight';
 import hljs from './highlighter.js';
 import 'highlight.js/styles/github.css';
 // GitHub Dark under [data-bs-theme="dark"], so the preview follows the admin's theme (P14; see build-js.mjs).
@@ -100,7 +101,7 @@ class MarkdownEditorHandle {
                     EditorView.lineWrapping,
                     // markdown() also adds its keymap: Enter continues lists and quotes, Backspace removes markup.
                     markdown({ base: markdownLanguage }),
-                    syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+                    syntaxHighlighting(markdownHighlightStyle, { fallback: true }),
                     placeholderText(options.placeholder ?? ''),
                     // Our shortcuts win over the defaults (for example Mod-i, which selects the parent syntax node).
                     Prec.high(keymap.of([
@@ -611,6 +612,35 @@ function toggleLinePrefix(view, prefix, pattern) {
     view.dispatch({ changes });
     return true;
 }
+
+/**
+ * CodeMirror's defaultHighlightStyle, with each color written as light-dark(light, dark). The light colors are
+ * CodeMirror's own; its dark blues (links, URLs, code fence languages) are unreadable on the dark admin theme, so
+ * dark mode uses GitHub Dark colors to match the preview's code blocks. light-dark() follows the color-scheme
+ * that Bootstrap sets under [data-bs-theme="dark"], so the editor switches with the theme toggle without being
+ * reconfigured.
+ */
+const markdownHighlightStyle = HighlightStyle.define([
+    { tag: tags.meta, color: 'light-dark(#404740, #8b949e)' },
+    { tag: tags.link, textDecoration: 'underline' },
+    { tag: tags.heading, textDecoration: 'underline', fontWeight: 'bold' },
+    { tag: tags.emphasis, fontStyle: 'italic' },
+    { tag: tags.strong, fontWeight: 'bold' },
+    { tag: tags.strikethrough, textDecoration: 'line-through' },
+    { tag: tags.keyword, color: 'light-dark(#708, #d2a8ff)' },
+    { tag: [tags.atom, tags.bool, tags.url, tags.contentSeparator, tags.labelName], color: 'light-dark(#219, #79c0ff)' },
+    { tag: [tags.literal, tags.inserted], color: 'light-dark(#164, #7ee787)' },
+    { tag: [tags.string, tags.deleted], color: 'light-dark(#a11, #ff7b72)' },
+    { tag: [tags.regexp, tags.escape, tags.special(tags.string)], color: 'light-dark(#e40, #ffa657)' },
+    { tag: tags.definition(tags.variableName), color: 'light-dark(#00f, #79c0ff)' },
+    { tag: tags.local(tags.variableName), color: 'light-dark(#30a, #d2a8ff)' },
+    { tag: [tags.typeName, tags.namespace], color: 'light-dark(#085, #7ee787)' },
+    { tag: tags.className, color: 'light-dark(#167, #56d4dd)' },
+    { tag: [tags.special(tags.variableName), tags.macroName], color: 'light-dark(#256, #79c0ff)' },
+    { tag: tags.definition(tags.propertyName), color: 'light-dark(#00c, #79c0ff)' },
+    { tag: tags.comment, color: 'light-dark(#940, #8b949e)' },
+    { tag: tags.invalid, color: 'light-dark(#f00, #ff7b72)' }
+]);
 
 /** Sizes the editor to its host so the host decides the height, and matches Bootstrap's look. */
 const editorTheme = EditorView.theme({

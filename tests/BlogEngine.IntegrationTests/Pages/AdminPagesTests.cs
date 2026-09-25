@@ -1,9 +1,11 @@
 using System.Net;
 
+using BlogEngine.Data.Models;
 using BlogEngine.IntegrationTests.Infrastructure;
 using BlogEngine.Shared.Contracts;
 using BlogEngine.Shared.Services;
 
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace BlogEngine.IntegrationTests.Pages;
@@ -37,6 +39,7 @@ public class AdminPagesTests(BlogEngineWebApplicationFactory factory)
     [Arguments("/admin/pages")]
     [Arguments("/admin/pages/new")]
     [Arguments("/admin/pages/1")]
+    [Arguments("/admin/tags")]
     public async Task Page_Anonymous_RedirectsToLogin(string path)
     {
         using var client = IdentityTestHelper.CreateClient(factory);
@@ -193,6 +196,81 @@ public class AdminPagesTests(BlogEngineWebApplicationFactory factory)
         await Assert.That(html).Contains("id=\"settings-site-title\"");
         await Assert.That(html).Contains("<option value=\"America/Chicago\"");
         await Assert.That(html).Contains("Save settings");
+
+        // The remaining groups of design 13 (T4.25) and the export download (T4.24).
+        await Assert.That(html).Contains("Choose avatar");
+        await Assert.That(html).Contains("Choose favicon");
+        await Assert.That(html).Contains("id=\"settings-comment-avatars\"");
+        await Assert.That(html).Contains("id=\"settings-max-upload\"");
+        await Assert.That(html).Contains("id=\"settings-downscale\"");
+        await Assert.That(html).Contains("value=\"320, 640, 960, 1280, 1920\"");
+        await Assert.That(html).Contains("Choose social image");
+        await Assert.That(html).Contains("id=\"settings-robots-extras\"");
+        await Assert.That(html).Contains("href=\"api/admin/export\" download");
+    }
+
+    /// <summary>Tag management prerenders every tag with its counts and a link to its posts (T4.22).</summary>
+    [Test]
+    public async Task TagsList_PrerendersTags()
+    {
+        var token = Guid.NewGuid().ToString("N")[..8];
+        await CreatePostAsync($"Tagged {token}", [$"Managed {token}"]);
+
+        using var client = await CreateAdminClientAsync();
+        var html = await GetHtmlAsync(client, "/admin/tags");
+
+        await Assert.That(html).Contains($"Managed {token}");
+        await Assert.That(html).Contains($"/tags/managed-{token}");
+        await Assert.That(html).Contains($"href=\"admin/posts?tag=managed-{token}\"");
+        await Assert.That(html).Contains("href=\"admin/tags\"");
+    }
+
+    /// <summary>The Trash tab prerenders trashed posts with Restore and Delete permanently, and "Empty trash" (T4.23).</summary>
+    [Test]
+    public async Task PostsList_TrashTab_PrerendersTrashedPosts()
+    {
+        var token = Guid.NewGuid().ToString("N")[..8];
+        var post = await CreatePostAsync($"Discarded {token}", []);
+        await PublicTestPosts.TrashAsync(factory, post.Id);
+
+        using var client = await CreateAdminClientAsync();
+        var trash = await GetHtmlAsync(client, $"/admin/posts?status=Trash&search={token}");
+        var all = await GetHtmlAsync(client, $"/admin/posts?search={token}");
+
+        await Assert.That(trash).Contains($"Discarded {token}");
+        await Assert.That(trash).Contains($"Restore Discarded {token}");
+        await Assert.That(trash).Contains($"Delete Discarded {token} permanently");
+        await Assert.That(trash).Contains("Empty trash");
+        await Assert.That(trash).DoesNotContain($"href=\"admin/posts/{post.Id}\"");
+        await Assert.That(all).DoesNotContain($"Discarded {token}");
+    }
+
+    /// <summary>
+    /// The dashboard nudges an admin with neither a passkey nor two-factor authentication (design 12.1, T4.26), and stops
+    /// once two-factor authentication is on.
+    /// </summary>
+    [Test]
+    public async Task Dashboard_NudgesUntilTwoFactorIsOn()
+    {
+        using var client = await CreateAdminClientAsync();
+        var before = await GetHtmlAsync(client, "/admin");
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
+            var admin = await users.FindByEmailAsync(IdentityTestHelper.AdminEmail);
+            await users.SetTwoFactorEnabledAsync(admin!, true);
+        }
+
+        var after = await GetHtmlAsync(client, "/admin");
+
+        await Assert.That(before).Contains("Protect your account.");
+        await Assert.That(before).Contains("href=\"Account/Manage/Passkeys\"");
+        await Assert.That(before).Contains("href=\"Account/Manage/TwoFactorAuthentication\"");
+        await Assert.That(after).DoesNotContain("Protect your account.");
+        await Assert.That(after).Contains("Scheduled");
+        await Assert.That(after).Contains("Recent posts");
+        await Assert.That(after).Contains("Recent comments");
     }
 
     /// <summary>The standalone pages list and editor prerender with their data (T4.10), and the nav links to them.</summary>

@@ -51,6 +51,20 @@ public class BlogPostingSchemaTests
         await Assert.That(root.TryGetProperty("keywords", out _)).IsFalse();
     }
 
+    /// <summary>The author avatar setting becomes the Person's image; it is ignored when the blog itself is the author.</summary>
+    [Test]
+    public async Task ToJson_AuthorAvatar_IsPersonImage()
+    {
+        const string avatar = "https://blog.example/media/abc/me.png?v=2";
+        using var person = JsonDocument.Parse(BlogPostingSchema.ToJson(new BlogPostingSchema.Data(
+            Url, Article, null, null, "Ada Lovelace", "My blog", Site, avatar)));
+        using var organization = JsonDocument.Parse(BlogPostingSchema.ToJson(new BlogPostingSchema.Data(
+            Url, Article, null, null, null, "My blog", Site, avatar)));
+
+        await Assert.That(person.RootElement.GetProperty("author").GetProperty("image").GetString()).IsEqualTo(avatar);
+        await Assert.That(organization.RootElement.GetProperty("author").TryGetProperty("image", out _)).IsFalse();
+    }
+
     /// <summary>Markup in a title is escaped, so the JSON can't end its script element early.</summary>
     [Test]
     public async Task ToJson_EscapesHtmlSensitiveCharacters()

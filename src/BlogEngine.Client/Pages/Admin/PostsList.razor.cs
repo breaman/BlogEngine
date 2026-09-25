@@ -11,8 +11,9 @@ using Microsoft.AspNetCore.Components;
 namespace BlogEngine.Client.Pages.Admin;
 
 /// <summary>
-/// The admin posts list at <c>/admin/posts</c> (design 7.3, O2, T1.14, T4.1): status tabs (including Scheduled), tag
-/// filter, text search, paging and row actions (edit, view, unpublish or unschedule, move to trash).
+/// The admin posts list at <c>/admin/posts</c> (design 7.3, O2, T1.14, T4.1, T4.23): status tabs (including Scheduled and
+/// Trash), tag filter, text search, paging and row actions (edit, view, unpublish or unschedule, move to trash; in the
+/// trash: restore and delete permanently, plus "Empty trash").
 /// </summary>
 /// <remarks>
 /// <para>
@@ -27,13 +28,14 @@ namespace BlogEngine.Client.Pages.Admin;
 /// </remarks>
 public partial class PostsList : ComponentBase
 {
-    /// <summary>The status tabs; Trash is added with T4.23.</summary>
+    /// <summary>The status tabs, with the trash last (design 7.3).</summary>
     private static readonly IReadOnlyList<(PostListStatus Status, string Label)> StatusTabs =
     [
         (PostListStatus.All, "All"),
         (PostListStatus.Draft, "Drafts"),
         (PostListStatus.Scheduled, "Scheduled"),
-        (PostListStatus.Published, "Published")
+        (PostListStatus.Published, "Published"),
+        (PostListStatus.Trash, "Trash")
     ];
 
     [Inject] private IPostAdminService PostService { get; set; } = default!;
@@ -41,7 +43,7 @@ public partial class PostsList : ComponentBase
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private TimeProvider TimeProvider { get; set; } = default!;
 
-    /// <summary>Status tab from the query string (<c>All</c>, <c>Draft</c>, <c>Scheduled</c> or <c>Published</c>).</summary>
+    /// <summary>Status tab from the query string (<c>All</c>, <c>Draft</c>, <c>Scheduled</c>, <c>Published</c> or <c>Trash</c>).</summary>
     [SupplyParameterFromQuery(Name = "status")]
     public string? StatusParameter { get; set; }
 
@@ -71,11 +73,14 @@ public partial class PostsList : ComponentBase
     private bool _loading;
     private string? _loadError;
     private int? _busyPostId;
+    private bool _emptyingTrash;
 
     private PostListStatus Status => Enum.TryParse<PostListStatus>(StatusParameter, ignoreCase: true, out var status)
         && Enum.IsDefined(status) ? status : PostListStatus.All;
 
     private int CurrentPage => Math.Max(1, PageParameter ?? 1);
+
+    private bool IsTrash => Status == PostListStatus.Trash;
 
     private bool HasFilters => !string.IsNullOrWhiteSpace(TagParameter) || !string.IsNullOrWhiteSpace(SearchParameter);
 
@@ -224,6 +229,72 @@ public partial class PostsList : ComponentBase
         });
     }
 
+    /// <summary>Takes a post out of the trash as a draft (design 6.8).</summary>
+    private async Task RestoreAsync(PostSummaryDto post)
+    {
+        await RunRowActionAsync(post, async () =>
+        {
+            ShowResult(await PostService.RestoreAsync(post.Id) switch
+            {
+                PostSaved => (true, $"\"{post.Title}\" was restored as a draft."),
+                _ => (false, $"\"{post.Title}\" is no longer in the trash.")
+            });
+        });
+    }
+
+    /// <summary>Deletes one post in the trash for good, after confirming.</summary>
+    private async Task DeletePermanentlyAsync(PostSummaryDto post)
+    {
+        var confirmed = await _confirm.ConfirmAsync(
+            "Delete permanently?",
+            $"\"{post.Title}\" will be deleted with its comments and revisions. This can't be undone.",
+            "Delete permanently",
+            "btn-danger");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        await RunRowActionAsync(post, async () =>
+        {
+            var deleted = await PostService.DeletePermanentlyAsync(post.Id);
+            ShowResult(deleted
+                ? (true, $"\"{post.Title}\" was deleted permanently.")
+                : (false, $"\"{post.Title}\" is no longer in the trash."));
+        });
+    }
+
+    /// <summary>Deletes every post in the trash for good, after confirming (design 6.8, "Empty trash").</summary>
+    private async Task EmptyTrashAsync()
+    {
+        var confirmed = await _confirm.ConfirmAsync(
+            "Empty the trash?",
+            "Every post in the trash will be deleted with its comments and revisions. This can't be undone.",
+            "Empty trash",
+            "btn-danger");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        _emptyingTrash = true;
+        try
+        {
+            var deleted = await PostService.EmptyTrashAsync();
+            Toasts.ShowSuccess(deleted == 1 ? "1 post was deleted permanently." : $"{deleted:N0} posts were deleted permanently.");
+        }
+        catch (HttpRequestException)
+        {
+            Toasts.ShowError("The server couldn't be reached. Check your connection and try again.");
+        }
+        finally
+        {
+            _emptyingTrash = false;
+        }
+
+        await ReloadAsync();
+    }
+
     /// <summary>Runs a row action with its buttons disabled, then refreshes the list whatever the outcome.</summary>
     private async Task RunRowActionAsync(PostSummaryDto post, Func<Task> action)
     {
@@ -263,11 +334,16 @@ public partial class PostsList : ComponentBase
     }
 
     /// <summary>
-    /// Publish date for published posts, with the time as well for scheduled ones (when they go live matters),
-    /// otherwise the last change, in the author's local time.
+    /// When the post was trashed (in the trash), the publish date for published posts, with the time as well for scheduled
+    /// ones (when they go live matters), otherwise the last change, in the author's local time.
     /// </summary>
     private string DateText(PostSummaryDto post)
     {
+        if (post.DeletedOn is { } deletedOn)
+        {
+            return deletedOn.ToLocalTime().ToString("d", CultureInfo.CurrentCulture);
+        }
+
         if (post.Status != PostStatus.Published)
         {
             return post.ModifiedOn?.ToLocalTime().ToString("d", CultureInfo.CurrentCulture) ?? "—";

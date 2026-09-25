@@ -17,7 +17,15 @@
     @* Scoped CSS from .razor.css files, including those of BlogEngine.Client components. *@
     <link rel="stylesheet" href="@Assets["BlogEngine.Server.styles.css"]" />
     <ImportMap />
-    <link rel="icon" type="image/png" href="favicon.png" />
+    @if (_faviconUrl is not null)
+    {
+        @* The favicon from the settings; its type is left to the browser, as it may be any format the library accepts. *@
+        <link rel="icon" href="@_faviconUrl" />
+    }
+    else
+    {
+        <link rel="icon" type="image/png" href="favicon.png" />
+    }
     <HeadOutlet />
 </head>
 

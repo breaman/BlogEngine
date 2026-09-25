@@ -12,7 +12,9 @@ namespace BlogEngine.Shared.Services;
 /// </remarks>
 public interface IPostAdminService
 {
-    /// <summary>Lists posts for the admin posts page (never includes the trash).</summary>
+    /// <summary>
+    /// Lists posts for the admin posts page. Posts in the trash are listed only by <see cref="Enums.PostListStatus.Trash"/>.
+    /// </summary>
     Task<PagedResult<PostSummaryDto>> GetPostsAsync(PostListQuery query, CancellationToken cancellationToken = default);
 
     /// <summary>Loads a post for editing, or <see langword="null"/> if there is no such post outside the trash.</summary>
@@ -49,6 +51,24 @@ public interface IPostAdminService
     /// <summary>Moves the post to the trash (soft delete).</summary>
     /// <returns><see langword="false"/> if there is no such post outside the trash.</returns>
     Task<bool> DeleteAsync(int id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Takes a post out of the trash as a draft (design 6.8, O6). A post that was live keeps its publish date, so publishing
+    /// it again restores its old URL; a scheduled post forgets its date, as with <see cref="UnpublishAsync"/>.
+    /// </summary>
+    /// <returns><see cref="PostSaved"/> with the restored draft, or <see cref="PostNotFound"/> if the post isn't in the trash.</returns>
+    Task<PostSaveResult> RestoreAsync(int id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Permanently deletes one post that is in the trash, with its tag links, comments, revisions, media usage and preview
+    /// links (design 6.8).
+    /// </summary>
+    /// <returns><see langword="false"/> if there is no such post in the trash.</returns>
+    Task<bool> DeletePermanentlyAsync(int id, CancellationToken cancellationToken = default);
+
+    /// <summary>Permanently deletes every post in the trash, like <see cref="DeletePermanentlyAsync"/> (design 6.8, "Empty trash").</summary>
+    /// <returns>The number of posts deleted.</returns>
+    Task<int> EmptyTrashAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Lists the post's revisions, newest first, without their content (design 7.4, A13), or <see langword="null"/>

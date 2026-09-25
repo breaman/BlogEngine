@@ -62,6 +62,8 @@ public partial class Setup : ComponentBase
     private sealed class InputModel
     {
         public string DisplayName { get; set; } = "";
+        public string FirstName { get; set; } = "";
+        public string LastName { get; set; } = "";
         public string Email { get; set; } = "";
         public string Password { get; set; } = "";
         public string ConfirmPassword { get; set; } = "";
@@ -75,6 +77,16 @@ public partial class Setup : ComponentBase
                 .NotEmpty()
                 .MaximumLength(FieldLengths.PersonName)
                 .WithName("Display name");
+
+            RuleFor(x => x.FirstName)
+                .NotEmpty()
+                .MaximumLength(FieldLengths.PersonName)
+                .WithName("First name");
+
+            RuleFor(x => x.LastName)
+                .NotEmpty()
+                .MaximumLength(FieldLengths.PersonName)
+                .WithName("Last name");
 
             RuleFor(x => x.Email)
                 .NotEmpty()

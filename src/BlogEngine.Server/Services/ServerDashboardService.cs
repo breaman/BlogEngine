@@ -1,20 +1,27 @@
+using System.Globalization;
+
+using BlogEngine.Data.Interfaces;
 using BlogEngine.Data.Models;
 using BlogEngine.Server.Services.Comments;
 using BlogEngine.Shared.Contracts;
 using BlogEngine.Shared.Enums;
 using BlogEngine.Shared.Services;
 
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace BlogEngine.Server.Services;
 
 /// <summary>
-/// Server implementation of <see cref="IDashboardService"/> (design 4.5 O1, T3.10, T4.1): post counts by state, the
-/// pending comment count, the next scheduled posts and the latest posts and comments, straight from the database so they are always current.
+/// Server implementation of <see cref="IDashboardService"/> (design 4.5 O1, 12.1, T3.10, T4.1, T4.26): post counts by state,
+/// the pending comment count, the next scheduled posts and the latest posts and comments, straight from the database so
+/// they are always current, and whether the signed-in admin still needs a passkey or two-factor authentication.
 /// </summary>
 public sealed class ServerDashboardService(
     ApplicationDbContext dbContext,
     IPostAdminService postAdminService,
+    UserManager<User> userManager,
+    IUserService userService,
     TimeProvider timeProvider) : IDashboardService
 {
     /// <summary>How many recent posts and comments the activity lists show.</summary>
@@ -51,7 +58,23 @@ public sealed class ServerDashboardService(
                 .Take(RecentCount))
             .ToListAsync(cancellationToken);
         summary.RecentComments = [.. recentComments.Select(ServerCommentModerationService.WithPostPath)];
+        summary.ShowSecurityNudge = await NeedsSecurityNudgeAsync();
 
         return summary;
+    }
+
+    /// <summary>
+    /// Whether the signed-in user has neither a passkey nor two-factor authentication (design 12.1). An account that can't
+    /// be found (no signed-in user) gets no nudge: there is nobody to act on it.
+    /// </summary>
+    private async Task<bool> NeedsSecurityNudgeAsync()
+    {
+        if (userService.UserId <= 0
+            || await userManager.FindByIdAsync(userService.UserId.ToString(CultureInfo.InvariantCulture)) is not { } user)
+        {
+            return false;
+        }
+
+        return !await userManager.GetTwoFactorEnabledAsync(user) && (await userManager.GetPasskeysAsync(user)).Count == 0;
     }
 }

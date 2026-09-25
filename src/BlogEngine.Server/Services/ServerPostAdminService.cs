@@ -1,4 +1,5 @@
 using BlogEngine.Data.Common;
+using BlogEngine.Data.Interfaces;
 using BlogEngine.Data.Models;
 using BlogEngine.Server.Services.Public;
 using BlogEngine.Shared.Common;
@@ -41,6 +42,12 @@ namespace BlogEngine.Server.Services;
 /// clearing the context and running the whole operation again: the retry sees the winner's row and reuses
 /// it or picks the next free slug.
 /// </para>
+/// <para>
+/// Trash (design 6.8, O6): <see cref="DeleteAsync"/> soft-deletes through <c>SoftDeleteInterceptor</c>, the
+/// <see cref="PostListStatus.Trash"/> tab lists those posts with the soft-delete filter switched off, and
+/// <see cref="RestoreAsync"/> brings one back as a draft. Deleting a post that is already in the trash is let through
+/// as a real delete, and the database cascades it to tag links, comments, revisions, media usage and preview links.
+/// </para>
 /// </remarks>
 public sealed class ServerPostAdminService(
     ApplicationDbContext dbContext,
@@ -49,6 +56,7 @@ public sealed class ServerPostAdminService(
     TimeProvider timeProvider,
     IValidator<PostEditDto> postValidator,
     CacheInvalidator cacheInvalidator,
+    IUserService userService,
     ILogger<ServerPostAdminService> logger) : IPostAdminService
 {
     /// <summary>Autosave revisions kept per post; older ones are pruned (design 6.7).</summary>
@@ -69,9 +77,13 @@ public sealed class ServerPostAdminService(
         var page = Math.Max(1, query.Page);
         var pageSize = Math.Clamp(query.PageSize, 1, PostListQuery.MaxPageSize);
 
-        // "Scheduled" is a published post whose date is still ahead (design 6.3), so the tabs split on the time.
+        // "Scheduled" is a published post whose date is still ahead (design 6.3), so the tabs split on the time. The
+        // trash is the only tab that switches the soft-delete filter off, and it shows every status.
         var now = timeProvider.GetUtcNow();
-        IQueryable<Post> posts = dbContext.Posts.AsNoTracking();
+        IQueryable<Post> posts = query.Status == PostListStatus.Trash
+            ? dbContext.Posts.IgnoreQueryFilters([QueryFilters.SoftDelete]).Where(p => p.IsDeleted)
+            : dbContext.Posts;
+        posts = posts.AsNoTracking();
         posts = query.Status switch
         {
             PostListStatus.Draft => posts.Where(p => p.Status == PostStatus.Draft),
@@ -97,11 +109,13 @@ public sealed class ServerPostAdminService(
 
         var totalCount = await posts.CountAsync(cancellationToken);
 
-        // Published: newest first; scheduled: the next to go live first; everything else: most recently changed first.
+        // Published: newest first; scheduled: the next to go live first; trash: most recently trashed first; everything
+        // else: most recently changed first.
         var ordered = query.Status switch
         {
             PostListStatus.Published => posts.OrderByDescending(p => p.PublishedOn).ThenByDescending(p => p.Id),
             PostListStatus.Scheduled => posts.OrderBy(p => p.PublishedOn).ThenBy(p => p.Id),
+            PostListStatus.Trash => posts.OrderByDescending(p => p.DeletedOn).ThenByDescending(p => p.Id),
             _ => posts.OrderByDescending(p => p.ModifiedOn).ThenByDescending(p => p.Id)
         };
 
@@ -120,6 +134,7 @@ public sealed class ServerPostAdminService(
                 Tags = p.Tags.OrderBy(t => t.Name).Select(t => t.Name).ToList(),
                 p.WordCount,
                 p.IsFeatured,
+                p.DeletedOn,
                 p.RowVersion
             })
             .ToListAsync(cancellationToken);
@@ -135,7 +150,8 @@ public sealed class ServerPostAdminService(
             Tags = r.Tags,
             WordCount = r.WordCount,
             IsFeatured = r.IsFeatured,
-            PublicPath = PublicPathOf(r.Status, r.PublishedDateLocal, r.Slug),
+            DeletedOn = r.DeletedOn,
+            PublicPath = r.DeletedOn is null ? PublicPathOf(r.Status, r.PublishedDateLocal, r.Slug) : null,
             RowVersion = r.RowVersion
         }).ToList();
 
@@ -327,6 +343,7 @@ public sealed class ServerPostAdminService(
 
             await dbContext.SaveChangesAsync(ct);
             await cacheInvalidator.PostChangedAsync(entity.Id);
+            PostLog.PostPublished(logger, entity.Id, entity.Slug, publishOn, publishOn > now, userService.UserId);
 
             return new PostSaved(await ToEditDtoAsync(entity, ct));
         }, cancellationToken);
@@ -353,19 +370,11 @@ public sealed class ServerPostAdminService(
 
             if (entity.Status != PostStatus.Draft)
             {
-                // PublishedOn and PublishedDateLocal are kept, so republishing restores the same URL. Unscheduling
-                // forgets the scheduled date instead: the post was never live at it, and the slug should follow the
-                // title again until the post really is published.
-                if (PostSchedule.IsScheduled(entity.Status, entity.PublishedOn, timeProvider.GetUtcNow()))
-                {
-                    entity.PublishedOn = null;
-                    entity.PublishedDateLocal = null;
-                }
-
-                entity.Status = PostStatus.Draft;
+                var wasScheduled = ReturnToDraft(entity);
                 MarkModified(entity);
                 await dbContext.SaveChangesAsync(ct);
                 await cacheInvalidator.PostChangedAsync(entity.Id);
+                PostLog.PostUnpublished(logger, entity.Id, entity.Slug, wasScheduled, userService.UserId);
             }
 
             return new PostSaved(await ToEditDtoAsync(entity, ct));
@@ -391,7 +400,82 @@ public sealed class ServerPostAdminService(
             await cacheInvalidator.PostChangedAsync(entity.Id);
         }
 
+        PostLog.PostTrashed(logger, entity.Id, entity.Slug, wasPublished, userService.UserId);
         return true;
+    }
+
+    /// <inheritdoc />
+    public async Task<PostSaveResult> RestoreAsync(int id, CancellationToken cancellationToken = default)
+    {
+        var entity = await dbContext.Posts
+            .IgnoreQueryFilters([QueryFilters.SoftDelete])
+            .Include(p => p.Tags)
+            .SingleOrDefaultAsync(p => p.Id == id && p.IsDeleted, cancellationToken);
+        if (entity is null)
+        {
+            return PostSaveResult.NotFound;
+        }
+
+        // Always a draft, so restoring never puts anything back on the public site by surprise; the slug can't collide
+        // because trashed posts keep theirs (the unique index covers the trash).
+        entity.IsDeleted = false;
+        entity.DeletedOn = null;
+        ReturnToDraft(entity);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        PostLog.PostRestored(logger, entity.Id, entity.Slug, userService.UserId);
+
+        return new PostSaved(await ToEditDtoAsync(entity, cancellationToken));
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> DeletePermanentlyAsync(int id, CancellationToken cancellationToken = default)
+    {
+        return await PurgeAsync(id, cancellationToken) > 0;
+    }
+
+    /// <inheritdoc />
+    public Task<int> EmptyTrashAsync(CancellationToken cancellationToken = default)
+    {
+        return PurgeAsync(onlyPostId: null, cancellationToken);
+    }
+
+    /// <summary>
+    /// Hard-deletes posts in the trash (one, or all of them) and removes the redirects that pointed at their URLs.
+    /// </summary>
+    /// <remarks>
+    /// The posts are removed through the change tracker, so <c>AuditInterceptor</c> records the deletes; because they are
+    /// already in the trash, <c>SoftDeleteInterceptor</c> lets them through as real deletes. Their dependent rows are not
+    /// loaded: the database's cascades remove them (design 6.8). The redirect clean-up runs afterwards and on its own: if
+    /// it failed, the only effect would be stale redirects to a URL that answers 404, which is what it answers anyway.
+    /// </remarks>
+    private async Task<int> PurgeAsync(int? onlyPostId, CancellationToken cancellationToken)
+    {
+        var posts = await dbContext.Posts
+            .IgnoreQueryFilters([QueryFilters.SoftDelete])
+            .Where(p => p.IsDeleted && (onlyPostId == null || p.Id == onlyPostId))
+            .ToListAsync(cancellationToken);
+        if (posts.Count == 0)
+        {
+            return 0;
+        }
+
+        // Any URL the post had (including one it kept after being unpublished) may still be the target of old redirects.
+        var paths = posts
+            .Where(p => p.PublishedDateLocal is not null && p.Slug.Length > 0)
+            .Select(p => PostPaths.Post(p.PublishedDateLocal!.Value, p.Slug))
+            .ToList();
+
+        dbContext.Posts.RemoveRange(posts);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        if (paths.Count > 0)
+        {
+            await dbContext.Redirects.Where(r => paths.Contains(r.ToPath)).ExecuteDeleteAsync(cancellationToken);
+        }
+
+        PostLog.PostsPurged(logger, posts.Count, string.Join(',', posts.Select(p => p.Id)), userService.UserId);
+        return posts.Count;
     }
 
     /// <inheritdoc />
@@ -706,6 +790,25 @@ public sealed class ServerPostAdminService(
             .FirstOrDefaultAsync(cancellationToken);
 
         return published is not null && (published.Title != post.Title || published.ContentMarkdown != post.ContentMarkdown);
+    }
+
+    /// <summary>
+    /// Turns a published or scheduled post back into a draft. PublishedOn and PublishedDateLocal are kept, so republishing
+    /// restores the same URL. A scheduled post forgets its date instead: it was never live at it, and the slug should
+    /// follow the title again until the post really is published.
+    /// </summary>
+    /// <returns>Whether the post was scheduled.</returns>
+    private bool ReturnToDraft(Post post)
+    {
+        var wasScheduled = PostSchedule.IsScheduled(post.Status, post.PublishedOn, timeProvider.GetUtcNow());
+        if (wasScheduled)
+        {
+            post.PublishedOn = null;
+            post.PublishedDateLocal = null;
+        }
+
+        post.Status = PostStatus.Draft;
+        return wasScheduled;
     }
 
     /// <summary>Adds a revision of the post's current title and content.</summary>

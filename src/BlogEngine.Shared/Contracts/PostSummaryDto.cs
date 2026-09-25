@@ -34,7 +34,10 @@ public sealed class PostSummaryDto
     /// <summary>Whether the post is pinned to the home page.</summary>
     public bool IsFeatured { get; set; }
 
-    /// <summary>The public URL path while the post is published, otherwise <see langword="null"/>.</summary>
+    /// <summary>When the post was moved to the trash, or <see langword="null"/> if it isn't in the trash.</summary>
+    public DateTimeOffset? DeletedOn { get; set; }
+
+    /// <summary>The public URL path while the post is published (and not in the trash), otherwise <see langword="null"/>.</summary>
     public string? PublicPath { get; set; }
 
     /// <summary>Concurrency token, so row actions such as unpublish can detect a stale list.</summary>

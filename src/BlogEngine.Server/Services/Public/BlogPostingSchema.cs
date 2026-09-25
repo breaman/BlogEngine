@@ -45,6 +45,7 @@ public static class BlogPostingSchema
     /// <param name="AuthorName">The author name setting; the site is the author when it is blank.</param>
     /// <param name="SiteTitle">The site title.</param>
     /// <param name="SiteUrl">The site's absolute root URL.</param>
+    /// <param name="AuthorImageUrl">The absolute URL of the author avatar setting, if any; used only for a <c>Person</c> author.</param>
     public sealed record Data(
         Uri Url,
         SeoArticle Article,
@@ -52,7 +53,8 @@ public static class BlogPostingSchema
         string? ImageUrl,
         string? AuthorName,
         string SiteTitle,
-        Uri SiteUrl);
+        Uri SiteUrl,
+        string? AuthorImageUrl = null);
 
     /// <summary>The JSON-LD document, safe to embed in a <c>&lt;script&gt;</c> element.</summary>
     public static string ToJson(Data data)
@@ -74,7 +76,7 @@ public static class BlogPostingSchema
             ["dateModified"] = Iso(article.ModifiedOn > article.PublishedOn ? article.ModifiedOn : article.PublishedOn),
             ["author"] = string.IsNullOrWhiteSpace(data.AuthorName)
                 ? new JsonObject { ["@type"] = "Organization", ["name"] = data.SiteTitle, ["url"] = site }
-                : new JsonObject { ["@type"] = "Person", ["name"] = data.AuthorName.Trim(), ["url"] = site },
+                : Person(data.AuthorName.Trim(), site, data.AuthorImageUrl),
             ["isPartOf"] = new JsonObject { ["@type"] = "Blog", ["name"] = data.SiteTitle, ["url"] = site }
         };
 
@@ -94,6 +96,18 @@ public static class BlogPostingSchema
         }
 
         return node.ToJsonString(SerializerOptions);
+    }
+
+    /// <summary>The <c>Person</c> author, with the avatar as its <c>image</c> when one is set.</summary>
+    private static JsonObject Person(string name, string site, string? imageUrl)
+    {
+        var person = new JsonObject { ["@type"] = "Person", ["name"] = name, ["url"] = site };
+        if (!string.IsNullOrWhiteSpace(imageUrl))
+        {
+            person["image"] = imageUrl;
+        }
+
+        return person;
     }
 
     /// <summary>ISO 8601 in UTC, such as <c>2026-09-22T17:30:00Z</c>.</summary>

@@ -1,7 +1,8 @@
 namespace BlogEngine.Shared.Contracts;
 
 /// <summary>
-/// What the admin dashboard shows (design 4.5 O1, T3.10): post counts, the moderation queue size and recent activity.
+/// What the admin dashboard shows (design 4.5 O1, 12.1, T3.10, T4.26): post counts, the moderation queue size, scheduled
+/// posts, recent activity, and whether to nudge the admin to secure their account.
 /// </summary>
 public sealed class DashboardSummaryDto
 {
@@ -25,4 +26,10 @@ public sealed class DashboardSummaryDto
 
     /// <summary>The most recent comments of any status, newest first.</summary>
     public List<CommentDto> RecentComments { get; set; } = [];
+
+    /// <summary>
+    /// Whether the signed-in admin has neither a passkey nor two-factor authentication, so the dashboard suggests setting one
+    /// up (design 12.1).
+    /// </summary>
+    public bool ShowSecurityNudge { get; set; }
 }

@@ -1,0 +1,10 @@
+/* The social image spans the whole card otherwise; a thumbnail this wide is enough to recognize it. */
+.settings-social-image {
+    max-width: 20rem;
+}
+
+/* Floating-label textareas are one line tall by default; robots.txt rules need a few lines. The textarea is rendered by
+   InputTextArea, a child component, so it needs ::deep. */
+.settings-robots ::deep textarea {
+    min-height: 7rem;
+}

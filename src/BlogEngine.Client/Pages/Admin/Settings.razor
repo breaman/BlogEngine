@@ -52,6 +52,23 @@ else
                             <ValidationMessage For="() => Model.AuthorBioMarkdown" class="text-danger" />
                         </div>
 
+                        <div class="row g-3 mb-3">
+                            <div class="col-sm-6">
+                                <h3 class="h6">Author avatar</h3>
+                                <PostImageField Image="Images?.AuthorAvatar" ChooseText="Choose avatar" Disabled="@(!RendererInfo.IsInteractive)"
+                                                OnChoose="ChooseAuthorAvatarAsync" OnRemove="RemoveAuthorAvatar" />
+                                <ValidationMessage For="() => Model.AuthorAvatarMediaId" class="text-danger" />
+                                <div class="form-text">Shown with your name in search results for your posts.</div>
+                            </div>
+                            <div class="col-sm-6">
+                                <h3 class="h6">Favicon</h3>
+                                <PostImageField Image="Images?.Favicon" ChooseText="Choose favicon" Disabled="@(!RendererInfo.IsInteractive)"
+                                                OnChoose="ChooseFaviconAsync" OnRemove="RemoveFavicon" />
+                                <ValidationMessage For="() => Model.FaviconMediaId" class="text-danger" />
+                                <div class="form-text">The browser tab icon. A small square PNG works best.</div>
+                            </div>
+                        </div>
+
                         <h3 class="h6 mt-4">Social links</h3>
                         @if (Model.SocialLinks.Count == 0)
                         {
@@ -165,6 +182,11 @@ else
                             <label class="form-check-label" for="settings-auto-approve">Approve commenters who have an approved comment already</label>
                             <div class="form-text mt-0">Only comments the spam checks find nothing wrong with.</div>
                         </div>
+                        <div class="form-check form-switch mb-2">
+                            <InputCheckbox @bind-Value="Model.ShowCommentAvatars" id="settings-comment-avatars" class="form-check-input" role="switch" />
+                            <label class="form-check-label" for="settings-comment-avatars">Show commenter avatars from Gravatar</label>
+                            <div class="form-text mt-0">Off: commenters get a colored initial, and no request goes to Gravatar.</div>
+                        </div>
                         <div class="form-check form-switch mb-3">
                             <InputCheckbox @bind-Value="Model.NotifyOnPendingComment" id="settings-notify-pending" class="form-check-input" role="switch" />
                             <label class="form-check-label" for="settings-notify-pending">Email me when a comment is waiting for approval</label>
@@ -189,14 +211,75 @@ else
                     </div>
                 </section>
 
-                <section class="card mb-4" aria-labelledby="settings-seo">
-                    <div class="card-header"><h2 class="h6 mb-0" id="settings-seo"><span class="bi bi-search me-1" aria-hidden="true"></span> Search engines</h2></div>
+                <section class="card mb-4" aria-labelledby="settings-media">
+                    <div class="card-header"><h2 class="h6 mb-0" id="settings-media"><span class="bi bi-images me-1" aria-hidden="true"></span> Media</h2></div>
                     <div class="card-body">
-                        <div class="form-check form-switch">
+                        <div class="row g-2">
+                            <div class="col-sm-6">
+                                <div class="form-floating mb-3">
+                                    <InputNumber @bind-Value="Model.MaxUploadSizeMegabytes" id="settings-max-upload" class="form-control" placeholder="20" min="1" max="500" />
+                                    <label for="settings-max-upload">Largest upload (MB)</label>
+                                    <ValidationMessage For="() => Model.MaxUploadSizeMegabytes" class="text-danger" />
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="form-floating mb-3">
+                                    <InputNumber @bind-Value="Model.DownscaleOriginalsAbovePixels" id="settings-downscale" class="form-control" placeholder="0" min="0" max="20000" />
+                                    <label for="settings-downscale">Shrink uploads above (px, 0 = never)</label>
+                                    <ValidationMessage For="() => Model.DownscaleOriginalsAbovePixels" class="text-danger" />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-floating mb-1">
+                            <input type="text" id="settings-rendition-widths" class="form-control" placeholder="320, 640, 960" inputmode="numeric"
+                                   value="@_renditionWidthsText" @onchange="SetRenditionWidths" />
+                            <label for="settings-rendition-widths">Responsive image widths (px)</label>
+                            <ValidationMessage For="() => Model.RenditionWidths" class="text-danger" />
+                        </div>
+                        <div class="form-text">
+                            Smaller copies made of each image so phones download less. New widths apply to uploads and edits
+                            from now on; the media library offers to add them to existing images.
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card mb-4" aria-labelledby="settings-seo">
+                    <div class="card-header"><h2 class="h6 mb-0" id="settings-seo"><span class="bi bi-search me-1" aria-hidden="true"></span> Search engines and sharing</h2></div>
+                    <div class="card-body">
+                        <div class="form-check form-switch mb-3">
                             <InputCheckbox @bind-Value="Model.DiscourageSearchEngines" id="settings-discourage" class="form-check-input" role="switch" />
                             <label class="form-check-label" for="settings-discourage">Discourage search engines from indexing this site</label>
                             <div class="form-text mt-0">Useful before launch. Adds <code>noindex</code> to every page.</div>
                         </div>
+                        <h3 class="h6">Default social image</h3>
+                        <div class="mb-3 settings-social-image">
+                            <PostImageField Image="Images?.DefaultSocialImage" ChooseText="Choose social image" Disabled="@(!RendererInfo.IsInteractive)"
+                                            OnChoose="ChooseDefaultSocialImageAsync" OnRemove="RemoveDefaultSocialImage" />
+                            <ValidationMessage For="() => Model.DefaultSocialImageMediaId" class="text-danger" />
+                            <div class="form-text">Shown when a page is shared and has no cover or social image of its own. 1200 × 630 px works best.</div>
+                        </div>
+                        <div class="form-floating settings-robots">
+                            <InputTextArea @bind-Value="Model.RobotsTxtExtras" id="settings-robots-extras" class="form-control font-monospace"
+                                           placeholder="User-agent: …" maxlength="@FieldLengths.RobotsTxtExtras" />
+                            <label for="settings-robots-extras">Extra robots.txt lines</label>
+                            <ValidationMessage For="() => Model.RobotsTxtExtras" class="text-danger" />
+                            <div class="form-text">Added to the end of <code>/robots.txt</code>, for example rules for a particular crawler.</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card mb-4" aria-labelledby="settings-export">
+                    <div class="card-header"><h2 class="h6 mb-0" id="settings-export"><span class="bi bi-box-arrow-down me-1" aria-hidden="true"></span> Export</h2></div>
+                    <div class="card-body">
+                        <p class="mb-2">
+                            Download everything as a zip: posts and pages as Markdown with front matter (Hugo and Jekyll style),
+                            the original images, and the comments and settings as JSON.
+                        </p>
+                        @* A plain download link: the browser saves the streamed zip itself (Blazor leaves links with "download" alone). *@
+                        <a class="btn btn-outline-secondary" href="api/admin/export" download>
+                            <span class="bi bi-download me-1" aria-hidden="true"></span> Export blog
+                        </a>
+                        <div class="form-text">The file includes drafts and commenters' email addresses. Keep it private.</div>
                     </div>
                 </section>
             </div>
@@ -217,3 +300,5 @@ else
         </div>
     </EditForm>
 }
+
+<MediaPicker @ref="_mediaPicker" />
