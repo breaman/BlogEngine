@@ -7,6 +7,7 @@
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.EntityFrameworkCore" />
     <PackageReference Include="Aspire.Hosting.SqlServer" />
+    <PackageReference Include="CommunityToolkit.Aspire.Hosting.MailPit" />
   </ItemGroup>
 
   <ItemGroup>

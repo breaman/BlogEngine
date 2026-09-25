@@ -67,7 +67,7 @@
 
             @if (_comments.Count > 0)
             {
-                <CommentList Comments="_comments" ShowAvatars="_showAvatars" Now="_now" />
+                <CommentList Comments="_comments" ShowAvatars="_showAvatars" Now="_now" ReplyPath="@(_commentsOpen ? post.Path : null)" />
             }
             else if (_commentsOpen)
             {
@@ -76,7 +76,7 @@
 
             @if (_commentsOpen)
             {
-                <CommentForm PostId="post.Id" PostPath="@post.Path" />
+                <CommentForm PostId="post.Id" PostPath="@post.Path" Comments="_comments" ReplyTo="ReplyTo" />
             }
             else if (_commentsClosed)
             {

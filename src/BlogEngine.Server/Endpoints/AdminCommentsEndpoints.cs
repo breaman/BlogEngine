@@ -35,6 +35,7 @@ public static class AdminCommentsEndpoints
             ModerateAsync(id, CommentModerationAction.Spam, service, ct));
         comments.MapDelete("/{id:int}", (int id, ICommentModerationService service, CancellationToken ct) =>
             ModerateAsync(id, CommentModerationAction.Delete, service, ct));
+        comments.MapPost("/{id:int}/reply", ReplyAsync);
         comments.MapPost("/bulk", BulkAsync);
         comments.MapPost("/{id:int}/block", BlockCommenterAsync);
         comments.MapPost("/empty-spam", async (ICommentModerationService service, CancellationToken ct) =>
@@ -83,6 +84,22 @@ public static class AdminCommentsEndpoints
         ICommentModerationService service, CancellationToken cancellationToken)
     {
         return await service.ModerateAsync(id, action, cancellationToken) ? TypedResults.NoContent() : TypedResults.NotFound();
+    }
+
+    /// <summary>
+    /// The author's reply (design 8.4, C5): the published reply and the comments it approved, a 400 validation problem,
+    /// or 404 when the comment replied to doesn't exist.
+    /// </summary>
+    private static async Task<Results<Ok<CommentReplied>, ValidationProblem, NotFound>> ReplyAsync(int id, CommentReplyRequest request,
+        ICommentModerationService service, CancellationToken cancellationToken)
+    {
+        return await service.ReplyAsync(id, request, cancellationToken) switch
+        {
+            CommentReplied replied => TypedResults.Ok(replied),
+            CommentReplyInvalid invalid => TypedResults.ValidationProblem(invalid.Errors),
+            CommentReplyNotFound => TypedResults.NotFound(),
+            var other => throw new InvalidOperationException($"Unknown reply result {other.GetType().Name}.")
+        };
     }
 
     /// <summary>Applies one action to several comments; returns how many changed.</summary>

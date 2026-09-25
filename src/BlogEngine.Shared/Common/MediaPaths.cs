@@ -22,4 +22,13 @@ public static class MediaPaths
     {
         return string.Create(CultureInfo.InvariantCulture, $"{Item(publicId, fileName)}?v={version}");
     }
+
+    /// <summary>
+    /// A responsive rendition (design 9.4): <c>/media/ab12cd34ef56/sunset.jpg?w=640&amp;v=3</c>, with <c>&amp;f=webp</c>
+    /// for the WebP copy.
+    /// </summary>
+    public static string Rendition(string publicId, string fileName, int version, int width, bool webp = false)
+    {
+        return string.Create(CultureInfo.InvariantCulture, $"{Item(publicId, fileName)}?w={width}&v={version}{(webp ? "&f=webp" : string.Empty)}");
+    }
 }

@@ -30,6 +30,10 @@ public partial class CommentItem : ComponentBase
     [Parameter]
     public DateTimeOffset Now { get; set; }
 
+    /// <summary>Where the "Reply" link goes (C6); no link when <see langword="null"/> (comments are closed).</summary>
+    [Parameter]
+    public string? ReplyHref { get; set; }
+
     private string IsoDate => Comment.CreatedOn.ToString("O", CultureInfo.InvariantCulture);
 
     private string FullDate => Comment.CreatedOn.ToUniversalTime().ToString("MMMM d, yyyy, HH:mm 'UTC'", CultureInfo.InvariantCulture);

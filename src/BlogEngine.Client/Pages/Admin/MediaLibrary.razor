@@ -13,6 +13,24 @@
     <MediaUploadZone OnBatchCompleted="OnUploadsCompletedAsync" />
 </div>
 
+@if (Renditions is { Remaining: > 0 } renditions)
+{
+    @* Images stored before responsive sizes existed, or before the widths setting changed (T4.19). *@
+    <div class="alert alert-info d-flex flex-wrap align-items-center gap-2" role="status">
+        <span class="bi bi-aspect-ratio" aria-hidden="true"></span>
+        @if (_renditionsDone is { } done)
+        {
+            <span>Making responsive sizes… @done of @(done + renditions.Remaining) images done.</span>
+            <span class="spinner-border spinner-border-sm ms-auto" aria-hidden="true"></span>
+        }
+        else
+        {
+            <span>@renditions.Remaining @(renditions.Remaining == 1 ? "image doesn't" : "images don't") have responsive sizes yet, so readers download them at full size.</span>
+            <button type="button" class="btn btn-sm btn-primary ms-auto" @onclick="GenerateRenditionsAsync">Make responsive sizes</button>
+        }
+    </div>
+}
+
 <form class="row g-2 align-items-center mb-3" role="search" @onsubmit="ApplyFilters" @onsubmit:preventDefault>
     <div class="col-12 col-md-6">
         <div class="form-floating">

@@ -26,6 +26,13 @@ public interface ICommentModerationService
     /// <returns><see langword="false"/> if there is no such comment.</returns>
     Task<bool> ModerateAsync(int id, CommentModerationAction action, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Publishes the author's reply to a comment (design 8.4, C5): approved straight away, marked as the author's, and
+    /// filed under the top-level comment (threads are one level deep). Replying approves the comment replied to, and
+    /// its top-level comment when that is still waiting.
+    /// </summary>
+    Task<CommentReplyResult> ReplyAsync(int id, CommentReplyRequest request, CancellationToken cancellationToken = default);
+
     /// <summary>Applies one action to several comments; ids that don't exist are skipped.</summary>
     /// <returns>How many comments were changed or deleted.</returns>
     Task<int> ModerateManyAsync(CommentBulkRequest request, CancellationToken cancellationToken = default);

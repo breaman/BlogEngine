@@ -30,12 +30,28 @@ npm run js-build   (or js-watch to rebuild on every change; add "admin" or "publ
 The Sass output (`wwwroot/css/site.css`) is not rebuilt automatically; run `npm run sass-dev` or `sass-prod` after changing `styles/site.scss`.
 
 ## Media library
-Uploaded images are stored on the file system under `MediaStorage:RootPath` (default `App_Data/media`, relative to the server's content root; git-ignored). Each item keeps its original upload (`{publicId}/original.{ext}`) and the current edited version (`{publicId}/v{version}/current.{ext}`). When running with Aspire the server is a project on your machine, so the folder survives restarts; to keep uploads elsewhere, set `MediaStorage:RootPath` in the AppHost's user secrets. In a container, mount a persistent volume at that folder. `/health` includes a `media-storage` check that the folder is writable.
+Uploaded images are stored on the file system under `MediaStorage:RootPath` (default `App_Data/media`, relative to the server's content root; git-ignored). Each item keeps its original upload (`{publicId}/original.{ext}`), the current edited version (`{publicId}/v{version}/current.{ext}`), and responsive renditions of that version (`{publicId}/v{version}/{width}.webp`, plus a copy in the image's own format). Renditions are made at the widths in the media settings on upload and after every edit; GIFs keep only their original, so animations survive. Images stored before renditions existed, or before the widths setting changed, are listed on `/admin/media` with a button that makes their renditions and updates the posts that use them. When running with Aspire the server is a project on your machine, so the folder survives restarts; to keep uploads elsewhere, set `MediaStorage:RootPath` in the AppHost's user secrets. In a container, mount a persistent volume at that folder. `/health` includes a `media-storage` check that the folder is writable.
 
 Images are processed with [ImageSharp](https://github.com/SixLabors/ImageSharp), licensed under the [Six Labors Split License](https://github.com/SixLabors/ImageSharp/blob/main/LICENSE): free for open source software and for companies with less than $1M annual gross revenue; others need a commercial license. The package is pinned to 3.x because ImageSharp 4 requires a Six Labors license key at build time.
 
 ## Comments
 Readers comment without accounts through a static form on each post page; nothing appears until it's approved at `/admin/comments`. Commenter IP addresses are stored only as HMAC-SHA256 hashes keyed with `Comments:IpHashSalt`, so IP blocks and the rate limit (3 comments per 5 minutes per address) keep working without keeping raw addresses. The Aspire AppHost generates the salt on first run and keeps it in its user secrets as the `comment-ip-salt` parameter. Outside Aspire, set `Comments:IpHashSalt` to a long random value and keep it stable: if it's missing, the server uses a random salt and logs a warning, and IP blocks stop matching after a restart. Behind a reverse proxy, configure forwarded headers so the rate limit sees the real client address.
+
+### Email notifications
+With "Email me when a comment is waiting for approval" on in the settings, every admin account is emailed about each new pending comment (spam isn't announced). Account emails (confirmation, password reset) use the same sender.
+
+Under `aspire run` the AppHost starts [Mailpit](https://mailpit.axllent.org), and all mail lands in its web UI (open the `mailpit` resource in the dashboard) instead of anyone's inbox. In production, configure an SMTP server in the server's user secrets or environment variables:
+
+```
+cd src/BlogEngine.Server
+dotnet user-secrets set "Email:SmtpHost" "smtp.example.com"
+dotnet user-secrets set "Email:SmtpPort" "587"
+dotnet user-secrets set "Email:UserName" "blog@example.com"
+dotnet user-secrets set "Email:Password" "<password>"
+dotnet user-secrets set "Email:FromAddress" "blog@example.com"
+```
+
+Port 587 uses STARTTLS; set `Email:UseSsl` to `true` for port 465. Without an SMTP host (and outside Aspire) nothing is sent: each message is logged by subject only, and the register confirmation page shows its link on screen. Email is sent with [MailKit](https://github.com/jstedfast/MailKit).
 
 ## EF Migrations
 This project adds EF as a dotnet tool, so before running any EF commands, one needs to run the following command from the project folder (there is also a command in the Aspire dashboard to run this restore command if the app is started before the restore command is run manually):

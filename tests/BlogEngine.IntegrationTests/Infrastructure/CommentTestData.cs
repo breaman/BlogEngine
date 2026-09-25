@@ -44,11 +44,13 @@ public static class CommentTestData
 
     /// <summary>
     /// Posts the comment form on the post page with its antiforgery token, a render timestamp <paramref name="formAge"/>
-    /// old (a minute by default, past the time trap), and an empty honeypot unless one is given.
+    /// old (a minute by default, past the time trap), and an empty honeypot unless one is given; with
+    /// <paramref name="parentId"/>, as a reply to that comment. The token comes from <paramref name="tokenPage"/> when the
+    /// post itself shows no form (comments closed).
     /// </summary>
     public static async Task<HttpResponseMessage> SubmitAsync(BlogEngineWebApplicationFactory factory, HttpClient client, PostEditDto post,
         string body, string name = "Ada Reader", string? email = null, string? website = null, string? honeypot = null,
-        TimeSpan? formAge = null)
+        TimeSpan? formAge = null, int? parentId = null, string? tokenPage = null)
     {
         var timestamps = factory.Services.GetRequiredService<CommentFormTimestamp>();
         var fields = new Dictionary<string, string>
@@ -60,8 +62,12 @@ public static class CommentTestData
             [CommentForm.HoneypotField] = honeypot ?? string.Empty,
             [CommentForm.TimestampField] = timestamps.Create(post.Id, DateTimeOffset.UtcNow - (formAge ?? TimeSpan.FromMinutes(1)))
         };
+        if (parentId is { } parent)
+        {
+            fields["Input.ParentCommentId"] = parent.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
 
-        return await IdentityTestHelper.SubmitFormAsync(client, post.PublicPath!, CommentForm.FormName, fields);
+        return await IdentityTestHelper.SubmitFormAsync(client, post.PublicPath!, CommentForm.FormName, fields, tokenPage);
     }
 
     /// <summary>The body of <paramref name="response"/>, HTML-decoded.</summary>

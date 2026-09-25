@@ -71,7 +71,8 @@ public sealed class MediaLookupCache(IMediaService mediaService, ILogger<MediaLo
     {
         ArgumentNullException.ThrowIfNull(item);
 
-        items[item.PublicId] = new MediaLookupItem(item.Id, item.PublicId, item.FileName, item.Width, item.Height, item.Version, item.AltText);
+        items[item.PublicId] = new MediaLookupItem(item.Id, item.PublicId, item.FileName, item.Width, item.Height, item.Version, item.AltText,
+            item.RenditionWidths);
     }
 
     /// <summary>Forgets an id so the next <see cref="LoadAsync"/> asks the server again.</summary>

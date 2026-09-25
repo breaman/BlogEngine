@@ -81,12 +81,13 @@ public static partial class IdentityTestHelper
 
     /// <summary>
     /// Loads <paramref name="pagePath"/>, then posts the Blazor form <paramref name="formName"/> on it with
-    /// the page's antiforgery token and the given fields, the way a browser submits an <c>EditForm</c>.
+    /// the page's antiforgery token and the given fields, the way a browser submits an <c>EditForm</c>. The token is read
+    /// from <paramref name="tokenPage"/> instead when the page itself renders no form.
     /// </summary>
     public static async Task<HttpResponseMessage> SubmitFormAsync(
-        HttpClient client, string pagePath, string formName, Dictionary<string, string> fields)
+        HttpClient client, string pagePath, string formName, Dictionary<string, string> fields, string? tokenPage = null)
     {
-        var token = await GetAntiforgeryTokenAsync(client, pagePath);
+        var token = await GetAntiforgeryTokenAsync(client, tokenPage ?? pagePath);
 
         var form = new Dictionary<string, string>(fields)
         {

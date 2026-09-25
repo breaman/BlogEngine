@@ -2,6 +2,8 @@ using System.Globalization;
 using System.Net;
 using System.Threading.RateLimiting;
 
+using BlogEngine.Shared.Security;
+
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 
@@ -35,10 +37,13 @@ public static class CommentRateLimiting
         return services;
     }
 
-    /// <summary>A fixed window per IP hash for comment posts; no limit for anything else.</summary>
+    /// <summary>
+    /// A fixed window per IP hash for comment posts; no limit for anything else, or for the blog author, whose comments
+    /// on the post page are author replies (design 8.4) rather than reader comments.
+    /// </summary>
     private static RateLimitPartition<string> Partition(HttpContext context)
     {
-        if (!HttpMethods.IsPost(context.Request.Method))
+        if (!HttpMethods.IsPost(context.Request.Method) || context.User.IsInRole(AppRoles.Admin))
         {
             return RateLimitPartition.GetNoLimiter(string.Empty);
         }

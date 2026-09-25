@@ -20,8 +20,10 @@ namespace BlogEngine.Client.Pages.Admin;
 /// <para>
 /// The cropper always shows the original upload and starts from the stored edits, because the server applies the
 /// operations to the original (design 9.2). <b>Save</b> sends only the operations; the server writes a new version,
-/// and every post that uses the image is re-rendered with the new <c>?v=</c>. <b>Cancel</b> returns to the library
-/// without saving. (Save as copy and Revert come with T4.18.)
+/// and every post that uses the image is re-rendered with the new <c>?v=</c>. <b>Save as copy</b> stores the result as a
+/// new library item instead and opens it, leaving the posts that use this one alone. <b>Revert to original</b> undoes
+/// every edit (after confirming when posts use the image), and <b>Cancel</b> returns to the library without saving
+/// (design 9.2, M7, T4.18).
 /// </para>
 /// <para>The item loaded while prerendering is carried into WebAssembly with <see cref="PersistentStateAttribute"/>.</para>
 /// </remarks>
@@ -67,6 +69,9 @@ public partial class MediaEditor : ComponentBase
     /// <summary>Save is available once the cropper reported, when the result differs from the stored edits.</summary>
     private bool CanSave => _interactive && !_saving && _crop is not null && Item is not null
         && !SameOperations(_crop.ToOperations(_resize), Item.EditOperations);
+
+    /// <summary>Save as copy is available once the cropper reported; unlike Save it also works without changes (a duplicate).</summary>
+    private bool CanSaveCopy => _interactive && !_saving && _crop is not null && Item is not null;
 
     /// <summary>Loads the item unless restored state already belongs to this route.</summary>
     protected override async Task OnParametersSetAsync()
@@ -180,25 +185,75 @@ public partial class MediaEditor : ComponentBase
             return;
         }
 
+        await RunSaveAsync(() => MediaService.EditAsync(Item.Id, _crop.ToOperations(_resize)), "The image wasn't saved", saved =>
+        {
+            Item = saved;
+            ResetForm();
+            var posts = saved.UsageCount;
+            Toasts.ShowSuccess(posts > 0
+                ? $"Saved version {saved.Version}. {posts} {(posts == 1 ? "post shows" : "posts show")} the new version."
+                : $"Saved version {saved.Version}.");
+        });
+    }
+
+    /// <summary>Stores the current selection as a new library item and opens it (design 9.2).</summary>
+    private async Task SaveAsCopyAsync()
+    {
+        if (_crop is null || Item is null)
+        {
+            return;
+        }
+
+        await RunSaveAsync(() => MediaService.SaveAsCopyAsync(Item.Id, _crop.ToOperations(_resize)), "The copy wasn't saved", copy =>
+        {
+            Toasts.ShowSuccess($"Saved a copy as {copy.FileName}. Posts using the original are unchanged.");
+            Navigation.NavigateTo($"admin/media/{copy.Id}");
+        });
+    }
+
+    /// <summary>Undoes every edit, after confirming when posts would change with it (M7).</summary>
+    private async Task RevertAsync()
+    {
+        if (Item is null)
+        {
+            return;
+        }
+
+        var posts = Item.UsageCount;
+        if (posts > 0 && !await _confirm.ConfirmAsync(
+                "Revert to the original?",
+                $"Every crop, rotation and resize will be undone, and the {(posts == 1 ? "post that uses" : $"{posts} posts that use")} this image will show the original.",
+                "Revert",
+                "btn-danger"))
+        {
+            return;
+        }
+
+        await RunSaveAsync(() => MediaService.RevertAsync(Item.Id), "The image wasn't reverted", reverted =>
+        {
+            Item = reverted;
+            ResetForm();
+            Toasts.ShowSuccess($"Reverted to the original ({reverted.Width} × {reverted.Height}) as version {reverted.Version}.");
+        });
+    }
+
+    /// <summary>Runs a save with the buttons disabled and reports its outcome.</summary>
+    private async Task RunSaveAsync(Func<Task<MediaSaveResult>> save, string failureTitle, Action<MediaItemDto> onSaved)
+    {
         _saving = true;
         try
         {
-            switch (await MediaService.EditAsync(Item.Id, _crop.ToOperations(_resize)))
+            switch (await save())
             {
                 case MediaSaved saved:
-                    Item = saved.Item;
-                    ResetForm();
-                    var posts = saved.Item.UsageCount;
-                    Toasts.ShowSuccess(posts > 0
-                        ? $"Saved version {saved.Item.Version}. {posts} {(posts == 1 ? "post shows" : "posts show")} the new version."
-                        : $"Saved version {saved.Item.Version}.");
+                    onSaved(saved.Item);
                     break;
                 case MediaNotFound:
                     ItemMissing = true;
                     Item = null;
                     break;
                 case MediaInvalid invalid:
-                    Toasts.ShowError(string.Join(" ", invalid.Errors.SelectMany(e => e.Value)), "The image wasn't saved");
+                    Toasts.ShowError(string.Join(" ", invalid.Errors.SelectMany(e => e.Value)), failureTitle);
                     break;
             }
         }

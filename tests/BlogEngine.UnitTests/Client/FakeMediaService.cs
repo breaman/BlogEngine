@@ -32,6 +32,18 @@ internal sealed class FakeMediaService(params MediaLookupItem[] items) : IMediaS
     public Task<MediaSaveResult> EditAsync(int id, MediaEditOperations operations, CancellationToken cancellationToken = default)
         => throw new NotSupportedException();
 
+    public Task<MediaSaveResult> RevertAsync(int id, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException();
+
+    public Task<MediaSaveResult> SaveAsCopyAsync(int id, MediaEditOperations operations, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException();
+
+    public Task<MediaRenditionProgress> GetRenditionProgressAsync(CancellationToken cancellationToken = default)
+        => throw new NotSupportedException();
+
+    public Task<MediaRenditionProgress> GenerateRenditionsAsync(int maxItems, CancellationToken cancellationToken = default)
+        => throw new NotSupportedException();
+
     public Task<MediaDeleteResult> DeleteAsync(int id, bool force, CancellationToken cancellationToken = default)
         => throw new NotSupportedException();
 }

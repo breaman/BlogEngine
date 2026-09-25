@@ -22,10 +22,17 @@ if (osArch == System.Runtime.InteropServices.Architecture.Arm64
 var db = sqlServer.WithLifetime(ContainerLifetime.Persistent)
     .AddDatabase(Constants.DatabaseConnectionString);
 
+// Mailpit catches the blog's outgoing email in development (design 8.4, C9): new-comment notifications and account
+// emails show up in its web UI (the "mailpit" resource in the dashboard) instead of reaching anyone. The server reads
+// the SMTP endpoint from the connection string; in production set Email:SmtpHost and friends instead.
+var mailpit = builder.AddMailPit(Constants.MailConnectionString);
+
 var server = builder.AddProject<Projects.BlogEngine_Server>("server", "https")
     .WithExternalHttpEndpoints()
     .WithHttpHealthCheck(Constants.HealthEndpointPath)
-    .WithReference(db);
+    .WithReference(db)
+    .WithReference(mailpit)
+    .WaitFor(mailpit);
 
 // Optional admin seeding (design 12.1). Only wired up when admin-email is configured, e.g.
 //   dotnet user-secrets set "Parameters:admin-email" "you@example.com"

@@ -1,3 +1,4 @@
+using BlogEngine.Server.Components.Blog;
 using BlogEngine.Server.Services;
 using BlogEngine.Server.Services.Comments;
 using BlogEngine.Server.Services.Public;
@@ -59,6 +60,10 @@ public partial class PostDetail : ComponentBase
     /// <summary>The slug from the URL.</summary>
     [Parameter]
     public string Slug { get; set; } = string.Empty;
+
+    /// <summary>The comment a reader chose to reply to with its "Reply" link (C6).</summary>
+    [SupplyParameterFromQuery(Name = CommentList.ReplyToParameter)]
+    public int? ReplyTo { get; set; }
 
     /// <summary>Related posts shown under a post (design 14.2, P10).</summary>
     private const int RelatedPostCount = 3;

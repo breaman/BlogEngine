@@ -1248,24 +1248,29 @@ public partial class PostEditor : ComponentBase, IAsyncDisposable
     /// When a scheduled post goes live, in the blog's time zone (the zone the schedule was picked in), such as
     /// "October 1, 2026 at 9:00 AM".
     /// </summary>
-    private string ScheduledText
-    {
-        get
-        {
-            if (Post?.PublishedOn is not { } publishOn)
-            {
-                return string.Empty;
-            }
+    private string ScheduledText => Post?.PublishedOn is { } publishOn ? BlogDateTimeText(publishOn) : string.Empty;
 
-            try
-            {
-                var local = _timeZoneId is null ? publishOn.ToLocalTime().DateTime : BlogTimeZone.ToLocalDateTime(publishOn, _timeZoneId);
-                return string.Create(CultureInfo.CurrentCulture, $"{local:MMMM d, yyyy} at {local:t}");
-            }
-            catch (TimeZoneNotFoundException)
-            {
-                return string.Create(CultureInfo.CurrentCulture, $"{publishOn.ToLocalTime():MMMM d, yyyy} at {publishOn.ToLocalTime():t}");
-            }
+    /// <summary>
+    /// The note under "Allow comments" about the closing date set at publish time (design 8.5), or
+    /// <see langword="null"/> when comments never close.
+    /// </summary>
+    private string? CommentsCloseText => Post?.CommentsCloseOn is { } closeOn && Post.AllowComments
+        ? closeOn <= TimeProvider.GetUtcNow()
+            ? $"Comments closed on {BlogDateTimeText(closeOn)}."
+            : $"Comments close on {BlogDateTimeText(closeOn)}."
+        : null;
+
+    /// <summary>A moment in the blog's time zone (the author's own if it is unknown), such as "October 1, 2026 at 9:00 AM".</summary>
+    private string BlogDateTimeText(DateTimeOffset value)
+    {
+        try
+        {
+            var local = _timeZoneId is null ? value.ToLocalTime().DateTime : BlogTimeZone.ToLocalDateTime(value, _timeZoneId);
+            return string.Create(CultureInfo.CurrentCulture, $"{local:MMMM d, yyyy} at {local:t}");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return string.Create(CultureInfo.CurrentCulture, $"{value.ToLocalTime():MMMM d, yyyy} at {value.ToLocalTime():t}");
         }
     }
 

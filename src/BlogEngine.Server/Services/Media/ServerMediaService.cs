@@ -31,6 +31,10 @@ namespace BlogEngine.Server.Services.Media;
 /// <para>
 /// <b>Usage</b> counts posts in the trash as well: restoring a post must not bring back a broken image.
 /// </para>
+/// <para>
+/// <b>Renditions</b> (design 9.4, T4.19) are made by <see cref="MediaRenditionWriter"/> whenever a version is stored
+/// (upload, edit, revert, copy), before posts are re-rendered, since the stored HTML lists the rendition widths.
+/// </para>
 /// </remarks>
 public sealed class ServerMediaService(
     ApplicationDbContext dbContext,
@@ -38,12 +42,16 @@ public sealed class ServerMediaService(
     MediaProcessor processor,
     ISettingsService settingsService,
     PostContentRenderer contentRenderer,
+    MediaRenditionWriter renditionWriter,
     IValidator<MediaUpdateRequest> updateValidator,
     IValidator<MediaEditOperations> editValidator,
     ILogger<ServerMediaService> logger) : IMediaService
 {
     /// <summary>Attempts at picking an unused public id before giving up.</summary>
     private const int MaxPublicIdAttempts = 3;
+
+    /// <summary>Most images one rendition backfill call processes, so each request stays short.</summary>
+    public const int MaxRenditionBatch = 20;
 
     private static readonly JsonSerializerOptions OperationsJsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -144,23 +152,112 @@ public sealed class ServerMediaService(
             return new MediaInvalid(errors.AsReadOnly());
         }
 
+        return await ApplyEditsAsync(id, operations, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    /// <remarks>An edit with no operations, so the result, logging and post updates are exactly an edit's.</remarks>
+    public Task<MediaSaveResult> RevertAsync(int id, CancellationToken cancellationToken = default)
+    {
+        return ApplyEditsAsync(id, new MediaEditOperations(), cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<MediaSaveResult> SaveAsCopyAsync(int id, MediaEditOperations operations, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(operations);
+
+        var errors = editValidator.Validate(operations).ToDictionary();
+        if (errors.Count > 0)
+        {
+            return new MediaInvalid(errors.AsReadOnly());
+        }
+
+        var source = await dbContext.MediaItems.AsNoTracking().SingleOrDefaultAsync(m => m.Id == id, cancellationToken);
+        if (source is null)
+        {
+            return MediaSaveResult.NotFound;
+        }
+
+        var original = await ReadOriginalAsync(source, cancellationToken);
+        if (original is null)
+        {
+            return MediaSaveResult.Invalid(string.Empty, "The original image is missing from storage, so it can't be copied.");
+        }
+
+        ProcessedImage edited;
+        try
+        {
+            edited = await processor.ApplyEditsAsync(new MemoryStream(original, writable: false), operations, cancellationToken);
+        }
+        catch (MediaProcessingException ex)
+        {
+            return MediaSaveResult.Invalid(string.Empty, ex.Message);
+        }
+
+        // The copy keeps the source's original, so it can be edited and reverted on its own later (design 9.2).
+        var copy = await StoreNewItemAsync(source.FileName, new StoredOriginal(original, source.ContentType, edited.Extension, source.ContentHash),
+            edited, operations, source.AltText, source.Caption, cancellationToken);
+        await renditionWriter.WriteAsync(copy, edited.Content, cancellationToken);
+
+        MediaLog.MediaCopied(logger, copy.Id, copy.PublicId, source.Id, copy.Width, copy.Height, copy.SizeBytes);
+        return new MediaSaved((await GetMediaItemAsync(copy.Id, cancellationToken))!);
+    }
+
+    /// <inheritdoc />
+    public async Task<MediaRenditionProgress> GetRenditionProgressAsync(CancellationToken cancellationToken = default)
+    {
+        return new MediaRenditionProgress(0, (await FindOutdatedRenditionsAsync(cancellationToken)).Count);
+    }
+
+    /// <inheritdoc />
+    public async Task<MediaRenditionProgress> GenerateRenditionsAsync(int maxItems, CancellationToken cancellationToken = default)
+    {
+        var outdated = await FindOutdatedRenditionsAsync(cancellationToken);
+        var batch = outdated.Take(Math.Clamp(maxItems, 1, MaxRenditionBatch)).ToList();
+
+        var posts = new HashSet<int>();
+        foreach (var itemId in batch)
+        {
+            var item = await dbContext.MediaItems.SingleOrDefaultAsync(m => m.Id == itemId, cancellationToken);
+            if (item is null)
+            {
+                continue;
+            }
+
+            await renditionWriter.WriteAsync(item, current: null, cancellationToken);
+            posts.UnionWith(await LoadUsingPostIdsAsync(item.Id, cancellationToken));
+        }
+
+        // The stored HTML of the posts lists the rendition widths in srcset, so it has to be rendered again.
+        await contentRenderer.RerenderAsync(posts, cancellationToken);
+        logger.LogInformation("Renditions generated for {Count} media items; {Remaining} remain.", batch.Count, outdated.Count - batch.Count);
+
+        return new MediaRenditionProgress(batch.Count, outdated.Count - batch.Count);
+    }
+
+    /// <summary>
+    /// Applies <paramref name="operations"/> to the stored original and saves the result as a new version (see
+    /// <see cref="IMediaService.EditAsync"/>); with no operations the original becomes current again (revert).
+    /// </summary>
+    private async Task<MediaSaveResult> ApplyEditsAsync(int id, MediaEditOperations operations, CancellationToken cancellationToken)
+    {
         var item = await dbContext.MediaItems.SingleOrDefaultAsync(m => m.Id == id, cancellationToken);
         if (item is null)
         {
             return MediaSaveResult.NotFound;
         }
 
-        await using var original = await storage.OpenReadAsync(item.OriginalStorageKey, cancellationToken);
+        var original = await ReadOriginalAsync(item, cancellationToken);
         if (original is null)
         {
-            logger.LogError("The original of media {MediaId} is missing from storage at {StorageKey}.", item.Id, item.OriginalStorageKey);
             return MediaSaveResult.Invalid(string.Empty, "The original image is missing from storage, so it can't be edited.");
         }
 
         ProcessedImage edited;
         try
         {
-            edited = await processor.ApplyEditsAsync(original, operations, cancellationToken);
+            edited = await processor.ApplyEditsAsync(new MemoryStream(original, writable: false), operations, cancellationToken);
         }
         catch (MediaProcessingException ex)
         {
@@ -174,7 +271,7 @@ public sealed class ServerMediaService(
             // Back to the untouched original: no need to store a copy of it.
             item.CurrentStorageKey = item.OriginalStorageKey;
             item.EditOperationsJson = null;
-            item.SizeBytes = original.Length;
+            item.SizeBytes = original.LongLength;
         }
         else
         {
@@ -208,10 +305,58 @@ public sealed class ServerMediaService(
             await DeleteQuietlyAsync(previousKey);
         }
 
+        // Renditions of the new version first: re-rendered posts pick up their widths.
+        await renditionWriter.WriteAsync(item, operations.IsIdentity ? original : edited.Content, cancellationToken);
+
         var postCount = await contentRenderer.RerenderAsync(await LoadUsingPostIdsAsync(id, cancellationToken), cancellationToken);
         MediaLog.MediaEdited(logger, item.Id, item.PublicId, item.Version, item.Width, item.Height, item.SizeBytes, postCount);
 
         return new MediaSaved((await GetMediaItemAsync(id, cancellationToken))!);
+    }
+
+    /// <summary>
+    /// Ids of the items whose renditions are missing or out of date (<see cref="MediaRenditionWriter.IsOutdated"/>),
+    /// oldest first. Reads only the columns involved, which stays small for a personal library.
+    /// </summary>
+    private async Task<List<int>> FindOutdatedRenditionsAsync(CancellationToken cancellationToken)
+    {
+        var settings = await settingsService.GetAsync(cancellationToken);
+        var items = await dbContext.MediaItems
+            .AsNoTracking()
+            .OrderBy(m => m.Id)
+            .Select(m => new
+            {
+                m.Id,
+                m.PublicId,
+                m.Width,
+                m.ContentType,
+                m.Version,
+                Renditions = m.Renditions.Select(r => new { r.Width, r.Format, r.StorageKey }).ToList()
+            })
+            .ToListAsync(cancellationToken);
+
+        return
+        [
+            .. items
+                .Where(m => MediaRenditionWriter.IsOutdated(m.Width, m.ContentType, m.Version, m.PublicId,
+                    [.. m.Renditions.Select(r => (r.Width, r.Format, r.StorageKey))], settings.RenditionWidths))
+                .Select(m => m.Id)
+        ];
+    }
+
+    /// <summary>The stored original of an item, or <see langword="null"/> (logged) when the file is missing.</summary>
+    private async Task<byte[]?> ReadOriginalAsync(MediaItem item, CancellationToken cancellationToken)
+    {
+        await using var stream = await storage.OpenReadAsync(item.OriginalStorageKey, cancellationToken);
+        if (stream is null)
+        {
+            logger.LogError("The original of media {MediaId} is missing from storage at {StorageKey}.", item.Id, item.OriginalStorageKey);
+            return null;
+        }
+
+        using var buffer = new MemoryStream();
+        await stream.CopyToAsync(buffer, cancellationToken);
+        return buffer.ToArray();
     }
 
     /// <inheritdoc />
@@ -306,7 +451,9 @@ public sealed class ServerMediaService(
             return Reject(result, length, ex.Message);
         }
 
-        var item = await StoreNewItemAsync(fileName, image, cancellationToken);
+        var item = await StoreNewItemAsync(fileName, new StoredOriginal(image.Content, image.ContentType, image.Extension, image.Hash),
+            image, operations: null, altText: string.Empty, caption: null, cancellationToken);
+        await renditionWriter.WriteAsync(item, image.Content, cancellationToken);
 
         var duplicates = await Project(dbContext.MediaItems.AsNoTracking()
                 .Where(m => m.ContentHash == image.Hash && m.Id != item.Id)
@@ -335,32 +482,51 @@ public sealed class ServerMediaService(
     }
 
     /// <summary>
-    /// Writes the file under a new public id and inserts its row, retrying with another id in the (astronomically
-    /// unlikely) event that the id is taken. The file is removed again if the row can't be saved.
+    /// Writes the files under a new public id and inserts the item's row, retrying with another id in the
+    /// (astronomically unlikely) event that the id is taken. The files are removed again if the row can't be saved.
     /// </summary>
-    private async Task<MediaItem> StoreNewItemAsync(string uploadedName, ProcessedImage image, CancellationToken cancellationToken)
+    /// <param name="fileName">The name to derive the URL file name from.</param>
+    /// <param name="original">The original to keep for later edits and reverts.</param>
+    /// <param name="current">The current version: the original itself for an upload, the edited copy for "Save as copy".</param>
+    /// <param name="operations">The edits that turned the original into <paramref name="current"/>, if any.</param>
+    /// <param name="altText">Alt text of the new item.</param>
+    /// <param name="caption">Caption of the new item.</param>
+    /// <param name="cancellationToken">Cancels the work.</param>
+    private async Task<MediaItem> StoreNewItemAsync(string fileName, StoredOriginal original, ProcessedImage current,
+        MediaEditOperations? operations, string altText, string? caption, CancellationToken cancellationToken)
     {
+        var edited = operations is { IsIdentity: false };
         for (var attempt = 1; ; attempt++)
         {
             var publicId = MediaFileNames.NewPublicId();
-            var key = MediaStorageKeys.Original(publicId, image.Extension);
+            var originalKey = MediaStorageKeys.Original(publicId, original.Extension);
+            var currentKey = edited ? MediaStorageKeys.Version(publicId, 1, current.Extension) : originalKey;
             var item = new MediaItem
             {
                 PublicId = publicId,
-                FileName = MediaFileNames.FromUpload(uploadedName, image.Extension),
-                OriginalStorageKey = key,
-                CurrentStorageKey = key,
-                ContentType = image.ContentType,
-                Width = image.Width,
-                Height = image.Height,
-                SizeBytes = image.SizeBytes,
-                ContentHash = image.Hash,
+                FileName = MediaFileNames.FromUpload(fileName, current.Extension),
+                OriginalStorageKey = originalKey,
+                CurrentStorageKey = currentKey,
+                EditOperationsJson = edited ? JsonSerializer.Serialize(operations, OperationsJsonOptions) : null,
+                ContentType = current.ContentType,
+                Width = current.Width,
+                Height = current.Height,
+                SizeBytes = edited ? current.SizeBytes : original.Content.LongLength,
+                AltText = altText,
+                Caption = caption,
+                ContentHash = original.Hash,
                 Version = 1
             };
 
-            await using (var content = image.OpenRead())
+            await using (var content = new MemoryStream(original.Content, writable: false))
             {
-                await storage.SaveAsync(key, content, image.ContentType, cancellationToken);
+                await storage.SaveAsync(originalKey, content, original.ContentType, cancellationToken);
+            }
+
+            if (edited)
+            {
+                await using var content = current.OpenRead();
+                await storage.SaveAsync(currentKey, content, current.ContentType, cancellationToken);
             }
 
             dbContext.MediaItems.Add(item);
@@ -436,7 +602,8 @@ public sealed class ServerMediaService(
         return items.Select(m => new MediaRow(
             m.Id, m.PublicId, m.FileName, m.ContentType, m.Width, m.Height, m.SizeBytes, m.AltText, m.Caption,
             m.Version, m.CreatedOn, m.EditOperationsJson,
-            posts.Count(p => p.CoverMediaId == m.Id || p.SocialImageMediaId == m.Id || p.PostMedia.Any(pm => pm.MediaItemId == m.Id))));
+            posts.Count(p => p.CoverMediaId == m.Id || p.SocialImageMediaId == m.Id || p.PostMedia.Any(pm => pm.MediaItemId == m.Id)),
+            m.Renditions.Where(r => r.Format == MediaRenditionWriter.WebpFormat).OrderBy(r => r.Width).Select(r => r.Width).ToList()));
     }
 
     private static MediaItemDto ToDto(MediaRow row)
@@ -459,12 +626,20 @@ public sealed class ServerMediaService(
             EditOperations = row.EditOperationsJson is null
                 ? null
                 : JsonSerializer.Deserialize<MediaEditOperations>(row.EditOperationsJson, OperationsJsonOptions),
-            UsageCount = row.UsageCount
+            UsageCount = row.UsageCount,
+            RenditionWidths = row.RenditionWidths
         };
     }
 
     /// <summary>A media item as read for the admin area.</summary>
     private sealed record MediaRow(int Id, string PublicId, string FileName, string ContentType, int Width, int Height,
         long SizeBytes, string AltText, string? Caption, int Version, DateTimeOffset? CreatedOn, string? EditOperationsJson,
-        int UsageCount);
+        int UsageCount, List<int> RenditionWidths);
+
+    /// <summary>An original about to be stored for a new item.</summary>
+    /// <param name="Content">Its bytes.</param>
+    /// <param name="ContentType">Its media type.</param>
+    /// <param name="Extension">Its file extension without the dot.</param>
+    /// <param name="Hash">Lowercase hex SHA-256 of <paramref name="Content"/>.</param>
+    private sealed record StoredOriginal(byte[] Content, string ContentType, string Extension, string Hash);
 }

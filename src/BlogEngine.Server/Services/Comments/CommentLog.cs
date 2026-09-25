@@ -45,4 +45,19 @@ internal static partial class CommentLog
     [LoggerMessage(EventId = 3007, EventName = "CommentRateLimited", Level = LogLevel.Warning,
         Message = "Comment post to {Path} rejected by the rate limiter")]
     public static partial void CommentRateLimited(ILogger logger, string path);
+
+    /// <summary>The author published a reply or comment of their own.</summary>
+    [LoggerMessage(EventId = 3008, EventName = "AuthorCommentPosted", Level = LogLevel.Information,
+        Message = "Author comment {CommentId} on post {PostId} posted by user {AuthorId} in reply to {ParentCommentId}")]
+    public static partial void AuthorCommentPosted(ILogger logger, int commentId, int postId, int authorId, int? parentCommentId);
+
+    /// <summary>Emailing the author about a new pending comment failed.</summary>
+    [LoggerMessage(EventId = 3009, EventName = "CommentNotificationFailed", Level = LogLevel.Error,
+        Message = "The notification email for comment {CommentId} on post {PostId} couldn't be sent")]
+    public static partial void CommentNotificationFailed(ILogger logger, Exception exception, int commentId, int postId);
+
+    /// <summary>The author was emailed about a new pending comment.</summary>
+    [LoggerMessage(EventId = 3010, EventName = "CommentNotificationSent", Level = LogLevel.Information,
+        Message = "Notification email for comment {CommentId} on post {PostId} sent to {RecipientCount} recipients")]
+    public static partial void CommentNotificationSent(ILogger logger, int commentId, int postId, int recipientCount);
 }

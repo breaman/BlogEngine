@@ -30,5 +30,12 @@
             </a>
         </header>
         <div class="comment-body">@((MarkupString)Comment.BodyHtml)</div>
+        @if (ReplyHref is { } replyHref)
+        {
+            @* A plain link, so replying works without JavaScript; nofollow keeps the ?replyTo= variants out of search engines. *@
+            <a class="comment-reply-link small link-secondary" href="@replyHref" rel="nofollow" aria-label="@($"Reply to {Comment.AuthorName}")">
+                <span class="bi bi-reply" aria-hidden="true"></span> Reply
+            </a>
+        }
     </div>
 </article>

@@ -1,7 +1,7 @@
 using System.Text;
 
 using BlogEngine.Data.Models;
-using BlogEngine.Server.Components.Email;
+using BlogEngine.Server.Services.Email;
 using BlogEngine.Shared.Services;
 
 using Microsoft.AspNetCore.Components;
@@ -52,9 +52,9 @@ public partial class RegisterConfirmation : ComponentBase
             HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
             _statusMessage = "Error finding user for unspecified email";
         }
-        else if (EmailSender is IdentityNoOpEmailSender)
+        else if (EmailSender is IdentityEmailSender { IsDelivering: false })
         {
-            // Once you add a real email sender, you should remove this code that lets you confirm the account
+            // Without an SMTP server nobody receives the confirmation email, so show its link here instead.
             var userId = await UserManager.GetUserIdAsync(user);
             var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
             code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));

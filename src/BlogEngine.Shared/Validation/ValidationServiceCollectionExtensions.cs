@@ -33,6 +33,7 @@ public static class ValidationServiceCollectionExtensions
         services.AddSingleton<IValidator<CommentSubmission>, CommentSubmissionValidator>();
         services.AddSingleton<IValidator<CommentBlockRequest>, CommentBlockRequestValidator>();
         services.AddSingleton<IValidator<CommentBulkRequest>, CommentBulkRequestValidator>();
+        services.AddSingleton<IValidator<CommentReplyRequest>, CommentReplyRequestValidator>();
         services.AddSingleton<IValidator<CreatePreviewLinkRequest>, CreatePreviewLinkRequestValidator>();
 
         return services;

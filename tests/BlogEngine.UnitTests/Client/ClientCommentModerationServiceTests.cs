@@ -93,6 +93,43 @@ public class ClientCommentModerationServiceTests
         await Assert.That(await CreateService(missing).BlockCommenterAsync(9)).IsNull();
     }
 
+    /// <summary>A reply is posted to the comment's reply route and comes back with the comments it approved (T4.15).</summary>
+    [Test]
+    public async Task ReplyAsync_PostsAndReadsReply()
+    {
+        var reply = new CommentDto { Id = 12, ParentCommentId = 4, IsAuthorReply = true, BodyHtml = "<p>Thanks!</p>" };
+        var handler = new StubHttpHandler(_ => JsonResponse(HttpStatusCode.OK, new CommentReplied(reply, [4])));
+
+        var result = await CreateService(handler).ReplyAsync(4, new CommentReplyRequest { Body = "Thanks!" });
+
+        var request = handler.Requests.Single();
+        await Assert.That(request.Method).IsEqualTo(HttpMethod.Post);
+        await Assert.That(request.RequestUri!.AbsolutePath).IsEqualTo("/api/admin/comments/4/reply");
+        await Assert.That((await request.Content!.ReadFromJsonAsync<CommentReplyRequest>())!.Body).IsEqualTo("Thanks!");
+        var replied = result as CommentReplied;
+        await Assert.That(replied).IsNotNull();
+        await Assert.That(replied!.Reply.Id).IsEqualTo(12);
+        await Assert.That(replied.ApprovedCommentIds).IsEquivalentTo([4]);
+    }
+
+    /// <summary>A 404 and a 400 map to the same results the server implementation returns.</summary>
+    [Test]
+    public async Task ReplyAsync_MapsNotFoundAndValidation()
+    {
+        var missing = new StubHttpHandler(_ => new HttpResponseMessage(HttpStatusCode.NotFound));
+        var invalid = new StubHttpHandler(_ => JsonResponse(HttpStatusCode.BadRequest, new
+        {
+            title = "One or more validation errors occurred.",
+            errors = new Dictionary<string, string[]> { ["Body"] = ["'Reply' must not be empty."] }
+        }));
+
+        var notFound = await CreateService(missing).ReplyAsync(4, new CommentReplyRequest());
+        var rejected = await CreateService(invalid).ReplyAsync(4, new CommentReplyRequest());
+
+        await Assert.That(notFound).IsTypeOf<CommentReplyNotFound>();
+        await Assert.That(((CommentReplyInvalid)rejected).Errors["Body"]).IsEquivalentTo(["'Reply' must not be empty."]);
+    }
+
     private static ClientCommentModerationService CreateService(StubHttpHandler handler)
     {
         return new ClientCommentModerationService(handler.CreateClient());

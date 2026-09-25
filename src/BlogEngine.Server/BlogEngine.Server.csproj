@@ -10,6 +10,7 @@
     <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
     <!-- Sanitizes rendered comment and post HTML (design 5.3, 12.2). -->
     <PackageReference Include="HtmlSanitizer" />
+    <PackageReference Include="MailKit" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
     <PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" />
     <!-- Two-level cache for settings and public queries, with tag-based eviction (design 11). -->

@@ -84,6 +84,10 @@ else
                     <div class="flex-grow-1 comment-row">
                         <div class="d-flex flex-wrap align-items-baseline column-gap-2 row-gap-1 small">
                             <span class="fw-semibold fs-6">@comment.AuthorName</span>
+                            @if (comment.IsAuthorReply)
+                            {
+                                <span class="badge text-bg-primary">Author</span>
+                            }
                             <a class="link-secondary" href="@($"mailto:{comment.AuthorEmail}")">@comment.AuthorEmail</a>
                             @if (comment.AuthorUrl is { } url)
                             {
@@ -94,7 +98,7 @@ else
                             <span class="text-body-secondary" title="@comment.CreatedOn?.ToLocalTime().ToString("f")">@Relative(comment.CreatedOn)</span>
                         </div>
                         <div class="small text-body-secondary mb-2">
-                            on <a href="@($"admin/posts/{comment.PostId}")">@comment.PostTitle</a>
+                            @(comment.ParentCommentId is null ? "on" : "reply on") <a href="@($"admin/posts/{comment.PostId}")">@comment.PostTitle</a>
                             @if (comment.PostPath is { } path)
                             {
                                 <a class="ms-1 link-secondary" href="@($"{path}#comment-{comment.Id}")" target="_blank" rel="noopener"
@@ -112,6 +116,13 @@ else
                             </div>
                         }
                         <div class="d-flex flex-wrap gap-1">
+                            @if (!comment.IsAuthorReply)
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-primary" disabled="@_busy" aria-expanded="@(_replyingTo == comment.Id ? "true" : "false")"
+                                        @onclick="() => StartReply(comment)">
+                                    <span class="bi bi-reply" aria-hidden="true"></span> Reply
+                                </button>
+                            }
                             @if (comment.Status != CommentStatus.Approved)
                             {
                                 <button type="button" class="btn btn-sm btn-outline-success" disabled="@_busy" @onclick="() => ModerateAsync(comment, CommentModerationAction.Approve)">
@@ -140,6 +151,32 @@ else
                                 </button>
                             }
                         </div>
+                        @if (_replyingTo == comment.Id)
+                        {
+                            @* The author's reply (design 8.4, C5): published at once, and it approves the comment it answers. *@
+                            <EditForm Model="_reply" OnValidSubmit="() => ReplyAsync(comment)" class="mt-3">
+                                <FluentValidator />
+                                <div class="form-floating mb-2">
+                                    <InputTextArea @bind-Value="_reply.Body" id="@($"reply-body-{comment.Id}")" class="form-control comment-reply-input"
+                                                   placeholder="Your reply" maxlength="@FieldLengths.CommentBody" rows="4" />
+                                    <label for="@($"reply-body-{comment.Id}")">Reply to @comment.AuthorName</label>
+                                    <ValidationMessage For="() => _reply.Body" class="text-danger" />
+                                </div>
+                                <p class="form-text mt-0 mb-2">
+                                    Published straight away with an "Author" badge.
+                                    @if (comment.Status != CommentStatus.Approved)
+                                    {
+                                        <span>This comment will be approved too.</span>
+                                    }
+                                </p>
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-sm btn-primary" disabled="@_busy">
+                                        <span class="bi bi-send" aria-hidden="true"></span> Publish reply
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@_busy" @onclick="CancelReply">Cancel</button>
+                                </div>
+                            </EditForm>
+                        }
                     </div>
                 </div>
             </li>

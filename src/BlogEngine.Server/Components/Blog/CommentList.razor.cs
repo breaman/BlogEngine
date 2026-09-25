@@ -1,3 +1,5 @@
+using System.Globalization;
+
 using BlogEngine.Server.Services.Public;
 
 using Microsoft.AspNetCore.Components;
@@ -22,12 +24,30 @@ public partial class CommentList : ComponentBase
     [Parameter]
     public DateTimeOffset Now { get; set; }
 
+    /// <summary>
+    /// The post's path when readers can reply (comments are open), so each comment gets a "Reply" link (C6);
+    /// <see langword="null"/> hides the links.
+    /// </summary>
+    [Parameter]
+    public string? ReplyPath { get; set; }
+
+    /// <summary>Query string parameter the "Reply" links set, which the post page hands to the comment form.</summary>
+    public const string ReplyToParameter = "replyTo";
+
     private IReadOnlyList<CommentThread> _threads = [];
 
     /// <summary>Groups the comments into threads.</summary>
     protected override void OnParametersSet()
     {
         _threads = Thread(Comments);
+    }
+
+    /// <summary>The "Reply" link of a comment: the post with <c>?replyTo={id}</c>, scrolled to the comment form.</summary>
+    private string? ReplyHref(int commentId)
+    {
+        return ReplyPath is null
+            ? null
+            : string.Create(CultureInfo.InvariantCulture, $"{ReplyPath}?{ReplyToParameter}={commentId}#{CommentForm.ElementId}");
     }
 
     /// <summary>

@@ -34,6 +34,28 @@ public interface IMediaService
     Task<MediaSaveResult> EditAsync(int id, MediaEditOperations operations, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Undoes every edit (design 9.2, M7): the original becomes the current version again, under a new version number so
+    /// cached copies of the edited image aren't reused, and the posts that use the item are re-rendered.
+    /// </summary>
+    Task<MediaSaveResult> RevertAsync(int id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// "Save as copy" (design 9.2): applies <paramref name="operations"/> to the item's original and stores the result as
+    /// a new library item with the same alt text and caption, leaving the item, and the posts that use it, untouched.
+    /// </summary>
+    /// <returns>The new item, or why nothing was saved.</returns>
+    Task<MediaSaveResult> SaveAsCopyAsync(int id, MediaEditOperations operations, CancellationToken cancellationToken = default);
+
+    /// <summary>How many images have missing or out-of-date responsive renditions (design 9.4, T4.19).</summary>
+    Task<MediaRenditionProgress> GetRenditionProgressAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Makes renditions for up to <paramref name="maxItems"/> images that need them, and re-renders the posts that use
+    /// those images. Call it again while <see cref="MediaRenditionProgress.Remaining"/> is above zero.
+    /// </summary>
+    Task<MediaRenditionProgress> GenerateRenditionsAsync(int maxItems, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Deletes the item and all its files. Unless <paramref name="force"/> is set, an item that posts use is
     /// kept and <see cref="MediaInUse"/> lists those posts (design 9.6).
     /// </summary>

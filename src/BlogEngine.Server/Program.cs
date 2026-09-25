@@ -6,10 +6,10 @@ using BlogEngine.Data.Interfaces;
 using BlogEngine.Data.Models;
 using BlogEngine.Server.Components;
 using BlogEngine.Server.Components.Account;
-using BlogEngine.Server.Components.Email;
 using BlogEngine.Server.Endpoints;
 using BlogEngine.Server.Services;
 using BlogEngine.Server.Services.Comments;
+using BlogEngine.Server.Services.Email;
 using BlogEngine.Server.Services.Media;
 using BlogEngine.Server.Services.Public;
 using BlogEngine.Server.Storage;
@@ -22,6 +22,7 @@ using FluentValidation;
 
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 using Serilog;
 
@@ -99,7 +100,17 @@ try
         .AddDefaultTokenProviders()
         .AddClaimsPrincipalFactory<CustomUserClaimsPrincipalFactory>();
 
-    builder.Services.AddSingleton<IEmailSender<User>, IdentityNoOpEmailSender>();
+    // Outgoing email (design 8.4, C9): SMTP through MailKit when Email:SmtpHost is set, or the Mailpit endpoint the
+    // AppHost passes in development; otherwise messages are only logged.
+    builder.Services.Configure<EmailOptions>(options =>
+    {
+        builder.Configuration.GetSection(EmailOptions.SectionName).Bind(options);
+        options.ApplyConnectionString(builder.Configuration.GetConnectionString(Constants.MailConnectionString));
+    });
+    builder.Services.AddSingleton<IEmailTransport>(sp => sp.GetRequiredService<IOptions<EmailOptions>>().Value.IsConfigured
+        ? ActivatorUtilities.CreateInstance<SmtpEmailTransport>(sp)
+        : ActivatorUtilities.CreateInstance<LoggingEmailTransport>(sp));
+    builder.Services.AddSingleton<IEmailSender<User>, IdentityEmailSender>();
     builder.Services.AddScoped<IUserService, HttpUserService>();
     builder.Services.AddScoped<IToastService, ToastService>();
     builder.Services.AddScoped<ISettingsService, ServerSettingsService>();
@@ -115,6 +126,7 @@ try
     builder.Services.Configure<MediaStorageOptions>(builder.Configuration.GetSection(MediaStorageOptions.SectionName));
     builder.Services.AddSingleton<IMediaStorage, FileSystemMediaStorage>();
     builder.Services.AddSingleton<MediaProcessor>();
+    builder.Services.AddScoped<MediaRenditionWriter>();
     builder.Services.AddScoped<ServerMediaService>();
     builder.Services.AddScoped<IMediaService>(sp => sp.GetRequiredService<ServerMediaService>());
     builder.Services.AddHealthChecks().AddCheck<MediaStorageHealthCheck>(MediaStorageHealthCheck.Name);
@@ -127,6 +139,10 @@ try
     builder.Services.AddSingleton<CommentHtmlSanitizer>();
     builder.Services.AddSingleton<CommentRenderer>();
     builder.Services.AddSingleton<SpamGuard>();
+    builder.Services.AddScoped<AuthorCommentWriter>();
+    builder.Services.AddSingleton<CommentNotificationQueue>();
+    builder.Services.AddSingleton<CommentNotificationSender>();
+    builder.Services.AddHostedService(sp => sp.GetRequiredService<CommentNotificationSender>());
     builder.Services.AddScoped<CommentSubmissionService>();
     builder.Services.AddScoped<ICommentModerationService, ServerCommentModerationService>();
     builder.Services.AddScoped<IDashboardService, ServerDashboardService>();

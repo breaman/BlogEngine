@@ -16,7 +16,7 @@
 | [1: Posts MVP](#phase-1--posts-mvp) | Can write and publish posts end to end | 25 | 25 |
 | [2: Media MVP](#phase-2--media-mvp) | Can add, edit and insert photos | 13 | 13 |
 | [3: Comments MVP](#phase-3--comments-mvp) | Readers can comment; the author moderates | 11 | 11 |
-| [4: V1 Polish](#phase-4--v1-polish) | Ready for public launch | 35 | 12 |
+| [4: V1 Polish](#phase-4--v1-polish) | Ready for public launch | 35 | 19 |
 | [5: Later](#phase-5--later) | As desired | 10 | 0 |
 
 Update the **Done** column as tasks are completed.
@@ -517,36 +517,43 @@ These apply to all tasks and are not repeated below:
 
 ### Comments
 
-- [ ] **T4.15 — Author replies** (§8.4, C5)
+- [x] **T4.15 — Author replies** (§8.4, C5)
   - `POST /comments/{id}/reply` from the queue or post; auto-approved, `IsAuthorReply` with an "Author" badge; approving via reply also approves the parent.
   - **Done when:** a reply appears under its parent with the badge.
+  - *Status:* `POST /comments/{id}/reply` (`ICommentModerationService.ReplyAsync`) plus a Reply box on each row of `/admin/comments`. `AuthorCommentWriter` builds author comments: approved, `IsAuthorReply`, named after the settings' author name (else the account's display name), the account's email. Replying approves the comment answered and its top-level comment. "From the post": when the signed-in admin views a post, the form asks only for the comment and publishes it as an author comment (no spam guard; admins are exempt from the comment rate limit). Log event `AuthorCommentPosted`. Verified in a browser: a queue reply appears under its parent with the badge.
 
-- [ ] **T4.16 — One level of threaded replies** (C6)
+- [x] **T4.16 — One level of threaded replies** (C6)
   - Public "Reply" link sets `ParentCommentId`; replies to replies attach to the top-level parent; replies indented.
   - **Done when:** nesting never exceeds one level.
+  - *Status:* Each comment gets a nofollow "Reply" link to `?replyTo={id}#comment-form` while comments are open; the form then says who is being answered and carries `Input.ParentCommentId`, so replying works without JavaScript. `CommentSubmissionService` files a reply to a reply under the top-level comment, and a parent that isn't an approved comment on the post starts a new thread. `CommentThreadingTests` cover both.
 
-- [ ] **T4.17 — Comment closing** (§8.5, C7)
+- [x] **T4.17 — Comment closing** (§8.5, C7)
   - Per-post `AllowComments` toggle in the editor; `CommentsCloseOn` set from the "close after N days" setting at publish time.
   - **Done when:** closed posts show existing comments and "Comments are closed."
+  - *Status:* The per-post toggle already existed. Publishing now sets `CommentsCloseOn` = publish date + N days (null for 0); the setting is applied at publish time, so changing it later leaves published posts alone, and the editor shows the closing date under the toggle.
 
-- [ ] **T4.18 — Non-destructive media editing: Revert and Save as copy** (§9.2, M7)
+- [x] **T4.18 — Non-destructive media editing: Revert and Save as copy** (§9.2, M7)
   - `POST /media/{id}/revert`; "Save as copy" creates a new `MediaItem` from the original + operations.
   - **Done when:** revert restores original dimensions and bumps the version.
+  - *Status:* `POST /media/{id}/revert` and `POST /media/{id}/copy` (`IMediaService.RevertAsync`/`SaveAsCopyAsync`). Revert is an edit with no operations; the copy keeps the source's original, so it can be edited and reverted on its own. The media editor has "Revert to original" (confirmed when posts use the image) and "Save as copy" (opens the copy).
 
-- [ ] **T4.19 — Responsive renditions** (§9.4, M6)
+- [x] **T4.19 — Responsive renditions** (§9.4, M6)
   - Generate WebP renditions at 320/640/960/1280/1920 (skipping widths wider than the image) on upload and edit; `?w=` selects the nearest rendition, `?f=webp` the format.
   - `MediaLinkRewriter` emits `<picture>` with `srcset`/`sizes` per §9.4.
   - Background job or admin action to backfill renditions for existing media.
   - **Done when:** a post image serves WebP at the appropriate width in the browser.
+  - *Status:* `MediaRenditionWriter` stores WebP plus own-format copies (`{publicId}/v{version}/{width}.{ext}`) at the configured widths narrower than the image, plus the image's own width when it fits under the largest; GIFs get none so animations survive. Made on upload, edit, revert and copy; old versions' files are removed. `?w=` serves the smallest rendition at least that wide, `?f=webp` the WebP one, falling back to the full image. `MediaLinkRewriter` emits `<picture>` with WebP and own-format `srcset`, `sizes` from the size hint, and a ≤1280 px fallback `src`. Backfill: `GET/POST /api/admin/media/renditions`, surfaced as a "Make responsive sizes" prompt on `/admin/media` that runs in batches and re-renders the posts using those images. Verified in a browser: a 1600 px PNG in a 768 px column loads the 960 px WebP (4.8 KB instead of 134 KB). **Gap:** as with T4.10, standalone pages aren't re-rendered, so they pick up renditions the next time they're saved.
 
-- [ ] **T4.20 — Auto-approve returning commenters** (C8, Q2)
+- [x] **T4.20 — Auto-approve returning commenters** (C8, Q2)
   - Honor the setting (default off): an email with a previously approved comment goes straight to Approved (unless spam-scored).
   - **Done when:** tests cover the setting on and off.
+  - *Status:* The logic was already in `SpamGuard`/`CommentSubmissionService`. The setting is on the settings page, and `CommentSettingsTests` cover it on (published at once, case-insensitive email), off, and on with a scored comment (still pending).
 
-- [ ] **T4.21 — Email notifications** (§8.4, C9)
+- [x] **T4.21 — Email notifications** (§8.4, C9)
   - Replace `IdentityNoOpEmailSender` with an SMTP (or SendGrid) `IEmailSender` configured via Aspire parameters/user secrets.
   - Email the author on each new pending comment when the setting is on.
   - **Done when:** a pending comment triggers an email in dev (e.g. via a local SMTP catcher like Mailpit/smtp4dev in Aspire).
+  - *Status:* `IdentityNoOpEmailSender` is replaced by `IdentityEmailSender` over `IEmailTransport`: `SmtpEmailTransport` (MailKit) when `Email:SmtpHost` is set, or the Mailpit endpoint the AppHost passes (`CommunityToolkit.Aspire.Hosting.MailPit`); otherwise `LoggingEmailTransport` only logs subjects. Pending comments (not spam) are queued (`CommentNotificationQueue`) and emailed to every admin account by the `CommentNotificationSender` background service, so SMTP problems never slow or fail a submission. The toggle is on the settings page; setup is in `README.md`. Verified with `aspire run`: a reader's pending comment produced the email in Mailpit, with links to the post and the queue.
 
 ### Administration
 

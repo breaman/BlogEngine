@@ -63,6 +63,25 @@ public sealed class ClientCommentModerationService(HttpClient http) : ICommentMo
     }
 
     /// <inheritdoc />
+    public async Task<CommentReplyResult> ReplyAsync(int id, CommentReplyRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        using var response = await http.PostAsJsonAsync($"{CommentsUri}/{id}/reply", request, cancellationToken);
+        switch (response.StatusCode)
+        {
+            case HttpStatusCode.NotFound:
+                return CommentReplyResult.NotFound;
+            case HttpStatusCode.BadRequest:
+                return new CommentReplyInvalid(await ProblemResponseReader.ReadErrorsAsync(response, cancellationToken));
+        }
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<CommentReplied>(cancellationToken)
+            ?? throw new InvalidOperationException($"POST {CommentsUri}/{id}/reply returned no reply.");
+    }
+
+    /// <inheritdoc />
     /// <exception cref="ValidationException">The server rejected the request (no comments, or too many).</exception>
     public async Task<int> ModerateManyAsync(CommentBulkRequest request, CancellationToken cancellationToken = default)
     {

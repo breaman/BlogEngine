@@ -33,6 +33,12 @@ namespace BlogEngine.Shared.Markdown;
 /// Explicit <c>width</c>/<c>height</c> prevent layout shift, and <c>?v=</c> lets browsers cache the file forever.
 /// </para>
 /// <para>
+/// When the item has responsive renditions (M6, T4.19), the image is wrapped in a <c>&lt;picture&gt;</c>: a WebP
+/// <c>&lt;source&gt;</c> and the <c>&lt;img&gt;</c> both list the renditions in <c>srcset</c>, with <c>sizes</c> matching
+/// the size hint, so the browser downloads the smallest copy that looks sharp. The <c>&lt;img&gt;</c> falls back to the
+/// rendition closest to <see cref="FallbackWidth"/> in the image's own format.
+/// </para>
+/// <para>
 /// When the item no longer exists (deleted with "Delete anyway", design 9.6), the admin preview shows a visible
 /// placeholder and published HTML silently leaves the image out. Images outside the library are not touched.
 /// </para>
@@ -48,6 +54,9 @@ public sealed class MediaLinkRewriter
 
     /// <summary>Class on the placeholder shown in the preview for a deleted item.</summary>
     public const string MissingClass = "media-missing";
+
+    /// <summary>Width of the <c>src</c> fallback when an image has renditions: wide enough for the post column.</summary>
+    public const int FallbackWidth = 1280;
 
     private readonly HashSet<string> internalHosts;
 
@@ -206,7 +215,7 @@ public sealed class MediaLinkRewriter
         }
 
         html.Append('>');
-        html.Append(item is null ? MissingPlaceholder(fileName, "div") : ImageTag(image, item, cssClass: null));
+        html.Append(item is null ? MissingPlaceholder(fileName, "div") : ImageTag(image, item, cssClass: null, classes));
 
         if (item is not null && !string.IsNullOrWhiteSpace(image.Title))
         {
@@ -225,11 +234,18 @@ public sealed class MediaLinkRewriter
         }
 
         var classes = image.TryGetAttributes()?.Classes;
-        return ImageTag(image, item, classes is { Count: > 0 } ? string.Join(' ', classes) : null);
+        return ImageTag(image, item, classes is { Count: > 0 } ? string.Join(' ', classes) : null, classes ?? []);
     }
 
-    /// <summary>The <c>&lt;img&gt;</c> tag for the current version of an item.</summary>
-    private static string ImageTag(LinkInline image, MediaLookupItem item, string? cssClass)
+    /// <summary>
+    /// The <c>&lt;img&gt;</c> tag for the current version of an item, inside a <c>&lt;picture&gt;</c> with its renditions
+    /// when it has any.
+    /// </summary>
+    /// <param name="image">The Markdown image.</param>
+    /// <param name="item">The library item.</param>
+    /// <param name="cssClass">Classes for the <c>&lt;img&gt;</c> (inline images carry their size hints themselves).</param>
+    /// <param name="hints">The size hints that decide <c>sizes</c>: the figure's or the image's classes.</param>
+    private static string ImageTag(LinkInline image, MediaLookupItem item, string? cssClass, IEnumerable<string> hints)
     {
         var alt = InlineText(image).Trim();
         if (alt.Length == 0)
@@ -237,16 +253,64 @@ public sealed class MediaLinkRewriter
             alt = item.AltText;
         }
 
-        var html = new StringBuilder("<img");
-        AppendAttribute(html, "src", MediaPaths.Versioned(item.PublicId, item.FileName, item.Version));
+        var widths = item.Renditions;
+        var html = new StringBuilder();
+        string? sizes = null;
+        if (widths.Count > 0)
+        {
+            sizes = SizesFor(hints);
+            html.Append("<picture><source type=\"image/webp\"");
+            AppendAttribute(html, "srcset", SrcSet(item, webp: true));
+            AppendAttribute(html, "sizes", sizes);
+            html.Append('>');
+        }
+
+        html.Append("<img");
+        AppendAttribute(html, "src", widths.Count > 0
+            ? MediaPaths.Rendition(item.PublicId, item.FileName, item.Version, FallbackRendition(widths))
+            : MediaPaths.Versioned(item.PublicId, item.FileName, item.Version));
+        if (widths.Count > 0)
+        {
+            AppendAttribute(html, "srcset", SrcSet(item, webp: false));
+            AppendAttribute(html, "sizes", sizes);
+        }
+
         AppendAttribute(html, "alt", alt, always: true);
         AppendAttribute(html, "width", item.Width.ToString(CultureInfo.InvariantCulture));
         AppendAttribute(html, "height", item.Height.ToString(CultureInfo.InvariantCulture));
         AppendAttribute(html, "class", cssClass);
         AppendAttribute(html, "loading", "lazy");
         AppendAttribute(html, "decoding", "async");
+        html.Append('>');
 
-        return html.Append('>').ToString();
+        return (widths.Count > 0 ? html.Append("</picture>") : html).ToString();
+    }
+
+    /// <summary>The <c>srcset</c> of an item's renditions, in WebP or in its own format.</summary>
+    private static string SrcSet(MediaLookupItem item, bool webp)
+    {
+        return string.Join(", ", item.Renditions.Select(width => string.Create(CultureInfo.InvariantCulture,
+            $"{MediaPaths.Rendition(item.PublicId, item.FileName, item.Version, width, webp)} {width}w")));
+    }
+
+    /// <summary>The rendition used as <c>src</c>: the widest up to <see cref="FallbackWidth"/>, or the narrowest one.</summary>
+    private static int FallbackRendition(IReadOnlyList<int> widths)
+    {
+        var fitting = widths.Where(w => w <= FallbackWidth).ToList();
+        return fitting.Count > 0 ? fitting.Max() : widths.Min();
+    }
+
+    /// <summary>
+    /// How wide the image is shown, for <c>sizes</c>: the post column is at most 48rem, medium images take two thirds of
+    /// it and small ones a third, and on phones (below 576px) medium images go full width and small ones half
+    /// (matching <c>site.scss</c>).
+    /// </summary>
+    public static string SizesFor(IEnumerable<string> hints)
+    {
+        var classes = hints.ToHashSet(StringComparer.Ordinal);
+        return classes.Contains("img-small") ? "(min-width: 48rem) 16rem, (min-width: 576px) 34vw, 50vw"
+            : classes.Contains("img-medium") ? "(min-width: 48rem) 32rem, (min-width: 576px) 67vw, 100vw"
+            : "(min-width: 48rem) 48rem, 100vw";
     }
 
     /// <summary>What the admin preview shows for an item that was deleted.</summary>

@@ -84,6 +84,35 @@ public sealed class ClientMediaService(HttpClient http) : IMediaService
     }
 
     /// <inheritdoc />
+    public async Task<MediaSaveResult> RevertAsync(int id, CancellationToken cancellationToken = default)
+    {
+        using var response = await http.PostAsync($"{BaseUri}/{id}/revert", null, cancellationToken);
+        return await ReadSaveResultAsync(response, $"POST {BaseUri}/{id}/revert", cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task<MediaSaveResult> SaveAsCopyAsync(int id, MediaEditOperations operations, CancellationToken cancellationToken = default)
+    {
+        return SendAsync(HttpMethod.Post, $"{BaseUri}/{id}/copy", operations, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<MediaRenditionProgress> GetRenditionProgressAsync(CancellationToken cancellationToken = default)
+    {
+        return await http.GetFromJsonAsync<MediaRenditionProgress>($"{BaseUri}/renditions", cancellationToken)
+            ?? new MediaRenditionProgress(0, 0);
+    }
+
+    /// <inheritdoc />
+    public async Task<MediaRenditionProgress> GenerateRenditionsAsync(int maxItems, CancellationToken cancellationToken = default)
+    {
+        using var response = await http.PostAsync(string.Create(CultureInfo.InvariantCulture, $"{BaseUri}/renditions?max={maxItems}"), null,
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<MediaRenditionProgress>(cancellationToken) ?? new MediaRenditionProgress(0, 0);
+    }
+
+    /// <inheritdoc />
     public async Task<MediaDeleteResult> DeleteAsync(int id, bool force, CancellationToken cancellationToken = default)
     {
         using var response = await http.DeleteAsync($"{BaseUri}/{id}{(force ? "?force=true" : string.Empty)}", cancellationToken);
@@ -108,7 +137,13 @@ public sealed class ClientMediaService(HttpClient http) : IMediaService
     {
         using var request = new HttpRequestMessage(method, uri) { Content = JsonContent.Create(body) };
         using var response = await http.SendAsync(request, cancellationToken);
+        return await ReadSaveResultAsync(response, $"{method} {uri}", cancellationToken);
+    }
 
+    /// <summary>Maps a response to a save result (see <see cref="SendAsync"/>).</summary>
+    private static async Task<MediaSaveResult> ReadSaveResultAsync(HttpResponseMessage response, string description,
+        CancellationToken cancellationToken)
+    {
         switch (response.StatusCode)
         {
             case HttpStatusCode.NotFound:
@@ -119,7 +154,7 @@ public sealed class ClientMediaService(HttpClient http) : IMediaService
 
         response.EnsureSuccessStatusCode();
         var item = await response.Content.ReadFromJsonAsync<MediaItemDto>(cancellationToken)
-            ?? throw new InvalidOperationException($"{method} {uri} returned no media item.");
+            ?? throw new InvalidOperationException($"{description} returned no media item.");
 
         return new MediaSaved(item);
     }

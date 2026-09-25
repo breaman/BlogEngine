@@ -7,13 +7,15 @@ namespace BlogEngine.UnitTests.Validation;
 
 /// <summary>
 /// Tests the shared comment validators (T3.1, T3.7, T3.9): <see cref="CommentSubmissionValidator"/> (name, email,
-/// website, body), <see cref="CommentBlockRequestValidator"/> and <see cref="CommentBulkRequestValidator"/>.
+/// website, body), <see cref="CommentBlockRequestValidator"/>, <see cref="CommentBulkRequestValidator"/> and
+/// <see cref="CommentReplyRequestValidator"/>.
 /// </summary>
 public class CommentValidatorsTests
 {
     private static readonly CommentSubmissionValidator SubmissionValidator = new();
     private static readonly CommentBlockRequestValidator BlockValidator = new();
     private static readonly CommentBulkRequestValidator BulkValidator = new();
+    private static readonly CommentReplyRequestValidator ReplyValidator = new();
 
     private static CommentSubmission Valid() => new()
     {
@@ -146,5 +148,18 @@ public class CommentValidatorsTests
         await Assert.That(empty.IsValid).IsFalse();
         await Assert.That(tooMany.IsValid).IsFalse();
         await Assert.That(badAction.IsValid).IsFalse();
+    }
+
+    /// <summary>The author's reply needs a body within the comment length (T4.15).</summary>
+    [Test]
+    public async Task Reply_RequiresBodyWithinLength()
+    {
+        var valid = ReplyValidator.Validate(new CommentReplyRequest { Body = "Thanks for reading!" });
+        var empty = ReplyValidator.Validate(new CommentReplyRequest { Body = "  " });
+        var tooLong = ReplyValidator.Validate(new CommentReplyRequest { Body = new string('a', FieldLengths.CommentBody + 1) });
+
+        await Assert.That(valid.IsValid).IsTrue();
+        await Assert.That(empty.Errors.Single().ErrorMessage).IsEqualTo("'Reply' must not be empty.");
+        await Assert.That(tooLong.IsValid).IsFalse();
     }
 }

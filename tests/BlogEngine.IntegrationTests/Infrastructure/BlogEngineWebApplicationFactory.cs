@@ -1,5 +1,6 @@
 using BlogEngine.Data.Models;
 using BlogEngine.Server.Services.Comments;
+using BlogEngine.Server.Services.Email;
 using BlogEngine.Server.Storage;
 using BlogEngine.ServiceDefaults;
 
@@ -23,6 +24,9 @@ public sealed class BlogEngineWebApplicationFactory : TestWebApplicationFactory<
     [ClassDataSource<SqlServerContainer>(Shared = SharedType.PerTestSession)]
     public required SqlServerContainer SqlServer { get; init; }
 
+    /// <summary>Every email the application sent during the session.</summary>
+    public CapturingEmailTransport Email { get; } = new();
+
     /// <summary>A throwaway media folder for this test session, so uploads never touch the real App_Data.</summary>
     public string MediaRoot { get; } = Path.Combine(Path.GetTempPath(), "blogengine-integration-media", Guid.NewGuid().ToString("N"));
 
@@ -41,8 +45,15 @@ public sealed class BlogEngineWebApplicationFactory : TestWebApplicationFactory<
         builder.UseSetting($"{MediaStorageOptions.SectionName}:{nameof(MediaStorageOptions.RootPath)}", MediaRoot);
         builder.UseSetting($"{CommentOptions.SectionName}:{nameof(CommentOptions.IpHashSalt)}", "integration-test-salt");
 
-        // The in-memory server has no client address; let tests choose one, so rate limits are per test (T3.5).
-        builder.ConfigureServices(services => services.AddSingleton<IStartupFilter, TestClientIpStartupFilter>());
+        builder.ConfigureServices(services =>
+        {
+            // The in-memory server has no client address; let tests choose one, so rate limits are per test (T3.5).
+            services.AddSingleton<IStartupFilter, TestClientIpStartupFilter>();
+
+            // Email is captured rather than sent, so tests can check notifications (T4.21).
+            services.AddSingleton(Email);
+            services.AddSingleton<IEmailTransport>(Email);
+        });
     }
 
     /// <summary>Stops the host and removes the session's media folder.</summary>

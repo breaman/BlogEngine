@@ -17,4 +17,11 @@ public sealed class CommentSubmission
 
     /// <summary>The comment in the restricted comment Markdown dialect (design 8.2).</summary>
     public string Body { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The approved comment this replies to, from the post page's "Reply" link (C6); <see langword="null"/> for a new
+    /// thread. Threads are one level deep, so a reply to a reply is stored under the top-level comment, and a parent
+    /// that isn't shown on the post (any more) makes this a new thread instead.
+    /// </summary>
+    public int? ParentCommentId { get; set; }
 }

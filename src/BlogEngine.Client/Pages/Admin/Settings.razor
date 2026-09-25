@@ -160,9 +160,15 @@ else
                             <label class="form-check-label" for="settings-require-approval">Hold new comments for approval</label>
                             <div class="form-text mt-0">Always on for now.</div>
                         </div>
-                        <div class="form-check form-switch mb-3">
+                        <div class="form-check form-switch mb-2">
                             <InputCheckbox @bind-Value="Model.AutoApproveReturningCommenters" id="settings-auto-approve" class="form-check-input" role="switch" />
                             <label class="form-check-label" for="settings-auto-approve">Approve commenters who have an approved comment already</label>
+                            <div class="form-text mt-0">Only comments the spam checks find nothing wrong with.</div>
+                        </div>
+                        <div class="form-check form-switch mb-3">
+                            <InputCheckbox @bind-Value="Model.NotifyOnPendingComment" id="settings-notify-pending" class="form-check-input" role="switch" />
+                            <label class="form-check-label" for="settings-notify-pending">Email me when a comment is waiting for approval</label>
+                            <div class="form-text mt-0">Sent to every admin account. Needs an email server (<code>Email</code> settings) to be configured.</div>
                         </div>
                         <div class="row g-2">
                             <div class="col-sm-6">

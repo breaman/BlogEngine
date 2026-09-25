@@ -32,6 +32,10 @@ public class AdminMediaApiTests(BlogEngineWebApplicationFactory factory)
         yield return ("POST", MediaApi);
         yield return ("PUT", $"{MediaApi}/1");
         yield return ("POST", $"{MediaApi}/1/edit");
+        yield return ("POST", $"{MediaApi}/1/revert");
+        yield return ("POST", $"{MediaApi}/1/copy");
+        yield return ("GET", $"{MediaApi}/renditions");
+        yield return ("POST", $"{MediaApi}/renditions");
         yield return ("DELETE", $"{MediaApi}/1");
     }
 
@@ -226,7 +230,9 @@ public class AdminMediaApiTests(BlogEngineWebApplicationFactory factory)
 
         var found = await client.GetFromJsonAsync<List<MediaLookupItem>>($"{MediaApi}/lookup?ids={item.PublicId}&ids=zzzzzzzzzzzz");
 
-        await Assert.That(found!.Single()).IsEqualTo(new MediaLookupItem(item.Id, item.PublicId, item.FileName, 64, 32, 1, ""));
+        var single = found!.Single();
+        await Assert.That(single with { RenditionWidths = null }).IsEqualTo(new MediaLookupItem(item.Id, item.PublicId, item.FileName, 64, 32, 1, ""));
+        await Assert.That(single.Renditions).IsEquivalentTo([64]);
     }
 
     /// <summary>An unused item is deleted with all its files.</summary>
@@ -302,7 +308,7 @@ public class AdminMediaApiTests(BlogEngineWebApplicationFactory factory)
         await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
         await Assert.That((edited!.Width, edited.Height, edited.Version)).IsEqualTo((100, 100, 2));
         await Assert.That(edited.EditOperations!.Rotate).IsEqualTo(90);
-        await Assert.That(page).Contains($"src=\"/media/{item.PublicId}/{item.FileName}?v=2\"");
+        await Assert.That(page).Contains($"src=\"/media/{item.PublicId}/{item.FileName}?w=100&amp;v=2\"");
         await Assert.That(page).Contains("width=\"100\" height=\"100\"");
         await Assert.That(Image.Identify(original).Width).IsEqualTo(400);
     }

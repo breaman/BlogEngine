@@ -123,4 +123,26 @@ public class PostHtmlSanitizerTests
         await Assert.That(html).Contains("href=\"https://blog.example/posts/2026/09/22/hello#fn:1\"");
         await Assert.That(html).Contains("src=\"https://blog.example/media/abc/cat.jpg\"");
     }
+
+    /// <summary>Responsive images from the media library keep their picture, WebP source, srcset and sizes (T4.19).</summary>
+    [Test]
+    public async Task Sanitize_KeepsResponsiveImages()
+    {
+        const string picture = """<figure class="media-figure"><picture><source type="image/webp" srcset="/media/abc/cat.jpg?w=320&amp;v=1&amp;f=webp 320w, /media/abc/cat.jpg?w=640&amp;v=1&amp;f=webp 640w" sizes="(min-width: 48rem) 48rem, 100vw"><img src="/media/abc/cat.jpg?w=640&amp;v=1" srcset="/media/abc/cat.jpg?w=320&amp;v=1 320w" sizes="100vw" alt="Cat" width="800" height="600" loading="lazy" decoding="async"></picture></figure>""";
+
+        var html = Sanitizer.Sanitize(picture);
+
+        await Assert.That(html).IsEqualTo(picture);
+    }
+
+    /// <summary>In feeds, the rendition URLs in srcset become absolute like src does, so feed readers can load them.</summary>
+    [Test]
+    public async Task Sanitize_WithBaseUrl_MakesSrcSetAbsolute()
+    {
+        var html = Sanitizer.Sanitize("""<picture><source type="image/webp" srcset="/media/abc/cat.jpg?w=320&amp;f=webp 320w, /media/abc/cat.jpg?w=640&amp;f=webp 640w"><img src="/media/abc/cat.jpg?w=640" alt=""></picture>""",
+            new Uri("https://blog.example/posts/2026/09/23/cats"));
+
+        await Assert.That(html).Contains("srcset=\"https://blog.example/media/abc/cat.jpg?w=320&amp;f=webp 320w, https://blog.example/media/abc/cat.jpg?w=640&amp;f=webp 640w\"");
+        await Assert.That(html).Contains("src=\"https://blog.example/media/abc/cat.jpg?w=640\"");
+    }
 }

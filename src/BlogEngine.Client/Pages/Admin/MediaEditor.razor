@@ -68,8 +68,19 @@ else
                 </div>
                 <div class="card-footer d-flex flex-wrap gap-2 align-items-center">
                     <span class="small text-body-secondary">Result: <strong>@_resize.Width × @_resize.Height</strong> px</span>
-                    <div class="ms-auto d-flex gap-2">
+                    <div class="ms-auto d-flex flex-wrap gap-2">
+                        @if (Item.EditOperations is not null)
+                        {
+                            <button type="button" class="btn btn-outline-danger" disabled="@(!_interactive || _saving)" @onclick="RevertAsync"
+                                    title="Undo every edit and use the image as it was uploaded">
+                                <span class="bi bi-arrow-counterclockwise me-1" aria-hidden="true"></span> Revert to original
+                            </button>
+                        }
                         <button type="button" class="btn btn-outline-secondary" disabled="@_saving" @onclick="Cancel">Cancel</button>
+                        <button type="button" class="btn btn-outline-primary" disabled="@(!CanSaveCopy)" @onclick="SaveAsCopyAsync"
+                                title="Save the result as a new image; posts using this one keep it unchanged">
+                            <span class="bi bi-copy me-1" aria-hidden="true"></span> Save as copy
+                        </button>
                         <button type="button" class="btn btn-primary" disabled="@(!CanSave)" @onclick="SaveEditsAsync">
                             @if (_saving)
                             {
@@ -121,7 +132,9 @@ else
                         <dt class="col-5 fw-normal text-body-secondary">Type</dt>
                         <dd class="col-7 mb-1">@Item.ContentType</dd>
                         <dt class="col-5 fw-normal text-body-secondary">Version</dt>
-                        <dd class="col-7 mb-0">@Item.Version@(Item.EditOperations is not null ? " (edited)" : null)</dd>
+                        <dd class="col-7 mb-1">@Item.Version@(Item.EditOperations is not null ? " (edited)" : null)</dd>
+                        <dt class="col-5 fw-normal text-body-secondary">Sizes</dt>
+                        <dd class="col-7 mb-0">@(Item.RenditionWidths.Count > 0 ? string.Join(", ", Item.RenditionWidths) + " px" : "Full size only")</dd>
                     </dl>
                     <label for="media-url" class="form-label mb-1 text-body-secondary">Markdown path</label>
                     <input id="media-url" class="form-control form-control-sm font-monospace" readonly value="@Item.Path" />

@@ -24,6 +24,10 @@ namespace BlogEngine.Client.Pages.Admin;
 /// the Spam tab can purge old spam. Destructive actions (delete, block, empty spam) ask for confirmation first.
 /// </para>
 /// <para>
+/// <b>Reply</b> (design 8.4, C5, T4.15) opens a box under the comment; the reply is published at once with an "Author"
+/// badge and approves the comment it answers.
+/// </para>
+/// <para>
 /// The page and the tab counts loaded while prerendering are carried into WebAssembly with
 /// <see cref="PersistentStateAttribute"/>. After every action the page and counts are reloaded and the pending count is
 /// reported to <see cref="CommentCountNotifier"/>, which keeps the nav badge current.
@@ -81,6 +85,8 @@ public partial class Comments : ComponentBase
     private ConfirmDialog _confirm = default!;
     private bool _busy;
     private string? _loadError;
+    private int? _replyingTo;
+    private CommentReplyRequest _reply = new();
 
     private CommentsTab Tab => Enum.TryParse<CommentsTab>(TabParameter, ignoreCase: true, out var tab) && Enum.IsDefined(tab)
         ? tab
@@ -248,6 +254,46 @@ public partial class Comments : ComponentBase
             else
             {
                 Toasts.ShowWarning("That comment no longer exists.");
+            }
+        });
+    }
+
+    /// <summary>Opens the reply box under a comment (closing any other), keeping text typed for the same comment.</summary>
+    private void StartReply(CommentDto comment)
+    {
+        if (_replyingTo != comment.Id)
+        {
+            _replyingTo = comment.Id;
+            _reply = new CommentReplyRequest();
+        }
+    }
+
+    private void CancelReply()
+    {
+        _replyingTo = null;
+        _reply = new CommentReplyRequest();
+    }
+
+    /// <summary>Publishes the author's reply; the comment it answers is approved with it (design 8.4).</summary>
+    private async Task ReplyAsync(CommentDto comment)
+    {
+        await RunAsync(async () =>
+        {
+            switch (await CommentService.ReplyAsync(comment.Id, _reply))
+            {
+                case CommentReplied replied:
+                    CancelReply();
+                    Toasts.ShowSuccess(replied.ApprovedCommentIds.Count > 0
+                        ? $"Your reply is on the site, and the comment by {comment.AuthorName} was approved."
+                        : "Your reply is on the site.");
+                    break;
+                case CommentReplyInvalid invalid:
+                    Toasts.ShowWarning(string.Join(" ", invalid.Errors.SelectMany(e => e.Value)));
+                    break;
+                default:
+                    CancelReply();
+                    Toasts.ShowWarning("That comment no longer exists.");
+                    break;
             }
         });
     }

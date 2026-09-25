@@ -27,4 +27,10 @@ internal static partial class MediaLog
     [LoggerMessage(EventId = 2004, EventName = "MediaUploadRejected", Level = LogLevel.Warning,
         Message = "Upload of {FileName} ({SizeBytes} bytes) was rejected: {Reason}")]
     public static partial void MediaUploadRejected(ILogger logger, string fileName, long sizeBytes, string reason);
+
+    /// <summary>"Save as copy" made a new library item from an edited original.</summary>
+    [LoggerMessage(EventId = 2005, EventName = "MediaCopied", Level = LogLevel.Information,
+        Message = "Media {MediaId} ({PublicId}) saved as an edited copy of media {SourceMediaId}: {Width}x{Height}, {SizeBytes} bytes")]
+    public static partial void MediaCopied(ILogger logger, int mediaId, string publicId, int sourceMediaId, int width, int height,
+        long sizeBytes);
 }

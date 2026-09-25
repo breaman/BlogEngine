@@ -44,6 +44,12 @@ public sealed class MediaProcessor
     private static readonly IReadOnlyList<IImageFormat> AllowedFormats =
         [JpegFormat.Instance, PngFormat.Instance, GifFormat.Instance, WebpFormat.Instance];
 
+    /// <summary>WebP settings for renditions: lossy at a quality that is hard to tell from the source at web sizes.</summary>
+    private static readonly WebpEncoder RenditionWebpEncoder = new() { FileFormat = WebpFileFormatType.Lossy, Quality = 80 };
+
+    /// <summary>JPEG settings for renditions; a little above ImageSharp's default of 75, since photos are the point of a blog's images.</summary>
+    private static readonly JpegEncoder RenditionJpegEncoder = new() { Quality = 82 };
+
     /// <summary>Message for anything that isn't one of the accepted formats.</summary>
     public const string UnsupportedFormatMessage = "Only JPEG, PNG, GIF and WebP images can be uploaded.";
 
@@ -136,6 +142,54 @@ public sealed class MediaProcessor
         });
 
         return await EncodeAsync(image, format, cancellationToken);
+    }
+
+    /// <summary>
+    /// Makes the responsive renditions of an image (design 9.4, M6): at each of <paramref name="widths"/>, a WebP copy and,
+    /// unless the image is WebP already, a copy in its own format for browsers without WebP. GIFs get none, because
+    /// resizing would throw away their animation; they are always served as uploaded.
+    /// </summary>
+    /// <param name="source">The current version, as stored.</param>
+    /// <param name="widths">The widths to make, none of them wider than the image (see <see cref="MediaRenditionWriter.PlanWidths"/>).</param>
+    /// <param name="cancellationToken">Cancels the work.</param>
+    /// <exception cref="MediaProcessingException">The source can't be decoded.</exception>
+    public async Task<IReadOnlyList<ProcessedRendition>> CreateRenditionsAsync(byte[] source, IReadOnlyList<int> widths,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(widths);
+
+        await using var buffer = await BufferAsync(new MemoryStream(source, writable: false), cancellationToken);
+        var format = await DetectAllowedFormatAsync(buffer, cancellationToken);
+        if (format == GifFormat.Instance || widths.Count == 0)
+        {
+            return [];
+        }
+
+        using var image = await LoadAsync(buffer, cancellationToken);
+        var renditions = new List<ProcessedRendition>(widths.Count * 2);
+        foreach (var width in widths.Where(w => w > 0 && w <= image.Width).Distinct().Order())
+        {
+            using var resized = width == image.Width ? image.Clone(_ => { }) : image.Clone(x => x.Resize(width, 0));
+
+            renditions.Add(await EncodeRenditionAsync(resized, WebpFormat.Instance, RenditionWebpEncoder, cancellationToken));
+            if (format != WebpFormat.Instance)
+            {
+                var encoder = format == JpegFormat.Instance ? RenditionJpegEncoder : resized.Configuration.ImageFormatsManager.GetEncoder(format);
+                renditions.Add(await EncodeRenditionAsync(resized, format, encoder, cancellationToken));
+            }
+        }
+
+        return renditions;
+    }
+
+    private static async Task<ProcessedRendition> EncodeRenditionAsync(Image image, IImageFormat format, IImageEncoder encoder,
+        CancellationToken cancellationToken)
+    {
+        using var output = new MemoryStream();
+        await image.SaveAsync(output, encoder, cancellationToken);
+
+        return new ProcessedRendition(image.Width, image.Height, format.FileExtensions.First(), format.DefaultMimeType, output.ToArray());
     }
 
     /// <summary>Copies the input into memory so it can be read more than once (identify, then decode).</summary>

@@ -40,6 +40,12 @@ public sealed class PostEditDto
     /// <summary>Whether readers may comment.</summary>
     public bool AllowComments { get; set; } = true;
 
+    /// <summary>
+    /// When comments close, set from the "close after N days" setting at publish time (design 8.5); read-only, ignored
+    /// on save. <see langword="null"/> when they never close.
+    /// </summary>
+    public DateTimeOffset? CommentsCloseOn { get; set; }
+
     /// <summary>Pins the post to the top of the home page.</summary>
     public bool IsFeatured { get; set; }
 

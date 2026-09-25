@@ -29,6 +29,9 @@ public sealed class CommentSubmissionService(
     CommentRenderer renderer,
     CommentFormTimestamp formTimestamp,
     CacheInvalidator cacheInvalidator,
+    AuthorCommentWriter authorComments,
+    CommentNotificationQueue notifications,
+    IValidator<CommentReplyRequest> authorValidator,
     TimeProvider timeProvider,
     ILogger<CommentSubmissionService> logger)
 {
@@ -50,22 +53,12 @@ public sealed class CommentSubmissionService(
         }
 
         var now = timeProvider.GetUtcNow();
-        var post = await dbContext.Posts
-            .AsNoTracking()
-            .VisibleToPublic(timeProvider)
-            .Where(p => p.Id == postId)
-            .Select(p => new { p.AllowComments, p.CommentsCloseOn })
-            .SingleOrDefaultAsync(cancellationToken);
-        if (post is null)
+        if (await CheckOpenAsync(postId, now, cancellationToken) is { } notOpen)
         {
-            return CommentSubmitResult.NotFound;
+            return notOpen;
         }
 
         var settings = await settingsService.GetAsync(cancellationToken);
-        if (!settings.CommentsEnabled || !post.AllowComments || post.CommentsCloseOn <= now)
-        {
-            return CommentSubmitResult.Closed;
-        }
 
         var email = submission.AuthorEmail.Trim().ToLowerInvariant();
         var blocks = await dbContext.CommentBlocks
@@ -97,6 +90,7 @@ public sealed class CommentSubmissionService(
         var comment = new Comment
         {
             PostId = postId,
+            ParentCommentId = await ResolveParentAsync(postId, submission.ParentCommentId, cancellationToken),
             AuthorName = submission.AuthorName.Trim(),
             AuthorEmail = email,
             AuthorUrl = string.IsNullOrWhiteSpace(submission.AuthorUrl) ? null : submission.AuthorUrl.Trim(),
@@ -120,7 +114,89 @@ public sealed class CommentSubmissionService(
             return CommentSubmitResult.Published;
         }
 
+        // The author hears about comments waiting for them (C9), but not about spam, which only waits to be emptied.
+        if (comment.Status == CommentStatus.Pending && settings.NotifyOnPendingComment
+            && !notifications.TryEnqueue(new CommentNotification(comment.Id, context.SiteRoot)))
+        {
+            logger.LogWarning("The notification queue is full; no email for comment {CommentId}.", comment.Id);
+        }
+
         return CommentSubmitResult.AwaitingModeration;
+    }
+
+    /// <summary>
+    /// Publishes a comment by the signed-in blog author from the post page (design 8.4, C5): no spam guard or moderation,
+    /// an "Author" badge, and the same one-level threading as readers' replies.
+    /// </summary>
+    /// <param name="postId">The post commented on.</param>
+    /// <param name="parentCommentId">The approved comment replied to, or <see langword="null"/> for a new thread.</param>
+    /// <param name="body">The comment.</param>
+    /// <param name="cancellationToken">Cancels the database work.</param>
+    public async Task<CommentSubmitResult> SubmitAsAuthorAsync(int postId, int? parentCommentId, string body,
+        CancellationToken cancellationToken = default)
+    {
+        var validation = await authorValidator.ValidateAsync(new CommentReplyRequest { Body = body ?? string.Empty }, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return CommentSubmitResult.Invalid(validation.ToDictionary());
+        }
+
+        if (await CheckOpenAsync(postId, timeProvider.GetUtcNow(), cancellationToken) is { } notOpen)
+        {
+            return notOpen;
+        }
+
+        var parentId = await ResolveParentAsync(postId, parentCommentId, cancellationToken);
+        var comment = await authorComments.AddAsync(postId, parentId, body!, cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await cacheInvalidator.CommentsChangedAsync([postId]);
+
+        CommentLog.AuthorCommentPosted(logger, comment.Id, postId, comment.ModeratedBy ?? 0, parentId);
+        return CommentSubmitResult.Published;
+    }
+
+    /// <summary>
+    /// <see langword="null"/> when the post is visible and takes comments; otherwise <see cref="CommentSubmitResult.NotFound"/>
+    /// or <see cref="CommentSubmitResult.Closed"/> (design 8.5: the site-wide switch, the post's toggle, or its closing date).
+    /// </summary>
+    private async Task<CommentSubmitResult?> CheckOpenAsync(int postId, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var post = await dbContext.Posts
+            .AsNoTracking()
+            .VisibleToPublic(timeProvider)
+            .Where(p => p.Id == postId)
+            .Select(p => new { p.AllowComments, p.CommentsCloseOn })
+            .SingleOrDefaultAsync(cancellationToken);
+        if (post is null)
+        {
+            return CommentSubmitResult.NotFound;
+        }
+
+        var settings = await settingsService.GetAsync(cancellationToken);
+        return !settings.CommentsEnabled || !post.AllowComments || post.CommentsCloseOn <= now
+            ? CommentSubmitResult.Closed
+            : null;
+    }
+
+    /// <summary>
+    /// The top-level comment a reply belongs under (C6): the requested parent when it is an approved comment on the same
+    /// post, or that comment's own parent when it is a reply itself, so threads never nest deeper than one level. A
+    /// parent readers can't see (unknown, another post's, not approved) starts a new thread instead.
+    /// </summary>
+    private async Task<int?> ResolveParentAsync(int postId, int? requestedParentId, CancellationToken cancellationToken)
+    {
+        if (requestedParentId is not { } id)
+        {
+            return null;
+        }
+
+        var parent = await dbContext.Comments
+            .AsNoTracking()
+            .Where(c => c.Id == id && c.PostId == postId && c.Status == CommentStatus.Approved)
+            .Select(c => new { c.Id, c.ParentCommentId })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        return parent is null ? null : parent.ParentCommentId ?? parent.Id;
     }
 
     private static string Truncate(string value, int maxLength)
@@ -134,7 +210,8 @@ public sealed class CommentSubmissionService(
 /// <param name="UserAgent">The browser's user agent, kept as moderation context.</param>
 /// <param name="Honeypot">The hidden honeypot field; people leave it empty.</param>
 /// <param name="FormToken">The signed render timestamp (<see cref="CommentFormTimestamp"/>).</param>
-public sealed record CommentSubmissionContext(string IpHash, string? UserAgent, string? Honeypot, string? FormToken);
+/// <param name="SiteRoot">The site's absolute root URL, for the links in the author's notification email.</param>
+public sealed record CommentSubmissionContext(string IpHash, string? UserAgent, string? Honeypot, string? FormToken, Uri? SiteRoot = null);
 
 /// <summary>What the commenter is told.</summary>
 public enum CommentSubmitOutcome

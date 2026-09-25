@@ -107,4 +107,30 @@ public class CommentComponentsTests
         await Assert.That(CommentAvatar.ColorClass(Hash)).StartsWith("text-bg-");
         await Assert.That(CommentAvatar.ColorClass(null)).StartsWith("text-bg-");
     }
+
+    /// <summary>
+    /// While comments are open every comment, replies included, gets a "Reply" link to <c>?replyTo=</c> and the form
+    /// (T4.16); without a reply path there are none.
+    /// </summary>
+    [Test]
+    public async Task List_ReplyLinks_OnlyWhileOpen()
+    {
+        await using var context = new BunitContext();
+        IReadOnlyList<PublicComment> comments = [Comment(1), Comment(2, parent: 1)];
+
+        var open = context.Render<CommentList>(p => p
+            .Add(x => x.Comments, comments)
+            .Add(x => x.Now, Now)
+            .Add(x => x.ReplyPath, "/posts/2026/09/23/hello"));
+        var closed = context.Render<CommentList>(p => p
+            .Add(x => x.Comments, comments)
+            .Add(x => x.Now, Now));
+
+        var links = open.FindAll("a.comment-reply-link");
+        await Assert.That(links.Select(l => l.GetAttribute("href") ?? string.Empty))
+            .IsEquivalentTo(["/posts/2026/09/23/hello?replyTo=1#comment-form", "/posts/2026/09/23/hello?replyTo=2#comment-form"]);
+        await Assert.That(links[0].GetAttribute("rel")).IsEqualTo("nofollow");
+        await Assert.That(links[0].GetAttribute("aria-label")).IsEqualTo("Reply to Ada");
+        await Assert.That(closed.FindAll("a.comment-reply-link")).IsEmpty();
+    }
 }

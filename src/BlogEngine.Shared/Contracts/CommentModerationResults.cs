@@ -28,3 +28,28 @@ public sealed record BulkModerationResponse(int Changed);
 /// <summary>Response of <c>POST /api/admin/comments/empty-spam</c>.</summary>
 /// <param name="Deleted">How many comments were deleted.</param>
 public sealed record EmptySpamResponse(int Deleted);
+
+/// <summary>
+/// Outcome of the author replying to a comment: exactly one of <see cref="CommentReplied"/>,
+/// <see cref="CommentReplyInvalid"/> or <see cref="CommentReplyNotFound"/>.
+/// </summary>
+public abstract record CommentReplyResult
+{
+    /// <summary>The comment replied to doesn't exist.</summary>
+    public static CommentReplyResult NotFound { get; } = new CommentReplyNotFound();
+}
+
+/// <summary>The reply is published (also the response of <c>POST /api/admin/comments/{id}/reply</c>).</summary>
+/// <param name="Reply">The new reply.</param>
+/// <param name="ApprovedCommentIds">
+/// Comments the reply approved: the one replied to, and its top-level comment when that was a reply too. Empty when
+/// they were approved already.
+/// </param>
+public sealed record CommentReplied(CommentDto Reply, IReadOnlyList<int> ApprovedCommentIds) : CommentReplyResult;
+
+/// <summary>The reply failed validation and nothing was saved.</summary>
+/// <param name="Errors">Messages keyed by property name.</param>
+public sealed record CommentReplyInvalid(IReadOnlyDictionary<string, string[]> Errors) : CommentReplyResult;
+
+/// <summary>There is no comment with that id.</summary>
+public sealed record CommentReplyNotFound : CommentReplyResult;

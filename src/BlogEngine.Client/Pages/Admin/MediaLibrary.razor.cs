@@ -21,6 +21,9 @@ namespace BlogEngine.Client.Pages.Admin;
 /// </remarks>
 public partial class MediaLibrary : ComponentBase
 {
+    /// <summary>Images per rendition request: a handful, so progress shows and no request runs long.</summary>
+    private const int MaxRenditionBatch = 5;
+
     [Inject] private IMediaService MediaService { get; set; } = default!;
     [Inject] private IToastService Toasts { get; set; } = default!;
     [Inject] private NavigationManager Navigation { get; set; } = default!;
@@ -52,6 +55,12 @@ public partial class MediaLibrary : ComponentBase
     private string? _loadError;
     private int? _busyItemId;
 
+    /// <summary>How many images still need responsive renditions (T4.19).</summary>
+    [PersistentState]
+    public MediaRenditionProgress? Renditions { get; set; }
+
+    private int? _renditionsDone;
+
     private bool Unused => UnusedParameter == true;
 
     private bool HasFilters => Unused || !string.IsNullOrWhiteSpace(SearchParameter);
@@ -60,6 +69,11 @@ public partial class MediaLibrary : ComponentBase
     protected override async Task OnParametersSetAsync()
     {
         _searchFilter = SearchParameter;
+
+        if (Renditions is null)
+        {
+            await LoadRenditionProgressAsync();
+        }
 
         var query = CreateQuery();
         if (Result is null || LoadedQuery != QueryKey(query))
@@ -100,6 +114,68 @@ public partial class MediaLibrary : ComponentBase
     private Task ReloadAsync()
     {
         return LoadAsync(CreateQuery());
+    }
+
+    private async Task LoadRenditionProgressAsync()
+    {
+        try
+        {
+            Renditions = await MediaService.GetRenditionProgressAsync();
+        }
+        catch (HttpRequestException)
+        {
+            // Only the backfill prompt depends on it.
+        }
+    }
+
+    /// <summary>
+    /// Makes responsive renditions for every image that needs them (T4.19), a batch per request so each stays short,
+    /// showing progress as it goes. The posts using those images are re-rendered by the server.
+    /// </summary>
+    private async Task GenerateRenditionsAsync()
+    {
+        if (Renditions is not { Remaining: > 0 } progress)
+        {
+            return;
+        }
+
+        var total = progress.Remaining;
+        _renditionsDone = 0;
+        try
+        {
+            while (Renditions.Remaining > 0)
+            {
+                var before = Renditions.Remaining;
+                Renditions = await MediaService.GenerateRenditionsAsync(MaxRenditionBatch);
+                _renditionsDone = total - Renditions.Remaining;
+                StateHasChanged();
+
+                // Images that can't be processed (a missing or damaged file) stay outdated; stop instead of retrying them.
+                if (Renditions.Processed == 0 || Renditions.Remaining >= before)
+                {
+                    break;
+                }
+            }
+
+            if (Renditions.Remaining == 0)
+            {
+                Toasts.ShowSuccess($"Responsive sizes are ready for {total} {(total == 1 ? "image" : "images")}.");
+            }
+            else
+            {
+                Toasts.ShowWarning($"{Renditions.Remaining} {(Renditions.Remaining == 1 ? "image" : "images")} couldn't be processed; the server log says why.");
+            }
+        }
+        catch (HttpRequestException)
+        {
+            Toasts.ShowError("The server couldn't be reached. Check your connection and try again.");
+        }
+        finally
+        {
+            _renditionsDone = null;
+        }
+
+        await ReloadAsync();
     }
 
     /// <summary>New uploads appear at the top of the first page, so show that page once a batch is done.</summary>

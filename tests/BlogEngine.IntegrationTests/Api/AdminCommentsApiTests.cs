@@ -9,8 +9,8 @@ using BlogEngine.Shared.Security;
 namespace BlogEngine.IntegrationTests.Api;
 
 /// <summary>
-/// Tests the moderation API over HTTP (design 7.4, 8.4, T3.7, T3.9, T3.10): authorization, each action, bulk actions,
-/// blocking a commenter, emptying spam, the blocklist and the dashboard counts.
+/// Tests the moderation API over HTTP (design 7.4, 8.4, T3.7, T3.9, T3.10, T4.15): authorization, each action, bulk
+/// actions, blocking a commenter, emptying spam, the blocklist, the dashboard counts and author replies.
 /// </summary>
 [ClassDataSource<BlogEngineWebApplicationFactory>(Shared = SharedType.PerTestSession)]
 [NotInParallel([TestConstraints.Users, TestConstraints.Comments])]
@@ -28,6 +28,7 @@ public class AdminCommentsApiTests(BlogEngineWebApplicationFactory factory)
         yield return ("POST", $"{CommentsApi}/1/reject");
         yield return ("POST", $"{CommentsApi}/1/spam");
         yield return ("DELETE", $"{CommentsApi}/1");
+        yield return ("POST", $"{CommentsApi}/1/reply");
         yield return ("POST", $"{CommentsApi}/bulk");
         yield return ("POST", $"{CommentsApi}/1/block");
         yield return ("POST", $"{CommentsApi}/empty-spam");
@@ -292,6 +293,81 @@ public class AdminCommentsApiTests(BlogEngineWebApplicationFactory factory)
         await Assert.That(dashboardAfter.PublishedCount).IsGreaterThanOrEqualTo(1);
         await Assert.That(dashboardAfter.RecentComments.Select(c => c.BodyHtml)).Contains("<p>Count me too</p>");
         await Assert.That(dashboardAfter.RecentPosts).IsNotEmpty();
+    }
+
+    /// <summary>
+    /// Replying from the queue publishes an author reply under the comment, approves the pending comment, and both show on
+    /// the post page with the reply's "Author" badge (T4.15's done-when).
+    /// </summary>
+    [Test]
+    public async Task Reply_PublishesAuthorReply_AndApprovesParent()
+    {
+        var marker = PublicTestPosts.Token();
+        var post = await CommentTestData.PublishPostAsync(factory, $"Replied {marker}");
+        var comment = await CommentTestData.AddAsync(factory, post.Id, CommentStatus.Pending, $"Question {marker}", name: "Curious Reader");
+        var (client, token) = await LoginAdminAsync();
+        using var _ = client;
+
+        using var response = await SendAsync(client, token, HttpMethod.Post, $"{CommentsApi}/{comment.Id}/reply",
+            new CommentReplyRequest { Body = $"**Answer** {marker}" });
+        var replied = await response.Content.ReadFromJsonAsync<CommentReplied>();
+        var stored = await CommentTestData.ForPostAsync(factory, post.Id);
+        using var reader = CommentTestData.CreateClient(factory);
+        var page = await PublicTestPosts.GetOkAsync(reader, post.PublicPath!);
+
+        await Assert.That(response.StatusCode).IsEqualTo(HttpStatusCode.OK);
+        await Assert.That(replied!.ApprovedCommentIds).IsEquivalentTo([comment.Id]);
+        await Assert.That(replied.Reply.IsAuthorReply).IsTrue();
+        await Assert.That(replied.Reply.ParentCommentId).IsEqualTo(comment.Id);
+        await Assert.That(replied.Reply.Status).IsEqualTo(CommentStatus.Approved);
+        await Assert.That(replied.Reply.BodyHtml).Contains($"<strong>Answer</strong> {marker}");
+        await Assert.That(stored.Single(c => c.Id == comment.Id).Status).IsEqualTo(CommentStatus.Approved);
+        await Assert.That(stored.Single(c => c.IsAuthorReply).AuthorEmail).IsEqualTo(IdentityTestHelper.AdminEmail.ToLowerInvariant());
+
+        // The reply sits in the parent's thread, with the badge.
+        var thread = page[page.IndexOf($"id=\"comment-{comment.Id}\"", StringComparison.Ordinal)..];
+        await Assert.That(page).Contains($"Question {marker}");
+        await Assert.That(thread).Contains("comment-replies");
+        await Assert.That(thread).Contains($"id=\"comment-{replied.Reply.Id}\"");
+        await Assert.That(thread[thread.IndexOf($"id=\"comment-{replied.Reply.Id}\"", StringComparison.Ordinal)..]).Contains(">Author</span>");
+    }
+
+    /// <summary>Answering a reply files the answer under the top-level comment, so threads stay one level deep (T4.16).</summary>
+    [Test]
+    public async Task Reply_ToReply_AttachesToTopLevelComment()
+    {
+        var post = await CommentTestData.PublishPostAsync(factory, $"Deep thread {PublicTestPosts.Token()}");
+        var top = await CommentTestData.AddAsync(factory, post.Id, CommentStatus.Approved, "Top");
+        var reply = await CommentTestData.AddAsync(factory, post.Id, CommentStatus.Pending, "Reply", parentId: top.Id);
+        var (client, token) = await LoginAdminAsync();
+        using var _ = client;
+
+        using var response = await SendAsync(client, token, HttpMethod.Post, $"{CommentsApi}/{reply.Id}/reply", new CommentReplyRequest { Body = "Answer" });
+        var replied = await response.Content.ReadFromJsonAsync<CommentReplied>();
+
+        await Assert.That(replied!.Reply.ParentCommentId).IsEqualTo(top.Id);
+        await Assert.That(replied.ApprovedCommentIds).IsEquivalentTo([reply.Id]);
+        await Assert.That((await CommentTestData.FindAsync(factory, reply.Id))!.Status).IsEqualTo(CommentStatus.Approved);
+    }
+
+    /// <summary>An empty reply is a validation problem, an unknown comment a 404, and a reply needs the antiforgery token.</summary>
+    [Test]
+    public async Task Reply_InvalidRequests()
+    {
+        var post = await CommentTestData.PublishPostAsync(factory, $"Bad reply {PublicTestPosts.Token()}");
+        var comment = await CommentTestData.AddAsync(factory, post.Id, CommentStatus.Pending, "Hello");
+        var (client, token) = await LoginAdminAsync();
+        using var _ = client;
+
+        using var empty = await SendAsync(client, token, HttpMethod.Post, $"{CommentsApi}/{comment.Id}/reply", new CommentReplyRequest { Body = " " });
+        using var missing = await SendAsync(client, token, HttpMethod.Post, $"{CommentsApi}/999999999/reply", new CommentReplyRequest { Body = "Hi" });
+        using var noToken = await client.PostAsJsonAsync($"{CommentsApi}/{comment.Id}/reply", new CommentReplyRequest { Body = "Hi" });
+
+        await Assert.That(empty.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+        await Assert.That(missing.StatusCode).IsEqualTo(HttpStatusCode.NotFound);
+        await Assert.That(noToken.StatusCode).IsEqualTo(HttpStatusCode.BadRequest);
+        await Assert.That(await CommentTestData.ForPostAsync(factory, post.Id)).HasSingleItem();
+        await Assert.That((await CommentTestData.FindAsync(factory, comment.Id))!.Status).IsEqualTo(CommentStatus.Pending);
     }
 
     private async Task<(HttpClient Client, string Token)> LoginAdminAsync()

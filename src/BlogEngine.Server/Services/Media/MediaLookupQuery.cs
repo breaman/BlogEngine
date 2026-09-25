@@ -27,7 +27,8 @@ public static class MediaLookupQuery
         var items = await dbContext.MediaItems
             .AsNoTracking()
             .Where(m => ids.Contains(m.PublicId))
-            .Select(m => new MediaLookupItem(m.Id, m.PublicId, m.FileName, m.Width, m.Height, m.Version, m.AltText))
+            .Select(m => new MediaLookupItem(m.Id, m.PublicId, m.FileName, m.Width, m.Height, m.Version, m.AltText,
+                m.Renditions.Where(r => r.Format == MediaRenditionWriter.WebpFormat).OrderBy(r => r.Width).Select(r => r.Width).ToList()))
             .ToListAsync(cancellationToken);
 
         return new MediaLookup(items);

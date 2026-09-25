@@ -8,8 +8,9 @@ using Microsoft.AspNetCore.Http.HttpResults;
 namespace BlogEngine.Server.Endpoints;
 
 /// <summary>
-/// Admin API for the media library (design 7.4, 9): upload, list, look up, metadata, edit, delete, and the
-/// original file for the image editor. Handlers delegate to <see cref="ServerMediaService"/>.
+/// Admin API for the media library (design 7.4, 9): upload, list, look up, metadata, edit, revert, save as copy,
+/// delete, the original file for the image editor, and the rendition backfill. Handlers delegate to
+/// <see cref="ServerMediaService"/>.
 /// </summary>
 public static class AdminMediaEndpoints
 {
@@ -30,7 +31,18 @@ public static class AdminMediaEndpoints
             ToHttpResultAsync(service.UpdateAsync(id, request, ct)));
         media.MapPost("/{id:int}/edit", (int id, MediaEditOperations operations, IMediaService service, CancellationToken ct) =>
             ToHttpResultAsync(service.EditAsync(id, operations, ct)));
+        media.MapPost("/{id:int}/revert", (int id, IMediaService service, CancellationToken ct) =>
+            ToHttpResultAsync(service.RevertAsync(id, ct)));
+        media.MapPost("/{id:int}/copy", (int id, MediaEditOperations operations, IMediaService service, CancellationToken ct) =>
+            ToHttpResultAsync(service.SaveAsCopyAsync(id, operations, ct)));
         media.MapDelete("/{id:int}", DeleteAsync);
+
+        // Responsive renditions for images stored before they existed or before the widths setting changed (T4.19):
+        // how many are left, and a batch at a time so each request stays short.
+        media.MapGet("/renditions", async (IMediaService service, CancellationToken ct) =>
+            TypedResults.Ok(await service.GetRenditionProgressAsync(ct)));
+        media.MapPost("/renditions", async (int? max, IMediaService service, CancellationToken ct) =>
+            TypedResults.Ok(await service.GenerateRenditionsAsync(max ?? ServerMediaService.MaxRenditionBatch, ct)));
 
         return group;
     }

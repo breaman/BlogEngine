@@ -84,6 +84,53 @@ public class ClientMediaServiceTests
             .IsEqualTo("/api/admin/media/lookup?ids=aaaaaaaaaaaa&ids=bbbbbbbbbbbb");
     }
 
+    /// <summary>Revert and Save as copy go to their routes and return the item like an edit (T4.18).</summary>
+    [Test]
+    public async Task RevertAndCopy_UseTheirRoutes()
+    {
+        var bodies = new List<string?>();
+        var handler = new StubHttpHandler(request =>
+        {
+            bodies.Add(request.Content?.ReadAsStringAsync().GetAwaiter().GetResult());
+            return JsonResponse(HttpStatusCode.OK, new MediaItemDto { Id = 8, Version = 3 });
+        });
+        var service = CreateService(handler);
+
+        var reverted = await service.RevertAsync(5);
+        var copied = await service.SaveAsCopyAsync(5, new MediaEditOperations { Rotate = 90 });
+
+        await Assert.That(handler.Requests.Select(r => (r.Method.Method, r.RequestUri!.AbsolutePath)))
+            .IsEquivalentTo([("POST", "/api/admin/media/5/revert"), ("POST", "/api/admin/media/5/copy")]);
+        await Assert.That(((MediaSaved)reverted).Item.Version).IsEqualTo(3);
+        await Assert.That(((MediaSaved)copied).Item.Id).IsEqualTo(8);
+        await Assert.That(bodies[1]).Contains("\"rotate\":90");
+    }
+
+    /// <summary>A missing item is reported as not found.</summary>
+    [Test]
+    public async Task RevertAsync_NotFound()
+    {
+        var handler = new StubHttpHandler(_ => new HttpResponseMessage(HttpStatusCode.NotFound));
+
+        await Assert.That(await CreateService(handler).RevertAsync(5)).IsTypeOf<MediaNotFound>();
+    }
+
+    /// <summary>The rendition backfill reads its progress and runs a batch of the requested size (T4.19).</summary>
+    [Test]
+    public async Task Renditions_ReadAndGenerate()
+    {
+        var handler = new StubHttpHandler(request => JsonResponse(HttpStatusCode.OK,
+            request.Method == HttpMethod.Get ? new MediaRenditionProgress(0, 7) : new MediaRenditionProgress(5, 2)));
+        var service = CreateService(handler);
+
+        var progress = await service.GetRenditionProgressAsync();
+        var batch = await service.GenerateRenditionsAsync(5);
+
+        await Assert.That(progress).IsEqualTo(new MediaRenditionProgress(0, 7));
+        await Assert.That(batch).IsEqualTo(new MediaRenditionProgress(5, 2));
+        await Assert.That(handler.Requests[1].RequestUri!.PathAndQuery).IsEqualTo("/api/admin/media/renditions?max=5");
+    }
+
     private static ClientMediaService CreateService(StubHttpHandler handler)
     {
         return new ClientMediaService(handler.CreateClient());

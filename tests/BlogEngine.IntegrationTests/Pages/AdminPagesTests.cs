@@ -139,7 +139,7 @@ public class AdminPagesTests(BlogEngineWebApplicationFactory factory)
 
         var html = await GetHtmlAsync(client, $"/admin/posts/{post.Id}");
 
-        await Assert.That(html).Contains($"src=\"/media/{item.PublicId}/{item.FileName}?v=1\"");
+        await Assert.That(html).Contains($"{item.Path}?w=64&v=1&f=webp 64w");
         await Assert.That(html).Contains($"<figcaption>Caption {token}</figcaption>");
     }
 

@@ -1,7 +1,7 @@
 @* The public comment form (design 5.1, 8.1, T3.3): a static SSR EditForm posted with an enhanced form post, so it
    works without JavaScript and without WebAssembly. The honeypot and signed timestamp feed the spam guard (8.3). *@
-<section id="comment-form" class="comment-form mt-4" aria-labelledby="comment-form-heading">
-    <h3 id="comment-form-heading" class="h5 mb-3">Leave a comment</h3>
+<section id="@ElementId" class="comment-form mt-4" aria-labelledby="comment-form-heading">
+    <h3 id="comment-form-heading" class="h5 mb-3">@(_replyTarget is { } heading ? $"Reply to {heading.AuthorName}" : "Leave a comment")</h3>
 
     @if (_status is not null)
     {
@@ -9,44 +9,73 @@
     }
 
     <EditForm Model="Input" FormName="@FormName" OnValidSubmit="SubmitAsync" method="post" Enhance
-              action="@($"{PostPath}#comment-form")" data-comment-form>
-        <FluentValidator />
+              action="@($"{PostPath}#{ElementId}")" data-comment-form>
+        @* The author only writes the comment; their name and email come from their account (design 8.4, C5). *@
+        @if (_isAuthor)
+        {
+            <FluentValidator Validator="AuthorValidator" />
+        }
+        else
+        {
+            <FluentValidator />
+        }
         <ValidationSummary class="text-danger" role="alert" />
 
-        <input type="hidden" name="@TimestampField" value="@_renderToken" />
+        @if (_replyTarget is { } target)
+        {
+            @* One level of threading (C6): the server files a reply to a reply under the top-level comment. *@
+            <input type="hidden" name="Input.ParentCommentId" value="@target.Id" />
+            <p class="comment-reply-to small text-body-secondary">
+                <span class="bi bi-reply" aria-hidden="true"></span>
+                Replying to <a href="@($"{PostPath}#comment-{target.Id}")">@target.AuthorName</a>.
+                <a href="@($"{PostPath}#{ElementId}")" class="ms-1">Cancel reply</a>
+            </p>
+        }
 
-        @* Honeypot: hidden from people and screen readers, so only bots fill it in. *@
-        <div class="comment-hp" aria-hidden="true">
-            <div class="form-floating">
-                <input type="text" id="comment-website2" name="@HoneypotField" class="form-control" tabindex="-1" autocomplete="off" placeholder="Leave empty" />
-                <label for="comment-website2">Leave this field empty</label>
-            </div>
-        </div>
+        @if (_isAuthor)
+        {
+            <p class="small text-body-secondary">
+                <span class="badge text-bg-primary me-1">Author</span>
+                You're signed in as the blog's author, so your comment is published straight away.
+            </p>
+        }
+        else
+        {
+            <input type="hidden" name="@TimestampField" value="@_renderToken" />
 
-        <div class="row g-3 mb-3">
-            <div class="col-md-6">
+            @* Honeypot: hidden from people and screen readers, so only bots fill it in. *@
+            <div class="comment-hp" aria-hidden="true">
                 <div class="form-floating">
-                    <InputText @bind-Value="Input.AuthorName" id="comment-name" class="form-control" autocomplete="name" aria-required="true"
-                               placeholder="Your name" maxlength="@FieldLengths.PersonName" data-remember-field="name" />
-                    <label for="comment-name">Name</label>
-                    <ValidationMessage For="() => Input.AuthorName" class="text-danger" />
+                    <input type="text" id="comment-website2" name="@HoneypotField" class="form-control" tabindex="-1" autocomplete="off" placeholder="Leave empty" />
+                    <label for="comment-website2">Leave this field empty</label>
                 </div>
             </div>
-            <div class="col-md-6">
-                <div class="form-floating">
-                    <InputText type="email" @bind-Value="Input.AuthorEmail" id="comment-email" class="form-control" autocomplete="email" aria-required="true"
-                               aria-describedby="comment-email-help" placeholder="name@example.com" maxlength="@FieldLengths.Email" data-remember-field="email" />
-                    <label for="comment-email">Email</label>
-                    <ValidationMessage For="() => Input.AuthorEmail" class="text-danger" />
+
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <div class="form-floating">
+                        <InputText @bind-Value="Input.AuthorName" id="comment-name" class="form-control" autocomplete="name" aria-required="true"
+                                   placeholder="Your name" maxlength="@FieldLengths.PersonName" data-remember-field="name" />
+                        <label for="comment-name">Name</label>
+                        <ValidationMessage For="() => Input.AuthorName" class="text-danger" />
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="form-floating">
+                        <InputText type="email" @bind-Value="Input.AuthorEmail" id="comment-email" class="form-control" autocomplete="email" aria-required="true"
+                                   aria-describedby="comment-email-help" placeholder="name@example.com" maxlength="@FieldLengths.Email" data-remember-field="email" />
+                        <label for="comment-email">Email</label>
+                        <ValidationMessage For="() => Input.AuthorEmail" class="text-danger" />
+                    </div>
                 </div>
             </div>
-        </div>
-        <div class="form-floating mb-3">
-            <InputText type="url" @bind-Value="Input.AuthorUrl" id="comment-website" class="form-control" autocomplete="url"
-                       placeholder="https://example.com" maxlength="@FieldLengths.Url" data-remember-field="website" />
-            <label for="comment-website">Website (optional)</label>
-            <ValidationMessage For="() => Input.AuthorUrl" class="text-danger" />
-        </div>
+            <div class="form-floating mb-3">
+                <InputText type="url" @bind-Value="Input.AuthorUrl" id="comment-website" class="form-control" autocomplete="url"
+                           placeholder="https://example.com" maxlength="@FieldLengths.Url" data-remember-field="website" />
+                <label for="comment-website">Website (optional)</label>
+                <ValidationMessage For="() => Input.AuthorUrl" class="text-danger" />
+            </div>
+        }
         <div class="form-floating mb-2">
             <InputTextArea @bind-Value="Input.Body" id="comment-body" class="form-control comment-body-input" aria-required="true"
                            aria-describedby="comment-body-help" placeholder="Your comment" maxlength="@FieldLengths.CommentBody" rows="5" />
@@ -55,17 +84,23 @@
         </div>
         <p id="comment-body-help" class="form-text mt-0 mb-3">
             Basic Markdown works: *emphasis*, **bold**, `code`, links, lists and quotes.
-            <span id="comment-email-help">Your email is never shown.</span> Comments appear once they're approved.
+            @if (!_isAuthor)
+            {
+                <span id="comment-email-help">Your email is never shown.</span> <span>Comments appear once they're approved.</span>
+            }
         </p>
 
-        @* Filled in and revealed by js/public.js; without JavaScript it stays hidden because it would do nothing. *@
-        <div class="form-check mb-3" data-comment-remember hidden>
-            <input class="form-check-input" type="checkbox" id="comment-remember" />
-            <label class="form-check-label" for="comment-remember">Remember my name, email and website on this device</label>
-        </div>
+        @if (!_isAuthor)
+        {
+            @* Filled in and revealed by js/public.js; without JavaScript it stays hidden because it would do nothing. *@
+            <div class="form-check mb-3" data-comment-remember hidden>
+                <input class="form-check-input" type="checkbox" id="comment-remember" />
+                <label class="form-check-label" for="comment-remember">Remember my name, email and website on this device</label>
+            </div>
+        }
 
         <button type="submit" class="btn btn-primary">
-            <span class="bi bi-send" aria-hidden="true"></span> Post comment
+            <span class="bi bi-send" aria-hidden="true"></span> @(_replyTarget is null ? "Post comment" : "Post reply")
         </button>
     </EditForm>
 </section>

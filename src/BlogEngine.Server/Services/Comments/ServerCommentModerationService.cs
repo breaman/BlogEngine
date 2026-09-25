@@ -37,6 +37,8 @@ public sealed class ServerCommentModerationService(
     IUserService userService,
     IValidator<CommentBlockRequest> blockValidator,
     IValidator<CommentBulkRequest> bulkValidator,
+    IValidator<CommentReplyRequest> replyValidator,
+    AuthorCommentWriter authorComments,
     CacheInvalidator cacheInvalidator,
     TimeProvider timeProvider,
     IServiceScopeFactory scopeFactory,
@@ -90,6 +92,43 @@ public sealed class ServerCommentModerationService(
     public async Task<bool> ModerateAsync(int id, CommentModerationAction action, CancellationToken cancellationToken = default)
     {
         return await ApplyAsync([id], action, cancellationToken) > 0;
+    }
+
+    /// <inheritdoc />
+    public async Task<CommentReplyResult> ReplyAsync(int id, CommentReplyRequest request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var validation = await replyValidator.ValidateAsync(request, cancellationToken);
+        if (!validation.IsValid)
+        {
+            return new CommentReplyInvalid(validation.ToDictionary().AsReadOnly());
+        }
+
+        var target = await dbContext.Comments.SingleOrDefaultAsync(c => c.Id == id, cancellationToken);
+        if (target is null)
+        {
+            return CommentReplyResult.NotFound;
+        }
+
+        // Threads are one level deep (design 6.5), so answering a reply files the answer under its top-level comment.
+        var topLevel = target.ParentCommentId is { } parentId
+            ? await dbContext.Comments.SingleOrDefaultAsync(c => c.Id == parentId, cancellationToken) ?? target
+            : target;
+
+        // Answering a comment vouches for it (design 8.4): approve it, and its top-level comment, or the reply would
+        // hang under a thread readers can't see.
+        var approving = new[] { topLevel, target }.Distinct().Where(c => c.Status != CommentStatus.Approved).ToList();
+        SetStatus(approving, CommentStatus.Approved);
+
+        var reply = await authorComments.AddAsync(target.PostId, topLevel.Id, request.Body, cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await cacheInvalidator.CommentsChangedAsync([target.PostId]);
+
+        CommentLog.AuthorCommentPosted(logger, reply.Id, reply.PostId, userService.UserId, reply.ParentCommentId);
+
+        var row = await Project(dbContext.Comments.AsNoTracking().Where(c => c.Id == reply.Id)).SingleAsync(cancellationToken);
+        return new CommentReplied(WithPostPath(row), [.. approving.Select(c => c.Id)]);
     }
 
     /// <inheritdoc />

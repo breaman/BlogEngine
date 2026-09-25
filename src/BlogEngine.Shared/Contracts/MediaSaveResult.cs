@@ -50,3 +50,10 @@ public sealed record MediaDeleteNotFound : MediaDeleteResult;
 /// <summary>Nothing was deleted because posts use the item; repeat with <c>force</c> to delete anyway.</summary>
 /// <param name="Posts">The posts that use it.</param>
 public sealed record MediaInUse(IReadOnlyList<MediaUsageDto> Posts) : MediaDeleteResult;
+
+/// <summary>
+/// Progress of making responsive renditions for existing images (<c>/api/admin/media/renditions</c>, design 9.4, T4.19).
+/// </summary>
+/// <param name="Processed">Images given fresh renditions by this call.</param>
+/// <param name="Remaining">Images whose renditions are still missing or out of date.</param>
+public sealed record MediaRenditionProgress(int Processed, int Remaining);

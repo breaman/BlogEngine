@@ -11,4 +11,13 @@ namespace BlogEngine.Shared.Contracts;
 /// <param name="Height">Height of the current version, in pixels.</param>
 /// <param name="Version">Current version, appended as <c>?v=</c>.</param>
 /// <param name="AltText">Library alt text, used when the Markdown gives none.</param>
-public sealed record MediaLookupItem(int Id, string PublicId, string FileName, int Width, int Height, int Version, string AltText);
+/// <param name="RenditionWidths">
+/// Widths of the item's responsive renditions (design 9.4), smallest first, for <c>srcset</c>; empty when it has none
+/// (GIFs, or items the rendition backfill hasn't reached), which renders a plain <c>&lt;img&gt;</c>.
+/// </param>
+public sealed record MediaLookupItem(int Id, string PublicId, string FileName, int Width, int Height, int Version, string AltText,
+    IReadOnlyList<int>? RenditionWidths = null)
+{
+    /// <summary><see cref="RenditionWidths"/>, never <see langword="null"/>.</summary>
+    public IReadOnlyList<int> Renditions => RenditionWidths ?? [];
+}

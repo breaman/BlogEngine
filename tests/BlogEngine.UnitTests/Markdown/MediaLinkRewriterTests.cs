@@ -15,9 +15,12 @@ public class MediaLinkRewriterTests
 
     private static readonly BlogMarkdownPipeline Pipeline = new(new BlogMarkdownOptions { InternalHosts = ["blog.example.com"] });
 
+    private const string LakeId = "lake00000001";
+
     private static readonly MediaLookup Library = new(
     [
-        new MediaLookupItem(1, SunsetId, "sunset.jpg", 1280, 853, 3, "Library alt text")
+        new MediaLookupItem(1, SunsetId, "sunset.jpg", 1280, 853, 3, "Library alt text"),
+        new MediaLookupItem(2, LakeId, "lake.jpg", 2400, 1600, 2, "A lake", [320, 640, 960, 1280, 1920])
     ]);
 
     /// <summary>A standalone library image becomes a figure with its size, version and lazy loading.</summary>
@@ -149,6 +152,53 @@ public class MediaLinkRewriterTests
     public async Task TryParseLibraryUrl_RejectsOthers(string url)
     {
         await Assert.That(new MediaLinkRewriter(["blog.example.com"]).TryParseLibraryUrl(url)).IsNull();
+    }
+
+    /// <summary>
+    /// An image with renditions becomes a picture: WebP and own-format srcsets with the column's sizes, and a 1280 px
+    /// fallback, keeping its natural size for the layout (T4.19).
+    /// </summary>
+    [Test]
+    public Task Published_ImageWithRenditions()
+    {
+        return VerifyPublished($"![A lake](/media/{LakeId}/lake.jpg \"Morning\")");
+    }
+
+    /// <summary>The size hint decides <c>sizes</c>, so a small image asks for a small rendition.</summary>
+    [Test]
+    public async Task Published_ImageWithRenditions_SizesFollowHints()
+    {
+        var small = Pipeline.RenderPost($"![A lake](/media/{LakeId}/lake.jpg){{.img-small}}", Library).Html;
+        var inline = Pipeline.RenderPost($"Tiny ![lake](/media/{LakeId}/lake.jpg){{.img-medium}} inline.", Library).Html;
+
+        await Assert.That(small).Contains($"sizes=\"{MediaLinkRewriter.SizesFor(["img-small"])}\"");
+        await Assert.That(inline).Contains("<picture><source type=\"image/webp\"");
+        await Assert.That(inline).Contains($"sizes=\"{MediaLinkRewriter.SizesFor(["img-medium"])}\"");
+        await Assert.That(inline).Contains("class=\"img-medium\"");
+    }
+
+    /// <summary>Without a rendition at or under 1280 px, the narrowest one is the fallback.</summary>
+    [Test]
+    public async Task Published_ImageWithRenditions_FallbackIsWidestUpTo1280()
+    {
+        var lookup = new MediaLookup([new MediaLookupItem(3, LakeId, "lake.jpg", 1000, 500, 1, "", [320, 640, 960, 1000])]);
+
+        var html = Pipeline.RenderPost($"![x](/media/{LakeId}/lake.jpg)", lookup).Html;
+
+        await Assert.That(html).Contains($"src=\"/media/{LakeId}/lake.jpg?w=1000&amp;v=1\"");
+        await Assert.That(html).Contains("1000w\"");
+    }
+
+    /// <summary>The preview renders renditions the same way as published HTML.</summary>
+    [Test]
+    public async Task Preview_WithRenditions_MatchesPublished()
+    {
+        var markdown = $"![A lake](/media/{LakeId}/lake.jpg)";
+
+        var published = Pipeline.RenderPost(markdown, Library).Html;
+        var preview = Pipeline.RenderPostPreview(markdown, Library).Html;
+
+        await Assert.That(preview.Replace(" data-line=\"0\"", "")).IsEqualTo(published);
     }
 
     private static SettingsTask VerifyPublished(string markdown)

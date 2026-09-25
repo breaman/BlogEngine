@@ -316,6 +316,11 @@ public sealed class ServerPostAdminService(
             entity.PublishedOn = publishOn;
             entity.PublishedDateLocal = BlogTimeZone.ToLocalDate(publishOn, settings.TimeZoneId);
 
+            // "Close comments after N days" is applied at publish time (design 8.5, C7), counted from the publish date,
+            // so a scheduled post gets its full N days once it is live. Changing the setting later leaves published
+            // posts as they are; publishing again recomputes it.
+            entity.CommentsCloseOn = CommentsCloseOn(publishOn, settings.CloseCommentsAfterDays);
+
             await AddPublishRevisionAsync(entity, ct);
             await AddRedirectIfMovedAsync(oldPath, entity, ct);
             MarkModified(entity);
@@ -739,6 +744,7 @@ public sealed class ServerPostAdminService(
             ContentMarkdown = post.ContentMarkdown,
             Tags = [.. post.Tags.Select(t => t.Name).Order(StringComparer.OrdinalIgnoreCase)],
             AllowComments = post.AllowComments,
+            CommentsCloseOn = post.CommentsCloseOn,
             IsFeatured = post.IsFeatured,
             MetaTitle = post.MetaTitle,
             MetaDescription = post.MetaDescription,
@@ -875,6 +881,12 @@ public sealed class ServerPostAdminService(
     {
         var slug = SlugGenerator.Generate(title);
         return slug.Length > 0 ? slug : FallbackSlug;
+    }
+
+    /// <summary>When comments on a post published at <paramref name="publishOn"/> close; <see langword="null"/> for never (0 days).</summary>
+    public static DateTimeOffset? CommentsCloseOn(DateTimeOffset publishOn, int closeAfterDays)
+    {
+        return closeAfterDays > 0 ? publishOn.AddDays(closeAfterDays) : null;
     }
 
     private static string? NullIfBlank(string? value)

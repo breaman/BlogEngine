@@ -288,6 +288,10 @@ else
                             <InputCheckbox id="post-allow-comments" class="form-check-input" role="switch"
                                            @bind-Value="Post.AllowComments" @bind-Value:after="OnEditedAsync" />
                             <label class="form-check-label" for="post-allow-comments">Allow comments</label>
+                            @if (CommentsCloseText is { } closeText)
+                            {
+                                <div class="form-text mt-0">@closeText</div>
+                            }
                         </div>
                         <div class="form-check form-switch">
                             <InputCheckbox id="post-featured" class="form-check-input" role="switch"

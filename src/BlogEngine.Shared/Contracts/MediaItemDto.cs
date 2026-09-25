@@ -50,6 +50,9 @@ public sealed class MediaItemDto
     /// <summary>Number of posts (including posts in the trash) that use the item.</summary>
     public int UsageCount { get; set; }
 
+    /// <summary>Widths of the responsive renditions of the current version (design 9.4), smallest first.</summary>
+    public List<int> RenditionWidths { get; set; } = [];
+
     /// <summary>The posts that use the item; filled when a single item is loaded, empty in lists.</summary>
     public List<MediaUsageDto> UsedIn { get; set; } = [];
 }
