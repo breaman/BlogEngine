@@ -528,32 +528,33 @@ public partial class PostEditor : ComponentBase, IAsyncDisposable
     }
 
     /// <summary>
-    /// Opens the schedule picker at the current scheduled time, or at the start of the next hour, in the blog's time
-    /// zone.
+    /// Opens the date picker at the post's current date when it is scheduled or live, or at the start of the next hour,
+    /// in the blog's time zone.
     /// </summary>
     private void OpenSchedule()
     {
         _scheduleError = null;
         if (_timeZoneId is null)
         {
-            _scheduleError = "The blog's time zone couldn't be loaded, so posts can't be scheduled right now. Reload the page and try again.";
+            _scheduleError = "The blog's time zone couldn't be loaded, so the publish date can't be set right now. Reload the page and try again.";
             _showSchedule = true;
             return;
         }
 
         try
         {
-            var start = IsScheduled
+            var hasDate = IsScheduled || IsLive;
+            var start = hasDate
                 ? Post!.PublishedOn!.Value
                 : TimeProvider.GetUtcNow().AddHours(1);
             var local = BlogTimeZone.ToLocalDateTime(start, _timeZoneId);
-            var initial = IsScheduled ? local : local.Date.AddHours(local.Hour);
+            var initial = hasDate ? local : local.Date.AddHours(local.Hour);
             _scheduleText = initial.ToString(ScheduleInputFormats[0], CultureInfo.InvariantCulture);
             _showSchedule = true;
         }
         catch (TimeZoneNotFoundException)
         {
-            _scheduleError = $"The time zone '{_timeZoneId}' isn't available in this browser, so posts can't be scheduled here.";
+            _scheduleError = $"The time zone '{_timeZoneId}' isn't available in this browser, so the publish date can't be set here.";
             _showSchedule = true;
         }
     }
@@ -575,8 +576,45 @@ public partial class PostEditor : ComponentBase, IAsyncDisposable
     }
 
     /// <summary>
+    /// The date picker's submit button, named for what the picked time will do: a future time schedules the post, and a
+    /// past one publishes it backdated or, on a live post, changes its date. Falls back to "Set date" while the value
+    /// can't be read, and <see cref="ScheduleAsync"/> then reports why.
+    /// </summary>
+    private string ScheduleButtonText
+    {
+        get
+        {
+            if (_timeZoneId is null
+                || !DateTime.TryParseExact(_scheduleText, ScheduleInputFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out var local))
+            {
+                return "Set date";
+            }
+
+            DateTimeOffset picked;
+            try
+            {
+                picked = BlogTimeZone.FromLocalDateTime(local, _timeZoneId);
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                return "Set date";
+            }
+
+            return (picked > TimeProvider.GetUtcNow(), IsScheduled, IsLive) switch
+            {
+                (true, true, _) => "Reschedule",
+                (true, false, _) => "Schedule",
+                (false, _, true) => "Change date",
+                (false, _, false) => "Publish"
+            };
+        }
+    }
+
+    /// <summary>
     /// Saves the editor and publishes the post at the picked time (design 6.3, A9). The time is read in the blog's time
-    /// zone, whatever the browser's own zone is, and must be in the future; to publish now there is <b>Publish now</b>.
+    /// zone, whatever the browser's own zone is. A future time schedules the post; a past one publishes it backdated,
+    /// which is how posts imported from another blog keep their original date. On a live post this re-dates it, and the
+    /// server redirects the old URL when the date in it changes.
     /// </summary>
     private async Task ScheduleAsync()
     {
@@ -595,13 +633,7 @@ public partial class PostEditor : ComponentBase, IAsyncDisposable
         }
         catch (TimeZoneNotFoundException)
         {
-            _scheduleError = $"The time zone '{_timeZoneId}' isn't available in this browser, so posts can't be scheduled here.";
-            return;
-        }
-
-        if (publishOn <= TimeProvider.GetUtcNow())
-        {
-            _scheduleError = "Choose a time in the future, or use Publish now.";
+            _scheduleError = $"The time zone '{_timeZoneId}' isn't available in this browser, so the publish date can't be set here.";
             return;
         }
 
@@ -783,8 +815,12 @@ public partial class PostEditor : ComponentBase, IAsyncDisposable
             case SaveKind.Publish:
                 Toasts.ShowSuccess("Your post is live.", "Published");
                 break;
-            case SaveKind.Schedule:
+            case SaveKind.Schedule when IsScheduled:
                 Toasts.ShowSuccess($"Your post will be published on {ScheduledText}.", "Scheduled");
+                break;
+            case SaveKind.Schedule:
+                // A past date: the post is live, backdated to the picked time.
+                Toasts.ShowSuccess($"Your post is live, dated {ScheduledText}.", "Published");
                 break;
             case SaveKind.Update:
                 Toasts.ShowSuccess("Your changes are live.", "Updated");
@@ -1332,7 +1368,10 @@ public partial class PostEditor : ComponentBase, IAsyncDisposable
         /// <summary>Saves, then publishes now.</summary>
         Publish,
 
-        /// <summary>Saves, then publishes at the time picked in the schedule picker (design 6.3, A9).</summary>
+        /// <summary>
+        /// Saves, then publishes at the time picked in the date picker (design 6.3, A9): a future time schedules the
+        /// post, a past one backdates it.
+        /// </summary>
         Schedule
     }
 

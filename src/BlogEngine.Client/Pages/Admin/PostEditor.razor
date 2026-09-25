@@ -89,7 +89,7 @@ else
             </div>
 
             <aside class="col-12 col-xl-3" aria-label="Post settings">
-                @* Publishing: publish now, schedule (design 6.3, 10.2, A9), update, unpublish or unschedule. *@
+                @* Publishing: publish now, schedule or backdate (design 6.3, 10.2, A9), update, unpublish or unschedule. *@
                 <section class="card mb-3" aria-labelledby="post-publish-heading">
                     <div class="card-header d-flex align-items-center">
                         <h2 class="h6 mb-0" id="post-publish-heading">Publish</h2>
@@ -140,10 +140,17 @@ else
                                 {
                                     <div class="text-danger small mt-1" role="alert">@_scheduleError</div>
                                 }
-                                <div class="form-text">In the blog's time zone, whatever this computer's time zone is.</div>
+                                <div class="form-text">
+                                    In the blog's time zone, whatever this computer's time zone is. A future date schedules the post;
+                                    a past date publishes it backdated, for example when moving posts from another blog.
+                                    @if (IsLive)
+                                    {
+                                        <text>If the date in the URL changes, the old URL redirects to the new one.</text>
+                                    }
+                                </div>
                                 <div class="d-flex gap-2 mt-2">
                                     <button type="button" class="btn btn-sm btn-primary flex-fill" disabled="@(!CanAct || _timeZoneId is null)" @onclick="ScheduleAsync">
-                                        <span class="bi bi-calendar-check me-1" aria-hidden="true"></span> @(IsScheduled ? "Reschedule" : "Schedule")
+                                        <span class="bi bi-calendar-check me-1" aria-hidden="true"></span> @ScheduleButtonText
                                     </button>
                                     <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="CancelSchedule">Cancel</button>
                                 </div>
@@ -176,6 +183,12 @@ else
                                 <button type="button" class="btn btn-primary" disabled="@(!CanAct)" @onclick="UpdateAsync">
                                     <span class="bi bi-cloud-upload me-1" aria-hidden="true"></span> Update
                                 </button>
+                                @if (!_showSchedule)
+                                {
+                                    <button type="button" class="btn btn-outline-secondary" disabled="@(!CanAct)" @onclick="OpenSchedule">
+                                        <span class="bi bi-calendar me-1" aria-hidden="true"></span> Change date…
+                                    </button>
+                                }
                                 <div class="d-flex gap-2">
                                     @if (Post.PublicPath is { } path)
                                     {
@@ -197,7 +210,7 @@ else
                                     @if (!_showSchedule)
                                     {
                                         <button type="button" class="btn btn-outline-secondary flex-fill" disabled="@(!CanAct)" @onclick="OpenSchedule">
-                                            <span class="bi bi-calendar me-1" aria-hidden="true"></span> Schedule…
+                                            <span class="bi bi-calendar me-1" aria-hidden="true"></span> Set date…
                                         </button>
                                     }
                                     <button type="button" class="btn btn-outline-secondary flex-fill" disabled="@(!CanAct)" @onclick="SaveDraftAsync">
