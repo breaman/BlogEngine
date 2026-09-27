@@ -1,0 +1,149 @@
+name: CI / CD
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+
+jobs:
+  build:
+    name: Build & Package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      # ── .NET ──────────────────────────────────────────────────────────────
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # ── Node / npm ────────────────────────────────────────────────────────
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: src/BlogEngine.Server/package.json
+
+      - name: Restore npm packages
+        working-directory: src/BlogEngine.Server
+        run: npm install
+
+      # ── .NET restore & SASS ───────────────────────────────────────────────
+      # Restore the full solution without a RID so the Blazor WASM client
+      # project restores correctly (Mono win-x86 packages don't exist).
+      - name: Restore .NET dependencies
+        run: dotnet restore
+
+      # Compile SASS to production-minified CSS before the dotnet build so
+      # the output is included in the published artefact automatically.
+      - name: Compile SASS (production)
+        working-directory: src/BlogEngine.Server
+        run: npm run sass-prod
+
+      # ── Build & Publish ───────────────────────────────────────────────────
+      # Build the whole solution without a RID so the WASM client compiles
+      # correctly for browser-wasm.
+      - name: Build solution
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Publish web application
+        run: >
+          dotnet publish src/BlogEngine.Server/BlogEngine.Server.csproj
+          -r win-x86
+          --self-contained
+          --configuration Release
+          --output ${{ github.workspace }}/artifacts/app
+
+      # ── EF Migrations Bundle ──────────────────────────────────────────────
+      # Restore local .NET tools declared in .config/dotnet-tools.json
+      # (includes dotnet-ef) so no global installation is required.
+      # building again before creating the bundle ensures the latest code changes are included in the bundle's assembly.
+      - name: Build solution
+        run: dotnet build --configuration Release --no-restore
+        
+      - name: Restore .NET local tools
+        run: dotnet tool restore
+
+      - name: Create EF migrations bundle
+        run: >
+          dotnet tool run dotnet-ef migrations bundle
+          --startup-project src/BlogEngine.Server/BlogEngine.Server.csproj
+          --project src/BlogEngine.Data/BlogEngine.Data.csproj
+          --configuration Release
+          --output ${{ github.workspace }}/artifacts/efbundle
+          --self-contained
+          --force
+
+      # ── Upload artifacts ──────────────────────────────────────────────────
+      - name: Upload application artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app
+          path: ${{ github.workspace }}/artifacts/app
+          retention-days: 7
+
+      - name: Upload EF bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: efbundle
+          path: ${{ github.workspace }}/artifacts/efbundle
+          retention-days: 7
+
+  # ── Deployment ─────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build
+    # Protect this job with a GitHub environment so deployments require
+    # manual approval and secrets are scoped to production only.
+    # Required secrets:
+    #   DATABASE_CONNECTION_STRING  – full ADO.NET connection string for the
+    #                                 remote SQL Server database
+    #   FTP_SERVER                  – hostname or IP of the FTP server
+    #   FTP_USERNAME                – FTP account username
+    #   FTP_PASSWORD                – FTP account password
+    #   FTP_SERVER_DIR              – remote directory path, e.g. /wwwroot/
+    environment: production
+
+    steps:
+      - name: Download application artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: app
+          path: ./artifacts/app
+
+      - name: Download EF bundle artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: efbundle
+          path: ./artifacts/efbundle
+
+      # The bundle is a compiled Linux binary when built on ubuntu-latest.
+      - name: Make EF bundle executable
+        run: chmod +x ./artifacts/efbundle/efbundle
+
+      # Run pending migrations against the remote database before swapping
+      # the application files so the schema is always updated first.
+      - name: Apply EF migrations
+        run: ./artifacts/efbundle/efbundle --connection "${{ secrets.DATABASE_CONNECTION_STRING }}"
+
+      # Deploy published application files to the FTP server.
+      - name: Deploy via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ vars.FTP_SERVER }}
+          username: ${{ vars.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ./artifacts/app/
+          server-dir: ${{ vars.FTP_SERVER_DIR }}
+ 
