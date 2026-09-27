@@ -13,7 +13,6 @@ using FluentValidation;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Routing;
-using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 
 namespace BlogEngine.Client.Pages.Admin;

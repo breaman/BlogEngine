@@ -1,7 +1,7 @@
+using BlogEngine.Shared.Services;
+
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
-
-using BlogEngine.Shared.Services;
 
 namespace BlogEngine.Client.Components;
 
@@ -9,7 +9,7 @@ public partial class ToastContainer : ComponentBase, IDisposable
 {
     [Inject] private IToastService ToastService { get; set; } = default!;
     [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
-    
+
     private readonly List<ToastMessage> _toasts = [];
     private readonly Queue<Guid> _pendingShow = new();
 
@@ -50,10 +50,10 @@ public partial class ToastContainer : ComponentBase, IDisposable
     private static string GetBootstrapClass(ToastType type) => type switch
     {
         ToastType.Success => "success",
-        ToastType.Error   => "danger",
+        ToastType.Error => "danger",
         ToastType.Warning => "warning",
-        ToastType.Info    => "info",
-        _                 => "secondary"
+        ToastType.Info => "info",
+        _ => "secondary"
     };
 
     public void Dispose()

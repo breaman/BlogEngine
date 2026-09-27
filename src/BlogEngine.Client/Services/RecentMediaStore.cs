@@ -2,7 +2,6 @@ using System.Text.Json;
 
 using BlogEngine.Shared.Contracts;
 
-using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 
 namespace BlogEngine.Client.Services;

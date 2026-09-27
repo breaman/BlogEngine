@@ -266,8 +266,8 @@ public sealed class ServerTagService(
     {
         var uses = (postCount, trashedCount) switch
         {
-            (> 0, > 0) => $"{Posts(postCount)} and {Posts(trashedCount)} in the trash",
-            (> 0, _) => Posts(postCount),
+            ( > 0, > 0) => $"{Posts(postCount)} and {Posts(trashedCount)} in the trash",
+            ( > 0, _) => Posts(postCount),
             _ => $"{Posts(trashedCount)} in the trash"
         };
 

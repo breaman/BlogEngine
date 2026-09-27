@@ -1,11 +1,9 @@
-using BlogEngine.Shared.Common;
 using BlogEngine.Shared.Contracts;
 using BlogEngine.Shared.Services;
 using BlogEngine.Shared.Validation;
 
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
-using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 
 namespace BlogEngine.Client.Components;

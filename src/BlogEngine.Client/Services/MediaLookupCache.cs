@@ -2,8 +2,6 @@ using BlogEngine.Shared.Contracts;
 using BlogEngine.Shared.Markdown;
 using BlogEngine.Shared.Services;
 
-using Microsoft.Extensions.Logging;
-
 namespace BlogEngine.Client.Services;
 
 /// <summary>

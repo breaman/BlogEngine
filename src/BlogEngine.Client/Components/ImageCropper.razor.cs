@@ -2,7 +2,6 @@ using BlogEngine.Shared.Contracts;
 using BlogEngine.Shared.Media;
 
 using Microsoft.AspNetCore.Components;
-using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 
 namespace BlogEngine.Client.Components;

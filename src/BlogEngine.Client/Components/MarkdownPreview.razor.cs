@@ -2,7 +2,6 @@ using BlogEngine.Client.Services;
 using BlogEngine.Shared.Markdown;
 
 using Microsoft.AspNetCore.Components;
-using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 
 namespace BlogEngine.Client.Components;

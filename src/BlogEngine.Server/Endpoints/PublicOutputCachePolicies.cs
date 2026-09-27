@@ -1,7 +1,5 @@
 using BlogEngine.Server.Services.Public;
 
-using Microsoft.AspNetCore.OutputCaching;
-
 namespace BlogEngine.Server.Endpoints;
 
 /// <summary>

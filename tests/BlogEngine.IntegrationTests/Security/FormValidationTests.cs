@@ -5,8 +5,6 @@ using BlogEngine.Server.Components;
 
 using FluentValidation;
 
-using Microsoft.Extensions.DependencyInjection;
-
 namespace BlogEngine.IntegrationTests.Security;
 
 /// <summary>

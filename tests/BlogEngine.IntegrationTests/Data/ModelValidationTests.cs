@@ -2,7 +2,6 @@ using BlogEngine.Data.Models;
 using BlogEngine.IntegrationTests.Infrastructure;
 
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace BlogEngine.IntegrationTests.Data;

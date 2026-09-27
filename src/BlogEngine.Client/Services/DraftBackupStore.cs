@@ -1,6 +1,5 @@
 using System.Text.Json;
 
-using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 
 namespace BlogEngine.Client.Services;

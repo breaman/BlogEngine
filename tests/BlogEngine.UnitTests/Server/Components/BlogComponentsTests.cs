@@ -72,7 +72,8 @@ public class BlogComponentsTests
     {
         await using var context = new BunitContext();
         var post = PublicTestData.Post(5, new DateOnly(2026, 9, 2), new PublicTagLink(1, "C#", "csharp"), new PublicTagLink(2, ".NET", "dotnet"))
-            with { IsFeatured = true };
+            with
+        { IsFeatured = true };
 
         var cut = context.Render<PostCard>(p => p.Add(x => x.Post, post).Add(x => x.DateFormat, "d MMM yyyy").Add(x => x.ShowFeatured, true));
 
